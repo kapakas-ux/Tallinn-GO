@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-surface: #fcf9f5;
+  --color-on-surface: #1c1c1a;
+  --color-primary: #003571;
+  --color-primary-container: #004b9b;
+  --color-on-primary-container: #9dbeff;
+  --color-secondary: #5f5e5e;
+  --color-surface-container-low: #f6f3ef;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-high: #ebe8e4;
+  --color-surface-container-highest: #e5e2de;
+  --color-outline-variant: #c2c6d3;
+  --color-tertiary: #363636;
+  --color-on-tertiary: #ffffff;
+  --color-error: #ba1a1a;
+  --color-primary-fixed: #d7e2ff;
+  --color-on-primary-fixed-variant: #00458f;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-body;
+  }
+}
+
+.editorial-shadow {
+  box-shadow: 0 24px 48px -12px rgba(28, 28, 26, 0.06);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* MapLibre Popup Custom Styling */
+.maplibregl-popup-close-button {
+  font-size: 28px !important;
+  color: #ba1a1a !important;
+  font-weight: 900 !important;
+  padding: 8px !important;
+  right: 2px !important;
+  top: 2px !important;
+  transition: all 0.2s ease;
+  border-radius: 8px !important;
+  line-height: 1 !important;
+  width: 40px !important;
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  outline: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.maplibregl-popup-close-button:hover {
+  background-color: rgba(186, 26, 26, 0.15) !important;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(186, 26, 26, 0.2) !important;
+}
+
+.maplibregl-popup-content {
+  border-radius: 16px !important;
+  padding: 0 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: #ffffff !important;
+  border-bottom-color: #ffffff !important;
+}

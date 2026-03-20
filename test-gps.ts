@@ -1,0 +1,13 @@
+import https from 'https';
+
+https.get('https://transport.tallinn.ee/gps.txt', (res) => {
+  let data = '';
+  res.on('data', (chunk) => {
+    data += chunk;
+  });
+  res.on('end', () => {
+    console.log("GPS:", data.substring(0, 500));
+  });
+}).on('error', (e) => {
+  console.error(e);
+});

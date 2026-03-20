@@ -1,0 +1,7 @@
+{
+  "name": "Tallinn GO",
+  "description": "Real-time municipal transit companion for Tallinn, featuring live arrivals, route planning, and stop discovery.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
