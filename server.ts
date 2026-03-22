@@ -2,14 +2,50 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import axios from "axios";
+import cors from "cors";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Enable CORS for native app access
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow all origins
+      callback(null, true);
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+  }));
+
+  // Manual fallback for CORS headers to ensure they are always present
+  app.use((req, res, next) => {
+    const origin = req.headers.origin || '*';
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${origin}`);
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+    next();
+  });
+
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", time: new Date().toISOString(), env: process.env.NODE_ENV });
+  });
+
   // Proxy for Tallinn transport data
   app.get("/api/transport/stops", async (req, res) => {
-    console.log("Fetching stops from Tallinn API...");
+    console.log("GET /api/transport/stops - Fetching from Tallinn...");
     const urls = [
       "https://transport.tallinn.ee/data/stops.txt"
     ];

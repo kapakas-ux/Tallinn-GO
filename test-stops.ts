@@ -1,0 +1,1 @@
+global.window = { location: { origin: 'http://localhost' } as any } as any; import { fetchStops } from './src/services/transportService'; fetchStops().then(stops => { console.log(stops.find(x => x.id === '4132' || x.siriId === '4132' || x.id === '00299-1')); });

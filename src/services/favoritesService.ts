@@ -46,3 +46,10 @@ export const toggleFavorite = (stop: Stop): Stop[] => {
     return addFavorite(stop);
   }
 };
+
+export const updateFavorite = (stopId: string, updates: Partial<Pick<Stop, 'customName' | 'emoji'>>): Stop[] => {
+  const favorites = getFavorites();
+  const newFavorites = favorites.map(f => f.id === stopId ? { ...f, ...updates } : f);
+  saveFavorites(newFavorites);
+  return newFavorites;
+};

@@ -4,10 +4,11 @@ import { Menu, X } from 'lucide-react';
 export const TopBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
 
   return (
     <>
-      <header className="w-full top-0 sticky z-50 bg-primary dark:bg-slate-950 shadow-md">
+      <header className="w-full top-0 sticky z-50 bg-primary dark:bg-slate-950 shadow-md pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-6 py-4 w-full relative">
           <div className="flex items-center gap-4">
             <button 
@@ -16,44 +17,64 @@ export const TopBar = () => {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <h1 className="font-headline font-black italic text-2xl tracking-tight">
-              <span className="text-white">Tallinn</span> <span className="text-amber-400">GO</span>
-            </h1>
+            <img 
+              src="/logo.png" 
+              alt="Tallinn GO" 
+              className="h-7 object-contain"
+            />
           </div>
 
           {/* Dropdown Menu */}
           {isMenuOpen && (
-            <div className="absolute top-full left-6 mt-2 w-48 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 overflow-hidden z-50">
-              <button
-                onClick={() => {
-                  setIsTermsOpen(true);
-                  setIsMenuOpen(false);
-                }}
-                className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
-              >
-                Terms & Conditions
-              </button>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setIsMenuOpen(false);
-                  // TODO: Link to payment platform
-                  alert("Payment platform integration coming soon!");
-                }}
-                className="block w-full text-left px-4 py-3 text-sm font-headline font-bold text-amber-500 hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
-              >
-                ☕ Buy me a coffee
-              </a>
-            </div>
+            <>
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setIsMenuOpen(false)}
+              />
+              <div className="absolute top-full left-6 mt-2 w-48 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 overflow-hidden z-50">
+                <button
+                  onClick={() => {
+                    setIsTermsOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
+                >
+                  Terms & Conditions
+                </button>
+                <button
+                  onClick={() => {
+                    setIsPrivacyOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                >
+                  Privacy Policy
+                </button>
+                <a
+                  href="https://ko-fi.com/tallinngo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block w-full text-left px-4 py-3 text-sm font-headline font-bold text-amber-500 hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                >
+                  ☕ Buy me a coffee
+                </a>
+              </div>
+            </>
           )}
         </div>
       </header>
 
       {/* Terms & Conditions Modal */}
       {isTermsOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setIsTermsOpen(false)}
+        >
+          <div 
+            className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
               <h2 className="font-headline font-black text-2xl text-primary">Terms & Conditions</h2>
               <button 
@@ -108,7 +129,7 @@ export const TopBar = () => {
 
               <div>
                 <h3 className="font-bold text-primary mb-1">9. Contact Information</h3>
-                <p>For any questions regarding these Terms, please contact us via tallinngo@gmail.com</p>
+                <p>For any questions regarding these Terms, please contact us via tallinngoapp@gmail.com</p>
               </div>
             </div>
             <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">
@@ -117,6 +138,64 @@ export const TopBar = () => {
                 className="w-full py-3 bg-primary text-white rounded-xl font-bold font-headline hover:bg-primary/90 transition-colors"
               >
                 I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Privacy Policy Modal */}
+      {isPrivacyOpen && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setIsPrivacyOpen(false)}
+        >
+          <div 
+            className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
+              <h2 className="font-headline font-black text-2xl text-primary">Privacy Policy</h2>
+              <button 
+                onClick={() => setIsPrivacyOpen(false)}
+                className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-secondary"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto font-sans text-sm text-on-surface-variant space-y-4">
+              <p>Tallinn GO ("we," "our," or "us") respects your privacy. This Privacy Policy explains how we handle your information when you use our app.</p>
+              
+              <div>
+                <h3 className="font-bold text-primary mb-1">Information We Collect</h3>
+                <p>We request permission to access your device's location solely to provide real-time features within the app, such as navigation or nearby points of interest in Tallinn. We do not collect, store, or share any personal data, including location history, device identifiers, or usage logs.</p>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-primary mb-1">How We Use Information</h3>
+                <p>Location access is used only during active app sessions for core functionality. No data is retained after you close the app, and we do not track you across sessions or devices.</p>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-primary mb-1">No Data Sharing or Storage</h3>
+                <p>We do not sell, share, or disclose any information to third parties. No user data is saved on our servers or elsewhere.</p>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-primary mb-1">Changes to This Policy</h3>
+                <p>We may update this policy. Continued use of the app after changes means you accept them. Check this page periodically.</p>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-primary mb-1">Contact Us</h3>
+                <p>Questions? Email to us at tallinngoapp@gmail.com.</p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">
+              <button 
+                onClick={() => setIsPrivacyOpen(false)}
+                className="w-full py-3 bg-primary text-white rounded-xl font-bold font-headline hover:bg-primary/90 transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

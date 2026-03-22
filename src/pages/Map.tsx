@@ -1,12 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { useLocation } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes } from '../services/transportService';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
+import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
 import { Stop, Arrival, Vehicle } from '../types';
-import { Bus, Loader2, Navigation } from 'lucide-react';
+import { Bus, Loader2, Navigation, Footprints } from 'lucide-react';
+import { getDistance } from '../lib/geo';
+import { formatDistance, formatWalkingTime } from '../lib/utils';
 
-const TALLINN_CENTER: [number, number] = [24.7535, 59.437]; // [lng, lat]
+const TALLINN_CENTER: [number, number] = [TALLINN_CENTER_COORD.lng, TALLINN_CENTER_COORD.lat]; // [lng, lat]
 
 const isValidLngLat = (lng: number, lat: number) => {
   return !isNaN(lng) && !isNaN(lat) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
@@ -14,19 +19,24 @@ const isValidLngLat = (lng: number, lat: number) => {
 
 export const Map = () => {
   console.log('Map component rendering');
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<maplibregl.Map | null>(null);
-  const markers = useRef<maplibregl.Marker[]>([]);
-  const vehicleMarkers = useRef<{ [id: string]: maplibregl.Marker }>({});
-  const currentPopup = useRef<maplibregl.Popup | null>(null);
+  const location = useLocation();
+  const mapContainer = useRef(null as HTMLDivElement | null);
+  const map = useRef(null as maplibregl.Map | null);
+  const markers = useRef([] as maplibregl.Marker[]);
+  const vehicleMarkers = useRef({} as { [id: string]: maplibregl.Marker });
+  const userMarker = useRef(null as maplibregl.Marker | null);
+  const currentPopup = useRef(null as maplibregl.Popup | null);
   const [loadingDepartures, setLoadingDepartures] = useState(false);
+  const [userLocation, setUserLocation] = useState(null as [number, number] | null);
+  const [locationError, setLocationError] = useState(null as string | null);
 
-  const [stops, setStops] = useState<Stop[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [stops, setStops] = useState([] as Stop[]);
+  const [vehicles, setVehicles] = useState([] as Vehicle[]);
   const [styleLoadCount, setStyleLoadCount] = useState(0);
 
   useEffect(() => {
     console.log('Map component mounted');
+    
     fetchStops().then(data => {
       console.log(`Fetched ${data.length} stops`);
       setStops(data);
@@ -39,7 +49,9 @@ export const Map = () => {
     const loadVehicles = () => {
       fetchVehicles().then(data => {
         setVehicles(data);
-      }).catch(err => console.error('Error fetching vehicles:', err));
+      }).catch(err => {
+        console.error('Error fetching vehicles:', err);
+      });
     };
 
     loadVehicles();
@@ -48,16 +60,65 @@ export const Map = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Geolocation tracking
+  useEffect(() => {
+    const cleanup = watchLocation((location) => {
+      setUserLocation([location.lng, location.lat]);
+      setLocationError(null);
+    });
+
+    return cleanup;
+  }, []);
+
+  // Update user marker
+  useEffect(() => {
+    if (!map.current || !userLocation || styleLoadCount === 0) return;
+    
+    // Don't show marker at 0,0 (likely invalid/unlocked GPS)
+    if (Math.abs(userLocation[0]) < 0.1 && Math.abs(userLocation[1]) < 0.1) {
+      if (userMarker.current) {
+        userMarker.current.remove();
+        userMarker.current = null;
+      }
+      return;
+    }
+
+    if (!userMarker.current) {
+      const el = document.createElement('div');
+      el.className = 'relative flex items-center justify-center w-10 h-10';
+      el.innerHTML = `
+        <div class="absolute w-full h-full bg-blue-500 rounded-full opacity-20 animate-ping"></div>
+        <div class="relative w-5 h-5 bg-blue-600 rounded-full border-2 border-white shadow-lg"></div>
+      `;
+
+      userMarker.current = new maplibregl.Marker({ element: el })
+        .setLngLat(userLocation)
+        .addTo(map.current);
+    } else {
+      userMarker.current.setLngLat(userLocation);
+    }
+  }, [userLocation, styleLoadCount]);
+
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
     
     console.log('Initializing map instance...');
     try {
+      const searchParams = new URLSearchParams(location.search);
+      const latParam = searchParams.get('lat');
+      const lngParam = searchParams.get('lng');
+      const zoomParam = searchParams.get('zoom');
+
+      const initialCenter: [number, number] = latParam && lngParam 
+        ? [parseFloat(lngParam), parseFloat(latParam)] 
+        : TALLINN_CENTER;
+      const initialZoom = zoomParam ? parseFloat(zoomParam) : 13;
+
       map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: 'https://tiles.openfreemap.org/styles/bright',
-        center: TALLINN_CENTER,
-        zoom: 13,
+        center: initialCenter,
+        zoom: initialZoom,
         attributionControl: false
       });
 
@@ -70,6 +131,43 @@ export const Map = () => {
       map.current.on('load', () => {
         console.log('Map "load" event fired (count:', styleLoadCount + 1, ')');
         setStyleLoadCount(prev => prev + 1);
+
+        // Hide native bus stops to prevent clutter
+        if (map.current) {
+          const layers = map.current.getStyle().layers;
+          if (layers) {
+            layers.forEach(layer => {
+              if (layer.id.startsWith('poi_')) {
+                if (layer.id === 'poi_transit') {
+                  map.current.setFilter(layer.id, ['match', ['get', 'class'], ['airport', 'rail'], true, false]);
+                } else {
+                  const currentFilter = map.current.getFilter(layer.id);
+                  if (currentFilter) {
+                    map.current.setFilter(layer.id, ['all', currentFilter, ['!=', ['get', 'class'], 'bus']]);
+                  } else {
+                    map.current.setFilter(layer.id, ['!=', ['get', 'class'], 'bus']);
+                  }
+                }
+              }
+            });
+          }
+        }
+      });
+
+      map.current.on('zoom', () => {
+        const currentZoom = map.current?.getZoom() || 0;
+        const visible = currentZoom >= 13;
+        Object.values(vehicleMarkers.current).forEach((marker: maplibregl.Marker) => {
+          marker.getElement().style.display = visible ? 'block' : 'none';
+        });
+      });
+
+      map.current.on('move', () => {
+        const currentZoom = map.current?.getZoom() || 0;
+        const visible = currentZoom >= 13;
+        Object.values(vehicleMarkers.current).forEach((marker: maplibregl.Marker) => {
+          marker.getElement().style.display = visible ? 'block' : 'none';
+        });
       });
 
     } catch (err) {
@@ -105,37 +203,47 @@ export const Map = () => {
         // Update existing
         vehicleMarkers.current[vehicle.id].setLngLat([vehicle.lng, vehicle.lat]);
         const el = vehicleMarkers.current[vehicle.id].getElement();
+        
+        const currentZoom = map.current?.getZoom() || 0;
+        const visible = currentZoom >= 13;
+        el.style.display = visible ? 'block' : 'none';
+
         const icon = el.querySelector('.vehicle-icon') as HTMLElement;
         if (icon) {
           icon.style.transform = `rotate(${vehicle.bearing}deg)`;
         }
         const label = el.querySelector('.vehicle-label') as HTMLElement;
         if (label) {
-          label.textContent = vehicle.line;
+          label.textContent = vehicle.destination ? `${vehicle.line} ${vehicle.destination}` : vehicle.line;
         }
       } else {
         // Create new
         const el = document.createElement('div');
-        el.className = 'flex flex-col items-center justify-center pointer-events-none';
+        el.className = 'pointer-events-none';
         
-        let bgColor = 'bg-blue-500';
-        if (vehicle.type === 'tram') bgColor = 'bg-orange-500';
-        if (vehicle.type === 'trolley') bgColor = 'bg-green-500';
+        const bgColor = vehicle.type === 'tram' ? 'bg-tram' : vehicle.type === 'trolley' ? 'bg-trolley' : 'bg-bus';
+        const labelText = vehicle.destination ? `${vehicle.line} ${vehicle.destination}` : vehicle.line;
 
         el.innerHTML = `
-          <div class="vehicle-label text-[10px] font-bold text-white ${bgColor} px-1.5 py-0.5 rounded-sm shadow-sm mb-0.5">
-            ${vehicle.line}
-          </div>
-          <div class="vehicle-icon w-6 h-6 ${bgColor} rounded-full flex items-center justify-center shadow-md border-2 border-white transition-transform duration-1000" style="transform: rotate(${vehicle.bearing}deg)">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-            </svg>
+          <div class="relative w-5 h-5 flex items-center justify-center">
+            <div class="vehicle-label absolute bottom-full mb-1 text-[8px] font-bold text-white ${bgColor} opacity-80 px-1 py-0.5 rounded-sm shadow-sm whitespace-nowrap">
+              ${labelText}
+            </div>
+            <div class="vehicle-icon w-5 h-5 ${bgColor} rounded-full flex items-center justify-center shadow-sm border border-white transition-transform duration-1000" style="transform: rotate(${vehicle.bearing}deg)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+              </svg>
+            </div>
           </div>
         `;
 
-        const marker = new maplibregl.Marker({ element: el })
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([vehicle.lng, vehicle.lat])
           .addTo(map.current!);
+          
+        const currentZoom = map.current?.getZoom() || 0;
+        const visible = currentZoom >= 13;
+        el.style.display = visible ? 'block' : 'none';
           
         vehicleMarkers.current[vehicle.id] = marker;
       }
@@ -157,7 +265,7 @@ export const Map = () => {
     markers.current = [];
 
     // Filter valid stops for GeoJSON and handle exact coordinate overlaps
-    const coordMap: Record<string, number> = {};
+    const coordMap: { [key: string]: number } = {};
     const validStops = stops.filter(s => isValidLngLat(s.lng, s.lat)).map(stop => {
       // Use a precise key for grouping identical stops
       const key = `${stop.lat.toFixed(6)},${stop.lng.toFixed(6)}`;
@@ -224,13 +332,13 @@ export const Map = () => {
               'interpolate',
               ['linear'],
               ['zoom'],
-              13, 2,
-              16, 6
+              13, 4,
+              16, 10
             ],
             'circle-color': '#ff4444',
-            'circle-stroke-width': 1,
+            'circle-stroke-width': 2,
             'circle-stroke-color': '#ffffff',
-            'circle-opacity': 0.8
+            'circle-opacity': 0.9
           }
         });
       }
@@ -315,7 +423,7 @@ export const Map = () => {
         departures = await fetchDepartures(id, siriId);
       } catch (err: any) {
         console.error('Error in handleStopClick:', err);
-        errorMsg = err.message || 'Failed to fetch departures';
+        errorMsg = err.message || 'No live data';
       }
       setLoadingDepartures(false);
 
@@ -329,7 +437,7 @@ export const Map = () => {
         departuresHtml = departures.map(d => `
             <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0">
               <div class="flex items-center gap-3">
-                <div class="bg-tertiary text-white w-8 h-8 rounded-full flex items-center justify-center font-label font-bold text-xs">
+                <div class="${d.type === 'tram' ? 'bg-tram' : d.type === 'trolley' ? 'bg-trolley' : 'bg-bus'} text-white w-8 h-8 rounded-full flex items-center justify-center font-label font-bold text-xs">
                   ${d.line}
                 </div>
                 <div class="flex flex-col">
@@ -339,8 +447,7 @@ export const Map = () => {
               </div>
               <div class="text-right">
                 <span class="font-headline font-black text-lg text-primary">
-                  ${d.minutes > 30 && d.time ? d.time : (d.minutes <= 0 ? 'Now' : d.minutes)}
-                  <span class="text-[10px] ml-0.5">${d.minutes > 30 && d.time ? '' : (d.minutes <= 0 ? '' : 'MIN')}</span>
+                  ${d.minutes > 30 && d.time ? d.time : (d.minutes <= 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
                 </span>
               </div>
             </div>
@@ -352,8 +459,30 @@ export const Map = () => {
       const lastUpdated = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const isFav = isFavorite(id);
 
+      let distanceHtml = '';
+      if (userLocation) {
+        const distanceKm = getDistance(userLocation[1], userLocation[0], coordinates[1], coordinates[0]);
+        const distanceM = distanceKm * 1000;
+        
+        distanceHtml = `
+          <div class="flex items-center gap-2 mt-1">
+            <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
+              ${formatDistance(distanceM)}
+            </span>
+            <span class="text-secondary opacity-30">•</span>
+            <div class="flex items-center gap-1">
+              <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
+                ${formatWalkingTime(distanceM)}
+              </span>
+            </div>
+          </div>
+        `;
+      } else {
+        distanceHtml = `<p class="text-[10px] font-label uppercase tracking-wider text-secondary font-bold">ID: ${siriId || id}</p>`;
+      }
+
       popupContent.innerHTML = `
-        <div class="mb-3 pl-16 relative pr-4">
+        <div class="mb-3 pl-16 relative pr-8">
           <button id="refresh-btn" class="absolute top-0 left-0 p-1.5 hover:bg-surface-container-high rounded-full transition-colors group">
             <svg class="w-4 h-4 text-secondary group-hover:text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
           </button>
@@ -361,7 +490,7 @@ export const Map = () => {
             <svg class="w-4 h-4 ${isFav ? 'fill-current' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
           </button>
           <h3 class="font-headline font-black text-primary text-lg leading-tight">${name}</h3>
-          <p class="text-[10px] font-label uppercase tracking-widest text-secondary font-bold">ID: ${siriId || id}</p>
+          ${distanceHtml}
         </div>
         <div class="space-y-2">
           ${departuresHtml}
@@ -426,24 +555,32 @@ export const Map = () => {
     };
   }, [styleLoadCount, stops]);
 
+  const handleLocateMe = () => {
+    if (userLocation && map.current) {
+      // Don't fly to 0,0
+      if (Math.abs(userLocation[0]) < 0.1 && Math.abs(userLocation[1]) < 0.1) {
+        alert('Waiting for GPS...');
+        return;
+      }
+      map.current.flyTo({
+        center: userLocation,
+        zoom: 15,
+        essential: true
+      });
+    } else if (locationError) {
+      alert(`Location error: ${locationError}`);
+    }
+  };
+
   return (
-    <div className="h-[calc(100vh-140px)] w-full relative overflow-hidden bg-surface-container-high">
-      <div className="absolute top-4 left-4 z-50 bg-white/80 backdrop-blur-md px-3 py-2 rounded-lg shadow-sm text-[10px] font-mono border border-primary/5 pointer-events-none">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${styleLoadCount > 0 ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-            <span className="opacity-70">{styleLoadCount > 0 ? 'Map Ready' : 'Loading...'}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${stops.length > 0 ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-            <span className="opacity-70">{stops.length} stops</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${vehicles.length > 0 ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-            <span className="opacity-70">{vehicles.length} vehicles</span>
-          </div>
-        </div>
-      </div>
+    <div className="h-full w-full relative overflow-hidden bg-surface-container-high">
+      <button 
+        onClick={handleLocateMe}
+        className="absolute bottom-4 right-4 z-10 bg-white p-3 rounded-full shadow-lg border border-surface-container-high hover:bg-surface-container-low transition-colors group"
+        title="Locate me"
+      >
+        <Navigation className={`w-5 h-5 ${userLocation ? 'text-blue-600 fill-blue-600' : 'text-primary'}`} />
+      </button>
 
       <div ref={mapContainer} className="w-full h-full" />
       
@@ -456,11 +593,6 @@ export const Map = () => {
         </div>
       )}
 
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/60 backdrop-blur-lg px-4 py-1.5 rounded-full shadow-sm border border-white/20 z-10 transition-all hover:bg-white/80">
-        <p className="font-label text-[10px] uppercase tracking-[0.15em] text-primary/80 font-bold whitespace-nowrap">
-          Click a stop for live departures
-        </p>
-      </div>
     </div>
   );
 };

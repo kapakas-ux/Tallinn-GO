@@ -21,9 +21,23 @@
   --color-error: #ba1a1a;
   --color-primary-fixed: #d7e2ff;
   --color-on-primary-fixed-variant: #00458f;
+
+  --color-tram: #d9531e;
+  --color-trolley: #003571;
+  --color-bus: #003571;
 }
 
 @layer base {
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overscroll-behavior: none;
+  }
+  
   body {
     @apply bg-surface text-on-surface font-body;
   }
