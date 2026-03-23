@@ -447,7 +447,7 @@ export const Map = () => {
               </div>
               <div class="text-right">
                 <span class="font-headline font-black text-lg text-primary">
-                  ${d.minutes > 30 && d.time ? d.time : (d.minutes <= 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
+                  ${d.minutes > 60 && d.time ? d.time : (d.minutes <= 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
                 </span>
               </div>
             </div>

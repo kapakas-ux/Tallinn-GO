@@ -396,8 +396,10 @@ export const Stops = () => {
                                   <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
                                 </div>
                                 <div className="flex items-baseline gap-1">
-                                  <span className="font-headline font-black text-lg text-primary">{arr.minutes}</span>
-                                  <span className="text-[10px] font-bold text-secondary uppercase">min</span>
+                                  <span className="font-headline font-black text-lg text-primary">
+                                    {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
+                                  </span>
+                                  {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
                                 </div>
                               </div>
                             ))}
@@ -520,8 +522,10 @@ export const Stops = () => {
                               <span className="font-headline font-bold text-primary text-xs truncate max-w-[120px]">{arr.destination}</span>
                             </div>
                             <div className="flex items-baseline gap-0.5">
-                              <span className="font-headline font-black text-sm text-primary">{arr.minutes}</span>
-                              <span className="text-[8px] font-bold text-secondary uppercase">min</span>
+                              <span className="font-headline font-black text-sm text-primary">
+                                {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
+                              </span>
+                              {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[8px] font-bold text-secondary uppercase">min</span>}
                             </div>
                           </div>
                         ))
@@ -653,7 +657,9 @@ export const Stops = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-headline font-black text-xl text-primary">{arr.time || `${arr.minutes}m`}</p>
+                        <p className="font-headline font-black text-xl text-primary">
+                          {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : `${arr.minutes}m`)}
+                        </p>
                       </div>
                     </div>
                   ))}

@@ -135,6 +135,8 @@ function parseCoordinate(valStr: string, type: 'lat' | 'lng'): number {
   return 0; // Invalid or out of range
 }
 
+export const usedStopsSet = new Set<string>();
+
 export async function fetchRoutes(): Promise<void> {
   if (routesPromise) return routesPromise;
   
@@ -148,36 +150,48 @@ export async function fetchRoutes(): Promise<void> {
       
       console.log(`fetchRoutes: found ${lines.length} lines`);
       
-      for (let i = 0; i < lines.length; i++) {
+      if (lines.length === 0) return;
+      
+      let delim = ';';
+      if (lines[0].includes(';')) delim = ';';
+      else if (lines[0].includes(',')) delim = ',';
+      else if (lines[0].includes('\t')) delim = '\t';
+      
+      const header = lines[0].split(delim).map(h => h.trim().toUpperCase());
+      const fld: Record<string, number> = {};
+      for (let i = 0; i < header.length; i++) {
+        fld[header[i]] = i;
+      }
+      
+      let currentRouteNum = '';
+      
+      for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        let delim = ';';
-        if (line.includes(';')) delim = ';';
-        else if (line.includes(',')) delim = ',';
-        else if (line.includes('\t')) delim = '\t';
+        if (line.startsWith('#')) continue;
         
         const parts = line.split(delim).map(p => p.trim().replace(/"/g, ''));
-        if (parts.length >= 5) {
-          // Tallinn routes.txt: transport;operator;route_num;route_id;route_name;...
-          const routeNum = parts[2];
-          const routeId = parts[3];
-          const routeName = parts[4];
-          
-          if (i === 0) console.log(`Sample route line: ${line} -> num: ${routeNum}, id: ${routeId}, name: ${routeName}`);
-          
-          if (routeNum && routeName) {
-            routesMap[routeNum] = routeName;
-            // Also store normalized
-            const normNum = routeNum.replace(/^0+/, '');
-            if (normNum && normNum !== routeNum) routesMap[normNum] = routeName;
-          }
-          if (routeId && routeName) {
-            routesMap[routeId] = routeName;
-            const normId = routeId.replace(/^0+/, '');
-            if (normId && normId !== routeId) routesMap[normId] = routeName;
+        
+        const routeNum = parts[fld['ROUTENUM']];
+        if (routeNum && routeNum !== '-') {
+          currentRouteNum = routeNum;
+        }
+        
+        const routeName = parts[fld['ROUTENAME']];
+        if (currentRouteNum && routeName) {
+          routesMap[currentRouteNum] = routeName;
+          const normNum = currentRouteNum.replace(/^0+/, '');
+          if (normNum && normNum !== currentRouteNum) routesMap[normNum] = routeName;
+        }
+        
+        const routeStops = parts[fld['ROUTESTOPS']];
+        if (routeStops) {
+          const stops = routeStops.split(',');
+          for (const stop of stops) {
+            if (stop) usedStopsSet.add(stop);
           }
         }
       }
-      console.log(`Successfully parsed ${Object.keys(routesMap).length} route mappings`);
+      console.log(`Successfully parsed ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops`);
     } catch (error) {
       console.error('Error fetching/parsing routes:', error);
       routesPromise = null;
@@ -189,6 +203,10 @@ export async function fetchRoutes(): Promise<void> {
 
 export async function fetchStops(): Promise<Stop[]> {
   if (stopsPromise) return stopsPromise;
+  
+  if (Object.keys(routesMap).length === 0) {
+    await fetchRoutes();
+  }
   
   stopsPromise = (async () => {
     try {
@@ -311,6 +329,10 @@ export async function fetchStops(): Promise<Stop[]> {
 
       // Second pass: Create Stop objects
       for (const raw of rawStops) {
+        if (usedStopsSet.size > 0 && !usedStopsSet.has(raw.internalId)) {
+          continue; // Skip unused stops
+        }
+        
         let finalName = raw.initialName;
         const isBadName = (n: string | null) => !n || /^[\d\s,\-:]+$/.test(n) || (n.includes('-') && !/[a-zA-ZäöüõÄÖÜÕ]/.test(n));
 
@@ -418,12 +440,26 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       const vehicleId = parts[6];
       let destination = parts[9] || '';
       
-      if (destination && /^\d+$/.test(destination)) {
+      const isBadName = (n: string | null | undefined) => !n || /^[\d\s,\-:]+$/.test(n) || (n.includes('-') && !/[a-zA-ZäöüõÄÖÜÕ]/.test(n));
+      
+      if (destination && isBadName(destination)) {
         const normDest = destination.replace(/^0+/, '');
-        if (routesMap[destination]) destination = routesMap[destination];
-        else if (routesMap[normDest]) destination = routesMap[normDest];
-        else if (stopsMap[destination]) destination = stopsMap[destination];
-        else if (stopsMap[normDest]) destination = stopsMap[normDest];
+        if (routesMap[destination] && !isBadName(routesMap[destination])) destination = routesMap[destination];
+        else if (routesMap[normDest] && !isBadName(routesMap[normDest])) destination = routesMap[normDest];
+        else if (stopsMap[destination] && !isBadName(stopsMap[destination])) destination = stopsMap[destination];
+        else if (stopsMap[normDest] && !isBadName(stopsMap[normDest])) destination = stopsMap[normDest];
+        else if (typeRaw === '3') { // tram
+          const tramRoutes: Record<string, string> = {
+            '1': 'Kopli - Kadriorg',
+            '2': 'Kopli - Suur-Paala',
+            '3': 'Tondi - Kadriorg',
+            '4': 'Tondi - Suur-Paala',
+            '5': 'Kopli - Vana-Lõuna'
+          };
+          if (tramRoutes[lineNum]) destination = tramRoutes[lineNum];
+          else if (routesMap[lineNum] && !isBadName(routesMap[lineNum])) destination = routesMap[lineNum];
+        }
+        else if (routesMap[lineNum] && !isBadName(routesMap[lineNum])) destination = routesMap[lineNum];
       }
       
       vehicles.push({
@@ -560,14 +596,16 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
             else if (['1', '3', '4', '5'].includes(lineNum) && lineNum.length === 1) type = 'trolley';
           }
 
-          // Resolve destination name if it's a stop ID or route ID
-          if (destination && /^\d+$/.test(destination)) {
+          const isBadName = (n: string | null | undefined) => !n || /^[\d\s,\-:]+$/.test(n) || (n.includes('-') && !/[a-zA-ZäöüõÄÖÜÕ]/.test(n));
+
+          // Resolve destination name if it's a stop ID or route ID or a bad name
+          if (destination && isBadName(destination)) {
             const normDest = destination.replace(/^0+/, '');
             let resolvedName = stopsMap[destination] || stopsMap[normDest] || routesMap[destination] || routesMap[normDest];
             
             console.log(`Attempting to resolve destination ID: ${destination} (normalized: ${normDest}). Found in maps: ${!!resolvedName}`);
             
-            if (!resolvedName) {
+            if (!resolvedName || isBadName(resolvedName)) {
               // Try to find a partial match or a key that starts with this ID
               const keys = Object.keys(stopsMap);
               const match = keys.find(k => k === destination || k === normDest || k.startsWith(destination + '-') || k.startsWith(normDest + '-'));
@@ -577,10 +615,27 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
               }
             }
             
-            if (resolvedName) {
+            if (resolvedName && !isBadName(resolvedName)) {
               destination = resolvedName;
             } else {
               console.log(`Could not resolve destination ID: ${destination}`);
+              // Fallback: try to get the route name by line number
+              if (type === 'tram') {
+                const tramRoutes: Record<string, string> = {
+                  '1': 'Kopli - Kadriorg',
+                  '2': 'Kopli - Suur-Paala',
+                  '3': 'Tondi - Kadriorg',
+                  '4': 'Tondi - Suur-Paala',
+                  '5': 'Kopli - Vana-Lõuna'
+                };
+                if (tramRoutes[lineNum]) {
+                  destination = tramRoutes[lineNum];
+                } else if (routesMap[lineNum] && !isBadName(routesMap[lineNum])) {
+                  destination = routesMap[lineNum];
+                }
+              } else if (routesMap[lineNum] && !isBadName(routesMap[lineNum])) {
+                destination = routesMap[lineNum];
+              }
             }
           }
 
@@ -669,7 +724,10 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       }
       
       if (arrivals.length > 0) {
-        return arrivals.sort((a, b) => a.minutes - b.minutes).slice(0, 10);
+        return arrivals
+          .filter(a => a.minutes >= -2) // Allow up to 2 minutes in the past
+          .sort((a, b) => a.minutes - b.minutes)
+          .slice(0, 10);
       }
     }
 

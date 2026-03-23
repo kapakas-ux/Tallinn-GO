@@ -372,7 +372,8 @@ export const Dashboard = () => {
                   ) : (
                     <>
                       <span className="font-headline font-black text-xl text-primary">
-                        {arrival.minutes}<span className="text-[10px] ml-0.5 font-bold">min</span>
+                        {arrival.minutes <= 0 ? 'Now' : arrival.minutes}
+                        {arrival.minutes > 0 && <span className="text-[10px] ml-0.5 font-bold">min</span>}
                       </span>
                       <span className={cn(
                         "text-[8px] font-bold uppercase tracking-widest",
@@ -471,8 +472,10 @@ export const Dashboard = () => {
                               <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
                             </div>
                             <div className="flex items-baseline gap-1">
-                              <span className="font-headline font-black text-lg text-primary">{arr.minutes}</span>
-                              <span className="text-[10px] font-bold text-secondary uppercase">min</span>
+                              <span className="font-headline font-black text-lg text-primary">
+                                {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
+                              </span>
+                              {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
                             </div>
                           </div>
                         ))}
@@ -599,8 +602,10 @@ export const Dashboard = () => {
                             <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
                           </div>
                           <div className="flex items-baseline gap-1">
-                            <span className="font-headline font-black text-lg text-primary">{arr.minutes}</span>
-                            <span className="text-[10px] font-bold text-secondary uppercase">min</span>
+                            <span className="font-headline font-black text-lg text-primary">
+                              {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
+                            </span>
+                            {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
                           </div>
                         </div>
                       ))}
