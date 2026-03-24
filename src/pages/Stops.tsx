@@ -170,6 +170,41 @@ export const Stops = () => {
     handleStopClick(fav);
   };
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Refresh favorites
+      if (favorites.length > 0) {
+        favorites.forEach(async (fav) => {
+          try {
+            const deps = await fetchDepartures(fav.id, fav.siriId);
+            setFavDepartures(prev => ({ ...prev, [fav.id]: deps.slice(0, 3) }));
+          } catch (err) {
+            console.error(`Failed to refresh departures for favorite ${fav.name}`, err);
+          }
+        });
+      }
+
+      // Refresh expanded nearby stop
+      if (expandedNearby) {
+        const stop = allStops.find(s => s.id === expandedNearby);
+        if (stop) {
+          fetchDepartures(stop.id, stop.siriId).then(deps => {
+            setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
+          }).catch(err => console.error("Failed to refresh nearby departures", err));
+        }
+      }
+
+      // Refresh selected stop (modal)
+      if (selectedStop) {
+        fetchDepartures(selectedStop.id, selectedStop.siriId, '0').then(deps => {
+          setDepartures(deps);
+        }).catch(err => console.error("Failed to refresh selected stop departures", err));
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [favorites, expandedNearby, selectedStop, allStops]);
+
   const handleSaveEdit = () => {
     if (editingFav) {
       const newFavs = updateFavorite(editingFav.id, { customName: editName, emoji: editEmoji });

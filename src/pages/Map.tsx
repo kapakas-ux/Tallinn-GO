@@ -55,7 +55,7 @@ export const Map = () => {
     };
 
     loadVehicles();
-    const interval = setInterval(loadVehicles, 10000); // Update every 10 seconds
+    const interval = setInterval(loadVehicles, 5000); // Update every 5 seconds
 
     return () => clearInterval(interval);
   }, []);
@@ -210,7 +210,7 @@ export const Map = () => {
 
         const icon = el.querySelector('.vehicle-icon') as HTMLElement;
         if (icon) {
-          icon.style.transform = `rotate(${vehicle.bearing}deg)`;
+          icon.style.transform = `rotate(${vehicle.bearing - 45}deg)`;
         }
         const label = el.querySelector('.vehicle-label') as HTMLElement;
         if (label) {
@@ -229,7 +229,7 @@ export const Map = () => {
             <div class="vehicle-label absolute bottom-full mb-1 text-[8px] font-bold text-white ${bgColor} opacity-80 px-1 py-0.5 rounded-sm shadow-sm whitespace-nowrap">
               ${labelText}
             </div>
-            <div class="vehicle-icon w-5 h-5 ${bgColor} rounded-full flex items-center justify-center shadow-sm border border-white transition-transform duration-1000" style="transform: rotate(${vehicle.bearing}deg)">
+            <div class="vehicle-icon w-5 h-5 ${bgColor} rounded-full flex items-center justify-center shadow-sm border border-white transition-transform duration-1000" style="transform: rotate(${vehicle.bearing - 45}deg)">
               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
               </svg>
@@ -416,117 +416,132 @@ export const Map = () => {
       const { id, siriId, name } = feature.properties;
       const coordinates = (feature.geometry as any).coordinates.slice();
       
-      setLoadingDepartures(true);
-      let departures: Arrival[] = [];
-      let errorMsg = '';
-      try {
-        departures = await fetchDepartures(id, siriId);
-      } catch (err: any) {
-        console.error('Error in handleStopClick:', err);
-        errorMsg = err.message || 'No live data';
-      }
-      setLoadingDepartures(false);
-
       const popupContent = document.createElement('div');
       popupContent.className = 'p-4 pb-8 min-w-[240px] max-h-[50vh] overflow-y-auto overflow-x-hidden font-body no-scrollbar';
       
-      let departuresHtml = '';
-      if (errorMsg) {
-        departuresHtml = `<div class="py-4 text-center text-red-500 font-label text-xs uppercase tracking-wider">${errorMsg}</div>`;
-      } else if (departures.length > 0) {
-        departuresHtml = departures.map(d => `
-            <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0">
-              <div class="flex items-center gap-3">
-                <div class="${d.type === 'tram' ? 'bg-tram' : d.type === 'trolley' ? 'bg-trolley' : 'bg-bus'} text-white w-8 h-8 rounded-full flex items-center justify-center font-label font-bold text-xs">
-                  ${d.line}
+      let intervalId: any;
+
+      const updateContent = async (isLoading: boolean) => {
+        let departures: Arrival[] = [];
+        let errorMsg = '';
+        
+        if (!isLoading) {
+          try {
+            departures = await fetchDepartures(id, siriId);
+          } catch (err: any) {
+            console.error('Error in handleStopClick:', err);
+            errorMsg = err.message || 'No live data';
+          }
+        }
+
+        let departuresHtml = '';
+        if (isLoading) {
+          departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">Loading...</div>`;
+        } else if (errorMsg) {
+          departuresHtml = `<div class="py-4 text-center text-red-500 font-label text-xs uppercase tracking-wider">${errorMsg}</div>`;
+        } else if (departures.length > 0) {
+          departuresHtml = departures.map(d => `
+              <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0">
+                <div class="flex items-center gap-3">
+                  <div class="${d.type === 'tram' ? 'bg-tram' : d.type === 'trolley' ? 'bg-trolley' : 'bg-bus'} text-white w-8 h-8 rounded-full flex items-center justify-center font-label font-bold text-xs">
+                    ${d.line}
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="font-headline font-bold text-sm text-primary">${d.destination}</span>
+                    <span class="text-[9px] font-label uppercase text-secondary font-bold">${d.type}</span>
+                  </div>
                 </div>
-                <div class="flex flex-col">
-                  <span class="font-headline font-bold text-sm text-primary">${d.destination}</span>
-                  <span class="text-[9px] font-label uppercase text-secondary font-bold">${d.type}</span>
+                <div class="text-right">
+                  <span class="font-headline font-black text-lg text-primary">
+                    ${d.minutes > 60 && d.time ? d.time : (d.minutes <= 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
+                  </span>
                 </div>
               </div>
-              <div class="text-right">
-                <span class="font-headline font-black text-lg text-primary">
-                  ${d.minutes > 60 && d.time ? d.time : (d.minutes <= 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
+            `).join('');
+        } else {
+          departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">No departures scheduled</div>`;
+        }
+
+        const lastUpdated = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const isFav = isFavorite(id);
+
+        let distanceHtml = '';
+        if (userLocation) {
+          const distanceKm = getDistance(userLocation[1], userLocation[0], coordinates[1], coordinates[0]);
+          const distanceM = distanceKm * 1000;
+          
+          distanceHtml = `
+            <div class="flex items-center gap-2 mt-1">
+              <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
+                ${formatDistance(distanceM)}
+              </span>
+              <span class="text-secondary opacity-30">•</span>
+              <div class="flex items-center gap-1">
+                <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
+                  ${formatWalkingTime(distanceM)}
                 </span>
               </div>
             </div>
-          `).join('');
-      } else {
-        departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">No departures scheduled</div>`;
-      }
+          `;
+        } else {
+          distanceHtml = `<p class="text-[10px] font-label uppercase tracking-wider text-secondary font-bold">ID: ${siriId || id}</p>`;
+        }
 
-      const lastUpdated = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const isFav = isFavorite(id);
-
-      let distanceHtml = '';
-      if (userLocation) {
-        const distanceKm = getDistance(userLocation[1], userLocation[0], coordinates[1], coordinates[0]);
-        const distanceM = distanceKm * 1000;
-        
-        distanceHtml = `
-          <div class="flex items-center gap-2 mt-1">
-            <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-              ${formatDistance(distanceM)}
-            </span>
-            <span class="text-secondary opacity-30">•</span>
-            <div class="flex items-center gap-1">
-              <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-                ${formatWalkingTime(distanceM)}
-              </span>
-            </div>
+        popupContent.innerHTML = `
+          <div class="mb-3 pl-16 relative pr-8">
+            <button id="refresh-btn" class="absolute top-0 left-0 p-1.5 hover:bg-surface-container-high rounded-full transition-colors group">
+              <svg class="w-4 h-4 text-secondary group-hover:text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+            </button>
+            <button id="fav-btn" class="absolute top-0 left-8 p-1.5 hover:bg-surface-container-high rounded-full transition-colors group ${isFav ? 'text-amber-400' : 'text-secondary'}">
+              <svg class="w-4 h-4 ${isFav ? 'fill-current' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </button>
+            <h3 class="font-headline font-black text-primary text-lg leading-tight">${name}</h3>
+            ${distanceHtml}
+          </div>
+          <div class="space-y-2">
+            ${departuresHtml}
+          </div>
+          <div class="mt-4 pt-2 border-t border-surface-container-high text-[9px] text-secondary font-label uppercase tracking-widest text-center opacity-70">
+            Updated ${lastUpdated}
           </div>
         `;
-      } else {
-        distanceHtml = `<p class="text-[10px] font-label uppercase tracking-wider text-secondary font-bold">ID: ${siriId || id}</p>`;
-      }
 
-      popupContent.innerHTML = `
-        <div class="mb-3 pl-16 relative pr-8">
-          <button id="refresh-btn" class="absolute top-0 left-0 p-1.5 hover:bg-surface-container-high rounded-full transition-colors group">
-            <svg class="w-4 h-4 text-secondary group-hover:text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
-          </button>
-          <button id="fav-btn" class="absolute top-0 left-8 p-1.5 hover:bg-surface-container-high rounded-full transition-colors group ${isFav ? 'text-amber-400' : 'text-secondary'}">
-            <svg class="w-4 h-4 ${isFav ? 'fill-current' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-          </button>
-          <h3 class="font-headline font-black text-primary text-lg leading-tight">${name}</h3>
-          ${distanceHtml}
-        </div>
-        <div class="space-y-2">
-          ${departuresHtml}
-        </div>
-        <div class="mt-4 pt-2 border-t border-surface-container-high text-[9px] text-secondary font-label uppercase tracking-widest text-center opacity-70">
-          Updated ${lastUpdated}
-        </div>
-      `;
+        const refreshBtn = popupContent.querySelector('#refresh-btn');
+        if (refreshBtn) {
+          refreshBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateContent(false);
+          });
+        }
 
-      const refreshBtn = popupContent.querySelector('#refresh-btn');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          handleStopClick(feature);
-        });
-      }
+        const favBtn = popupContent.querySelector('#fav-btn');
+        if (favBtn) {
+          favBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const stop: Stop = { id, siriId, name, lat: coordinates[1], lng: coordinates[0] };
+            const newFavs = toggleFavorite(stop);
+            const isNowFav = !!newFavs.find(f => f.id === id);
+            
+            if (isNowFav) {
+              favBtn.classList.remove('text-secondary');
+              favBtn.classList.add('text-amber-400');
+              favBtn.querySelector('svg')?.classList.add('fill-current');
+            } else {
+              favBtn.classList.remove('text-amber-400');
+              favBtn.classList.add('text-secondary');
+              favBtn.querySelector('svg')?.classList.remove('fill-current');
+            }
+          });
+        }
+      };
 
-      const favBtn = popupContent.querySelector('#fav-btn');
-      if (favBtn) {
-        favBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const stop: Stop = { id, siriId, name, lat: coordinates[1], lng: coordinates[0] };
-          const newFavs = toggleFavorite(stop);
-          const isNowFav = !!newFavs.find(f => f.id === id);
-          
-          if (isNowFav) {
-            favBtn.classList.remove('text-secondary');
-            favBtn.classList.add('text-amber-400');
-            favBtn.querySelector('svg')?.classList.add('fill-current');
-          } else {
-            favBtn.classList.remove('text-amber-400');
-            favBtn.classList.add('text-secondary');
-            favBtn.querySelector('svg')?.classList.remove('fill-current');
-          }
-        });
-      }
+      setLoadingDepartures(true);
+      await updateContent(false);
+      setLoadingDepartures(false);
+
+      intervalId = setInterval(() => {
+        updateContent(false);
+      }, 10000);
 
       const popup = new maplibregl.Popup({ offset: 10, maxWidth: '300px' })
         .setLngLat(coordinates)
@@ -536,6 +551,7 @@ export const Map = () => {
       currentPopup.current = popup;
       
       popup.on('close', () => {
+        clearInterval(intervalId);
         if (currentPopup.current === popup) {
           currentPopup.current = null;
         }
@@ -574,6 +590,10 @@ export const Map = () => {
 
   return (
     <div className="h-full w-full relative overflow-hidden bg-surface-container-high">
+      <div className="absolute top-4 left-4 z-10 bg-surface-container-lowest/60 backdrop-blur-md px-2 py-1 rounded-full text-[8px] font-label font-bold text-secondary uppercase tracking-wider pointer-events-none shadow-sm border border-outline-variant/20">
+        OpenFreeMap, OSM & Transpordiamet
+      </div>
+
       <button 
         onClick={handleLocateMe}
         className="absolute bottom-4 right-4 z-10 bg-white p-3 rounded-full shadow-lg border border-surface-container-high hover:bg-surface-container-low transition-colors group"

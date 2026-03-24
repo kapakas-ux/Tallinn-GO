@@ -171,6 +171,31 @@ export const Dashboard = () => {
     setFavorites(newFavs);
   };
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Refresh closest stop
+      if (closestStop) {
+        fetchDepartures(closestStop.id, closestStop.siriId).then(deps => {
+          setDepartures(deps.slice(0, 6));
+        }).catch(err => console.error("Failed to refresh closest stop departures", err));
+      }
+
+      // Refresh expanded nearby stop or favorite
+      if (expandedNearby) {
+        const stop = allStops.find(s => s.id === expandedNearby) || favorites.find(f => f.id === expandedNearby);
+        if (stop) {
+          fetchDepartures(stop.id, stop.siriId).then(deps => {
+            // Favorites show 3, nearby show 6
+            const isFav = favorites.some(f => f.id === stop.id);
+            setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, isFav ? 3 : 6) }));
+          }).catch(err => console.error("Failed to refresh nearby departures", err));
+        }
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [closestStop, expandedNearby, allStops, favorites]);
+
   const handleSaveEdit = () => {
     if (editingFav) {
       const newFavs = updateFavorite(editingFav.id, { customName: editName, emoji: editEmoji });
@@ -370,18 +395,10 @@ export const Dashboard = () => {
                   {arrival.status === 'departed' ? (
                     <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
                   ) : (
-                    <>
-                      <span className="font-headline font-black text-xl text-primary">
-                        {arrival.minutes <= 0 ? 'Now' : arrival.minutes}
-                        {arrival.minutes > 0 && <span className="text-[10px] ml-0.5 font-bold">min</span>}
-                      </span>
-                      <span className={cn(
-                        "text-[8px] font-bold uppercase tracking-widest",
-                        arrival.status === 'on-time' ? "text-error" : "text-secondary"
-                      )}>
-                        {arrival.status.replace('-', ' ')}
-                      </span>
-                    </>
+                    <span className="font-headline font-black text-xl text-primary">
+                      {arrival.minutes <= 0 ? 'Now' : arrival.minutes}
+                      {arrival.minutes > 0 && <span className="text-[10px] ml-0.5 font-bold">min</span>}
+                    </span>
                   )}
                 </div>
               </div>

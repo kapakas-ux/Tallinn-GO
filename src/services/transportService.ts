@@ -235,6 +235,8 @@ export async function fetchStops(): Promise<Stop[]> {
 
       const stops: Stop[] = [];
       const rawStops: any[] = [];
+      const internalMap: { [key: string]: string } = {};
+      const siriMap: { [key: string]: string } = {};
       
       // Detect columns once
       let detectedLatIdx = -1;
@@ -306,22 +308,35 @@ export async function fetchStops(): Promise<Stop[]> {
           highQualityName = parts[nameIdx];
         }
 
-        // Register high-quality names in the global map
+        // Register high-quality names in the global maps
         if (highQualityName) {
-          const registerName = (id: string) => {
+          const registerName = (id: string, isSiri: boolean = false) => {
             if (!id) return;
             const normId = id.replace(/^0+/, '');
-            const baseId = id.split('-')[0];
             
-            [id, normId, baseId].forEach(key => {
-              if (key && (!stopsMap[key] || stopsMap[key].length < highQualityName.length)) {
-                stopsMap[key] = highQualityName;
-              }
-            });
+            if (!isSiri) {
+              const baseId = id.split('-')[0];
+              [id, normId, baseId].forEach(key => {
+                if (key && (!internalMap[key] || internalMap[key].length < highQualityName.length)) {
+                  internalMap[key] = highQualityName;
+                  stopsMap[key] = highQualityName;
+                }
+              });
+            } else {
+              [id, normId].forEach(key => {
+                if (key && (!siriMap[key] || siriMap[key].length < highQualityName.length)) {
+                  siriMap[key] = highQualityName;
+                  // Only put in stopsMap if it doesn't overwrite an internal ID
+                  if (!stopsMap[key]) {
+                    stopsMap[key] = highQualityName;
+                  }
+                }
+              });
+            }
           };
           
-          registerName(internalId);
-          if (siriId && siriId !== '0') registerName(siriId);
+          registerName(internalId, false);
+          if (siriId && siriId !== '0') registerName(siriId, true);
         }
 
         rawStops.push({ internalId, siriId, lat, lng, initialName: highQualityName });
@@ -342,8 +357,8 @@ export async function fetchStops(): Promise<Stop[]> {
           const baseId = id.split('-')[0];
           const siriId = raw.siriId;
           
-          finalName = stopsMap[id] || stopsMap[normId] || stopsMap[baseId] || 
-                      (siriId ? (stopsMap[siriId] || stopsMap[siriId.replace(/^0+/, '')]) : null);
+          finalName = internalMap[id] || internalMap[normId] || internalMap[baseId] || 
+                      (siriId ? (siriMap[siriId] || siriMap[siriId.replace(/^0+/, '')]) : null);
           
           if (isBadName(finalName)) {
             let nearestDist = 0.0025; // Increased threshold to catch opposite stops on wide roads
@@ -384,12 +399,22 @@ export async function fetchStops(): Promise<Stop[]> {
           const id = raw.internalId;
           const normId = id.replace(/^0+/, '');
           const baseId = id.split('-')[0];
+          const siriId = raw.siriId;
           
           [id, normId, baseId].forEach(key => {
             if (key && !stopsMap[key]) {
               stopsMap[key] = finalName as string;
             }
           });
+          
+          if (siriId && siriId !== '0') {
+            const normSiri = siriId.replace(/^0+/, '');
+            [siriId, normSiri].forEach(key => {
+              if (key && !stopsMap[key]) {
+                stopsMap[key] = finalName as string;
+              }
+            });
+          }
         }
 
         stops.push({
