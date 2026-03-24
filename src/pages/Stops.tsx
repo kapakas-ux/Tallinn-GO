@@ -200,7 +200,7 @@ export const Stops = () => {
           setDepartures(deps);
         }).catch(err => console.error("Failed to refresh selected stop departures", err));
       }
-    }, 10000);
+    }, 20000);
 
     return () => clearInterval(interval);
   }, [favorites, expandedNearby, selectedStop, allStops]);

@@ -55,7 +55,7 @@ export const Map = () => {
     };
 
     loadVehicles();
-    const interval = setInterval(loadVehicles, 5000); // Update every 5 seconds
+    const interval = setInterval(loadVehicles, 10000); // Update every 10 seconds
 
     return () => clearInterval(interval);
   }, []);
@@ -541,7 +541,7 @@ export const Map = () => {
 
       intervalId = setInterval(() => {
         updateContent(false);
-      }, 10000);
+      }, 20000);
 
       const popup = new maplibregl.Popup({ offset: 10, maxWidth: '300px' })
         .setLngLat(coordinates)

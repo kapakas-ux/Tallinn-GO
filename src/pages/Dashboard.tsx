@@ -191,7 +191,7 @@ export const Dashboard = () => {
           }).catch(err => console.error("Failed to refresh nearby departures", err));
         }
       }
-    }, 10000);
+    }, 20000);
 
     return () => clearInterval(interval);
   }, [closestStop, expandedNearby, allStops, favorites]);
