@@ -1,5 +1,6 @@
 import { Arrival, Stop, Vehicle } from '../types';
 import { CapacitorHttp, Capacitor } from '@capacitor/core';
+import { getDistance, getBearing } from '../lib/geo';
 
 const getApiBaseUrl = () => {
   // 1. Check for environment variable (set during build)
@@ -12,7 +13,7 @@ const getApiBaseUrl = () => {
   }
   
   // 2. Check if we are running in a native (Capacitor) environment
-  const origin = window.location.origin;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const isNative = origin.includes('localhost') || origin.includes('capacitor://');
   
   if (isNative) {
@@ -102,6 +103,7 @@ async function universalFetch(url: string): Promise<string> {
 
 let stopsMap: { [key: string]: string } = {};
 let routesMap: { [key: string]: string } = {};
+export const routeStopsMap: { [key: string]: { name: string, stops: string[] }[] } = {};
 let stopsPromise: Promise<Stop[]> | null = null;
 let routesPromise: Promise<void> | null = null;
 
@@ -185,9 +187,23 @@ export async function fetchRoutes(): Promise<void> {
         
         const routeStops = parts[fld['ROUTESTOPS']];
         if (routeStops) {
-          const stops = routeStops.split(',');
+          const stops = routeStops.split(',').filter(Boolean);
           for (const stop of stops) {
-            if (stop) usedStopsSet.add(stop);
+            usedStopsSet.add(stop);
+          }
+          if (currentRouteNum && routeName) {
+            if (!routeStopsMap[currentRouteNum]) {
+              routeStopsMap[currentRouteNum] = [];
+            }
+            routeStopsMap[currentRouteNum].push({ name: routeName, stops });
+            
+            const normNum = currentRouteNum.replace(/^0+/, '');
+            if (normNum && normNum !== currentRouteNum) {
+              if (!routeStopsMap[normNum]) {
+                routeStopsMap[normNum] = [];
+              }
+              routeStopsMap[normNum].push({ name: routeName, stops });
+            }
           }
         }
       }
@@ -204,11 +220,11 @@ export async function fetchRoutes(): Promise<void> {
 export async function fetchStops(): Promise<Stop[]> {
   if (stopsPromise) return stopsPromise;
   
-  if (Object.keys(routesMap).length === 0) {
-    await fetchRoutes();
-  }
-  
   stopsPromise = (async () => {
+    if (Object.keys(routesMap).length === 0) {
+      await fetchRoutes();
+    }
+    
     try {
       const url = Capacitor.isNativePlatform() 
         ? 'https://transport.tallinn.ee/data/stops.txt'
@@ -438,8 +454,16 @@ export async function fetchStops(): Promise<Stop[]> {
   return stopsPromise;
 }
 
+let cachedVehicles: Vehicle[] = [];
+let lastVehiclesFetch = 0;
+
 export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
+    const now = Date.now();
+    if (cachedVehicles.length > 0 && now - lastVehiclesFetch < 2000) {
+      return cachedVehicles;
+    }
+
     if (Object.keys(stopsMap).length === 0) await fetchStops();
     if (Object.keys(routesMap).length === 0) await fetchRoutes();
 
@@ -448,6 +472,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       : `${API_BASE}/api/transport/gps`;
     const text = await universalFetch(url);
     const lines = text.split(/\r\n|\r|\n/).filter(l => l.trim().length > 0);
+    console.log(`fetchVehicles: received ${lines.length} lines from gps.txt`);
     const vehicles: Vehicle[] = [];
     
     for (const line of lines) {
@@ -461,18 +486,19 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       
       if (lat === 0 || lng === 0) continue;
       
-      const bearing = parseInt(parts[5], 10) || 0;
+      const bearingStr = parts[5];
+      const bearing = bearingStr ? parseInt(bearingStr, 10) : null;
       const vehicleId = parts[6];
       let destination = parts[9] || '';
       
       const isBadName = (n: string | null | undefined) => !n || /^[\d\s,\-:]+$/.test(n) || (n.includes('-') && !/[a-zA-ZäöüõÄÖÜÕ]/.test(n));
       
-      if (destination && isBadName(destination)) {
+      if (!destination || isBadName(destination)) {
         const normDest = destination.replace(/^0+/, '');
-        if (routesMap[destination] && !isBadName(routesMap[destination])) destination = routesMap[destination];
-        else if (routesMap[normDest] && !isBadName(routesMap[normDest])) destination = routesMap[normDest];
-        else if (stopsMap[destination] && !isBadName(stopsMap[destination])) destination = stopsMap[destination];
-        else if (stopsMap[normDest] && !isBadName(stopsMap[normDest])) destination = stopsMap[normDest];
+        if (destination && routesMap[destination] && !isBadName(routesMap[destination])) destination = routesMap[destination];
+        else if (normDest && routesMap[normDest] && !isBadName(routesMap[normDest])) destination = routesMap[normDest];
+        else if (destination && stopsMap[destination] && !isBadName(stopsMap[destination])) destination = stopsMap[destination];
+        else if (normDest && stopsMap[normDest] && !isBadName(stopsMap[normDest])) destination = stopsMap[normDest];
         else if (typeRaw === '3') { // tram
           const tramRoutes: Record<string, string> = {
             '1': 'Kopli - Kadriorg',
@@ -489,7 +515,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       
       vehicles.push({
         id: vehicleId || `${lineNum}-${lat}-${lng}`,
-        type: typeRaw === '2' ? 'trolley' : (typeRaw === '3' ? 'tram' : 'bus'),
+        type: typeRaw === '1' ? 'trolley' : (typeRaw === '3' ? 'tram' : 'bus'),
         line: lineNum,
         lat,
         lng,
@@ -498,11 +524,359 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       });
     }
     
+    console.log(`fetchVehicles: parsed ${vehicles.length} vehicles successfully`);
+    cachedVehicles = vehicles;
+    lastVehiclesFetch = now;
     return vehicles;
   } catch (error) {
     console.error('Error fetching vehicles:', error);
-    return [];
+    return cachedVehicles; // Return cached if fetch fails
   }
+}
+
+export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]> {
+  if (Object.keys(routeStopsMap).length === 0) {
+    await fetchRoutes();
+  }
+  const allStops = await fetchStops();
+  const normArrivalLine = arrival.line.replace(/^0+/, '');
+  const routes = routeStopsMap[normArrivalLine];
+  if (!routes || routes.length === 0) return [];
+  
+  const vDest = (arrival.destination || '').toLowerCase();
+  
+  // Try to find the route that matches the destination
+  let bestRoute = routes[0];
+  
+  // 0. Try to match by the last stop name (most reliable for direction)
+  const lastStopMatch = routes.find(r => {
+    if (r.stops.length === 0) return false;
+    const lastStopId = r.stops[r.stops.length - 1];
+    const lastStop = allStops.find(s => s.id === lastStopId);
+    if (!lastStop) return false;
+    const sName = lastStop.name.toLowerCase();
+    return sName.includes(vDest) || vDest.includes(sName);
+  });
+
+  if (lastStopMatch) {
+    bestRoute = lastStopMatch;
+  } else {
+    // 1. Try to match by the end of the route name (e.g. "A - B" -> matches "B")
+    const endsWithMatch = routes.find(r => {
+      const rName = (r.name || '').toLowerCase();
+      return rName.endsWith(vDest) || rName.endsWith(vDest + ' rand'); // handle some edge cases
+    });
+    
+    if (endsWithMatch) {
+      bestRoute = endsWithMatch;
+    } else {
+      // 2. Try exact match
+      const exactMatch = routes.find(r => (r.name || '').toLowerCase() === vDest);
+      if (exactMatch) {
+        bestRoute = exactMatch;
+      } else {
+        // 3. Try partial match
+        const partialMatch = routes.find(r => {
+          const rName = (r.name || '').toLowerCase();
+          return rName.includes(vDest) || vDest.includes(rName);
+        });
+        if (partialMatch) bestRoute = partialMatch;
+      }
+    }
+  }
+  
+  // Map stop IDs to Stop objects
+  return bestRoute.stops.map(id => {
+    const exactStop = allStops.find(s => s.id === id);
+    if (exactStop) return exactStop;
+    
+    const baseId = id.split('-')[0];
+    const baseStop = allStops.find(s => s.id.startsWith(baseId + '-'));
+    if (baseStop) return baseStop;
+    
+    return { id, name: id, lat: 0, lng: 0 }; // Fallback
+  }).filter(s => s.lat !== 0 && s.lng !== 0);
+}
+
+export async function getRouteStopsForVehicle(vehicle: Vehicle, expectedDestination?: string): Promise<Stop[]> {
+  if (Object.keys(routeStopsMap).length === 0) {
+    await fetchRoutes();
+  }
+  const allStops = await fetchStops();
+  const routes = routeStopsMap[vehicle.line];
+  if (!routes || routes.length === 0) return [];
+  
+  const vDest = (expectedDestination || vehicle.destination || '').toLowerCase();
+  
+  // Try to find the route that matches the destination
+  let bestRoute = routes[0];
+  
+  // 0. Try to match by the last stop name (most reliable for direction)
+  const lastStopMatch = routes.find(r => {
+    if (r.stops.length === 0) return false;
+    const lastStopId = r.stops[r.stops.length - 1];
+    const lastStop = allStops.find(s => s.id === lastStopId);
+    if (!lastStop) return false;
+    const sName = lastStop.name.toLowerCase();
+    return sName.includes(vDest) || vDest.includes(sName);
+  });
+
+  if (lastStopMatch) {
+    bestRoute = lastStopMatch;
+  } else {
+    // 1. Try to match by the end of the route name (e.g. "A - B" -> matches "B")
+    const endsWithMatch = routes.find(r => {
+      const rName = (r.name || '').toLowerCase();
+      return rName.endsWith(vDest) || rName.endsWith(vDest + ' rand'); // handle some edge cases
+    });
+    
+    if (endsWithMatch) {
+      bestRoute = endsWithMatch;
+    } else {
+      // 2. Try exact match
+      const exactMatch = routes.find(r => (r.name || '').toLowerCase() === vDest);
+      if (exactMatch) {
+        bestRoute = exactMatch;
+      } else {
+        // 3. Try partial match
+        const partialMatch = routes.find(r => {
+          const rName = (r.name || '').toLowerCase();
+          return rName.includes(vDest) || vDest.includes(rName);
+        });
+        if (partialMatch) bestRoute = partialMatch;
+      }
+    }
+  }
+  
+  // Map stop IDs to Stop objects
+  return bestRoute.stops.map(id => {
+    const exactStop = allStops.find(s => s.id === id);
+    if (exactStop) return exactStop;
+    
+    const baseId = id.split('-')[0];
+    const baseStop = allStops.find(s => s.id.startsWith(baseId + '-'));
+    if (baseStop) return baseStop;
+    
+    return { id, name: id, lat: 0, lng: 0 }; // Fallback
+  }).filter(s => s.lat !== 0 && s.lng !== 0);
+}
+
+export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promise<Vehicle | null> {
+  const vehicles = await fetchVehicles();
+  const normArrivalLine = arrival.line.replace(/^0+/, '');
+  console.log(`getVehicleForArrival: looking for line ${arrival.line} (norm: ${normArrivalLine}), type ${arrival.type}, dest ${arrival.destination}`);
+  
+  const matching = vehicles.filter(v => {
+    const normVLine = v.line.replace(/^0+/, '');
+    return normVLine === normArrivalLine && v.type === arrival.type;
+  });
+  
+  console.log(`getVehicleForArrival: found ${matching.length} matching vehicles by line and type`);
+  if (matching.length === 0) {
+    const matchingLine = vehicles.filter(v => v.line.replace(/^0+/, '') === normArrivalLine);
+    console.log(`getVehicleForArrival: found ${matchingLine.length} matching vehicles by line only. Types: ${matchingLine.map(v => v.type).join(', ')}`);
+    return null;
+  }
+  
+  const arrDest = (arrival.destination || '').toLowerCase();
+  
+  // Try to match by destination
+  let destinationMatches = matching.filter(v => (v.destination || '').toLowerCase() === arrDest);
+  
+  // Try partial match if no exact match
+  if (destinationMatches.length === 0) {
+    destinationMatches = matching.filter(v => {
+      const vDest = (v.destination || '').toLowerCase();
+      return vDest.includes(arrDest) || arrDest.includes(vDest);
+    });
+  }
+  
+  // If still no match, just use all matching by line and type
+  if (destinationMatches.length === 0) {
+    // Try to exclude vehicles that clearly match the OTHER direction's route name
+    const routes = routeStopsMap[normArrivalLine] || [];
+    let wrongRouteName = '';
+    
+    const correctRoute = routes.find(r => {
+      const rName = (r.name || '').toLowerCase();
+      return rName.endsWith(arrDest) || rName.includes(arrDest) || arrDest.includes(rName);
+    });
+    
+    if (correctRoute) {
+      const wrongRoute = routes.find(r => r.name !== correctRoute.name);
+      if (wrongRoute) {
+        wrongRouteName = (wrongRoute.name || '').toLowerCase();
+      }
+    }
+    
+    if (wrongRouteName) {
+      destinationMatches = matching.filter(v => {
+        const vDest = (v.destination || '').toLowerCase();
+        if (!vDest) return true; // keep if unknown
+        
+        const matchesWrong = vDest.includes(wrongRouteName) || wrongRouteName.includes(vDest);
+        const matchesCorrect = correctRoute && (vDest.includes((correctRoute.name || '').toLowerCase()) || (correctRoute.name || '').toLowerCase().includes(vDest));
+        
+        if (matchesWrong && !matchesCorrect) return false;
+        
+        const wrongDestParts = wrongRouteName.split('-');
+        const wrongEnd = wrongDestParts[wrongDestParts.length - 1]?.trim();
+        if (wrongEnd && (vDest === wrongEnd || vDest.endsWith(wrongEnd))) {
+           return false;
+        }
+        
+        return true;
+      });
+    }
+    
+    if (destinationMatches.length === 0) {
+      destinationMatches = matching;
+    }
+  }
+  
+  // If we have a stop, sort vehicles by distance to the stop
+  if (stop) {
+    const routeStops = await getRouteStopsForVehicle(destinationMatches[0], arrival.destination);
+    
+    // Try to find the target stop in the route
+    let targetIndex = routeStops.findIndex(s => s.id === stop.id);
+    if (targetIndex === -1) {
+      // Try matching by base ID
+      const baseStopId = stop.id.split('-')[0];
+      targetIndex = routeStops.findIndex(s => s.id.split('-')[0] === baseStopId);
+    }
+    
+    console.log(`getVehicleForArrival: line ${arrival.line} dest ${arrival.destination} stop ${stop.name} (${stop.id}) -> targetIndex ${targetIndex}/${routeStops.length}`);
+    
+    const vehicleStats = destinationMatches.map(v => {
+      let minD = Infinity;
+      let closestIdx = -1;
+      
+      if (routeStops.length > 0) {
+        for (let i = 0; i < routeStops.length; i++) {
+          const d = getDistance(v.lat, v.lng, routeStops[i].lat, routeStops[i].lng);
+          if (d < minD) {
+            minD = d;
+            closestIdx = i;
+          }
+        }
+      }
+      
+      let isWrongDirection = false;
+      if (closestIdx >= 0 && v.bearing !== null) {
+        let s1, s2;
+        if (closestIdx < routeStops.length - 1) {
+          s1 = routeStops[closestIdx];
+          s2 = routeStops[closestIdx + 1];
+        } else if (closestIdx > 0) {
+          s1 = routeStops[closestIdx - 1];
+          s2 = routeStops[closestIdx];
+        }
+        
+        if (s1 && s2) {
+          const routeBearing = getBearing(s1.lat, s1.lng, s2.lat, s2.lng);
+          
+          let diff = Math.abs(v.bearing - routeBearing);
+          if (diff > 180) diff = 360 - diff;
+          if (diff > 120) {
+            isWrongDirection = true;
+          }
+        }
+      }
+
+      const distToTarget = getDistance(v.lat, v.lng, stop.lat, stop.lng);
+      console.log(`  Vehicle ${v.id} at idx ${closestIdx}, dist ${distToTarget.toFixed(2)}km, wrongDir: ${isWrongDirection}`);
+      return { vehicle: v, closestIdx, distToTarget, isWrongDirection };
+    });
+    
+    // Filter out vehicles that have passed or are going the wrong way
+    const filterApproaching = (stats: any[]) => stats.filter(vs => {
+      if (vs.isWrongDirection) return false;
+      
+      if (targetIndex !== -1 && vs.closestIdx !== -1) {
+        if (vs.closestIdx <= targetIndex) return true;
+        // Allow if it just passed but is still very close (e.g. at the stop)
+        if (vs.closestIdx === targetIndex + 1 && vs.distToTarget < 0.3) return true;
+        return false;
+      }
+      
+      return true; // If we can't determine position on route, keep it
+    });
+
+    let approaching = filterApproaching(vehicleStats);
+    
+    // If destination filtering resulted in no approaching vehicles, try with ALL matching vehicles
+    if (approaching.length === 0 && destinationMatches.length < matching.length) {
+      console.log(`getVehicleForArrival: no approaching vehicles found after destination filter, trying all matching vehicles`);
+      
+      const allVehicleStats = matching.map(v => {
+        let minD = Infinity;
+        let closestIdx = -1;
+        
+        if (routeStops.length > 0) {
+          for (let i = 0; i < routeStops.length; i++) {
+            const d = getDistance(v.lat, v.lng, routeStops[i].lat, routeStops[i].lng);
+            if (d < minD) {
+              minD = d;
+              closestIdx = i;
+            }
+          }
+        }
+        
+        let isWrongDirection = false;
+        if (closestIdx >= 0 && v.bearing !== null) {
+          let s1, s2;
+          if (closestIdx < routeStops.length - 1) {
+            s1 = routeStops[closestIdx];
+            s2 = routeStops[closestIdx + 1];
+          } else if (closestIdx > 0) {
+            s1 = routeStops[closestIdx - 1];
+            s2 = routeStops[closestIdx];
+          }
+          
+          if (s1 && s2) {
+            const routeBearing = getBearing(s1.lat, s1.lng, s2.lat, s2.lng);
+            
+            let diff = Math.abs(v.bearing - routeBearing);
+            if (diff > 180) diff = 360 - diff;
+            if (diff > 120) {
+              isWrongDirection = true;
+            }
+          }
+        }
+
+        const distToTarget = getDistance(v.lat, v.lng, stop.lat, stop.lng);
+        return { vehicle: v, closestIdx, distToTarget, isWrongDirection };
+      });
+      
+      approaching = filterApproaching(allVehicleStats);
+    }
+    
+    if (approaching.length === 0) {
+      console.log(`getVehicleForArrival: no approaching vehicles found for line ${arrival.line} to ${arrival.destination}`);
+      return null; // Don't show a wrong bus
+    }
+    
+    approaching.sort((a, b) => {
+      if (targetIndex !== -1 && a.closestIdx !== -1 && b.closestIdx !== -1 && a.closestIdx !== b.closestIdx) {
+        return b.closestIdx - a.closestIdx; // Descending index (closer to target first)
+      }
+      return a.distToTarget - b.distToTarget; // Ascending distance
+    });
+    
+    destinationMatches = approaching.map(vs => vs.vehicle);
+  }
+  
+  // Use vehicleIndex to pick the correct vehicle if there are multiple arrivals for the same line/dest
+  const index = arrival.vehicleIndex || 0;
+  
+  if (index < destinationMatches.length) {
+    console.log(`getVehicleForArrival: returning vehicle at index ${index} out of ${destinationMatches.length} matches`);
+    return destinationMatches[index];
+  }
+  
+  console.log(`getVehicleForArrival: vehicleIndex ${index} is out of bounds, returning closest vehicle`);
+  return destinationMatches[0];
 }
 
 export async function fetchDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
@@ -624,13 +998,13 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
           const isBadName = (n: string | null | undefined) => !n || /^[\d\s,\-:]+$/.test(n) || (n.includes('-') && !/[a-zA-ZäöüõÄÖÜÕ]/.test(n));
 
           // Resolve destination name if it's a stop ID or route ID or a bad name
-          if (destination && isBadName(destination)) {
-            const normDest = destination.replace(/^0+/, '');
-            let resolvedName = stopsMap[destination] || stopsMap[normDest] || routesMap[destination] || routesMap[normDest];
+          if (!destination || isBadName(destination)) {
+            const normDest = destination ? destination.replace(/^0+/, '') : '';
+            let resolvedName = destination ? (stopsMap[destination] || stopsMap[normDest] || routesMap[destination] || routesMap[normDest]) : '';
             
             console.log(`Attempting to resolve destination ID: ${destination} (normalized: ${normDest}). Found in maps: ${!!resolvedName}`);
             
-            if (!resolvedName || isBadName(resolvedName)) {
+            if (destination && (!resolvedName || isBadName(resolvedName))) {
               // Try to find a partial match or a key that starts with this ID
               const keys = Object.keys(stopsMap);
               const match = keys.find(k => k === destination || k === normDest || k.startsWith(destination + '-') || k.startsWith(normDest + '-'));
@@ -749,10 +1123,23 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       }
       
       if (arrivals.length > 0) {
-        return arrivals
+        const sortedArrivals = arrivals
           .filter(a => a.minutes >= -2) // Allow up to 2 minutes in the past
-          .sort((a, b) => a.minutes - b.minutes)
-          .slice(0, 10);
+          .sort((a, b) => a.minutes - b.minutes);
+          
+        // Assign vehicleIndex based on order of arrival for the same line and destination
+        const counts: Record<string, number> = {};
+        sortedArrivals.forEach(a => {
+          const key = `${a.type}-${a.line}-${a.destination}`;
+          if (counts[key] === undefined) {
+            counts[key] = 0;
+          } else {
+            counts[key]++;
+          }
+          a.vehicleIndex = counts[key];
+        });
+        
+        return sortedArrivals.slice(0, 10);
       }
     }
 

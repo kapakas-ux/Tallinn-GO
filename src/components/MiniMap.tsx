@@ -48,6 +48,36 @@ export const MiniMap = ({ userLocation, stops, onStopClick }: MiniMapProps) => {
             }
           });
         }
+
+        // Add stops source and labels layer
+        map.current.addSource('stops-source', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
+
+        map.current.addLayer({
+          id: 'stops-labels',
+          type: 'symbol',
+          source: 'stops-source',
+          minzoom: 12,
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-font': ['Open Sans Regular'],
+            'text-size': 10,
+            'text-offset': [0, 1.2],
+            'text-anchor': 'top',
+            'text-allow-overlap': false,
+            'text-ignore-placement': false
+          },
+          paint: {
+            'text-color': '#0052cc',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1.5
+          }
+        });
       }
     });
 
@@ -85,14 +115,21 @@ export const MiniMap = ({ userLocation, stops, onStopClick }: MiniMapProps) => {
       const el = document.createElement('div');
       // Highlight the first (closest) stop with a larger marker or different style
       const isClosest = idx === 0;
-      el.className = `flex items-center justify-center rounded-full border-2 border-white shadow-md cursor-pointer ${
+      el.className = `relative flex items-center justify-center rounded-full border-2 border-white shadow-md cursor-pointer ${
         isClosest ? 'w-8 h-8 bg-primary z-10' : 'w-6 h-6 bg-secondary'
       }`;
       
       // Add a small dot or icon inside
-      el.innerHTML = `
-        <div class="w-1.5 h-1.5 bg-white rounded-full"></div>
-      `;
+      if (isClosest) {
+        el.innerHTML = `
+          <div class="absolute w-full h-full bg-primary rounded-full opacity-40 animate-ping"></div>
+          <div class="relative w-2 h-2 bg-white rounded-full"></div>
+        `;
+      } else {
+        el.innerHTML = `
+          <div class="w-1.5 h-1.5 bg-white rounded-full"></div>
+        `;
+      }
       
       el.onclick = (e) => {
         e.stopPropagation();
@@ -105,6 +142,22 @@ export const MiniMap = ({ userLocation, stops, onStopClick }: MiniMapProps) => {
       markers.current.push(marker);
       bounds.extend([stop.lng, stop.lat]);
     });
+
+    // Update labels source
+    if (map.current.getSource('stops-source')) {
+      const geojson: any = {
+        type: 'FeatureCollection',
+        features: stops.map(s => ({
+          type: 'Feature',
+          properties: { name: s.name },
+          geometry: {
+            type: 'Point',
+            coordinates: [s.lng, s.lat]
+          }
+        }))
+      };
+      (map.current.getSource('stops-source') as maplibregl.GeoJSONSource).setData(geojson);
+    }
 
     if (!bounds.isEmpty()) {
       map.current.fitBounds(bounds, { 

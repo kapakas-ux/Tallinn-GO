@@ -7,6 +7,7 @@ import { getFavorites, isFavorite, toggleFavorite as toggleFavService, updateFav
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { Stop, Arrival } from '../types';
+import { ArrivalItem } from '../components/ArrivalItem';
 
 export const Dashboard = () => {
   const [closestStop, setClosestStop] = useState(null as Stop | null);
@@ -362,46 +363,8 @@ export const Dashboard = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {departures.map((arrival, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  "group flex items-center justify-between p-3 rounded-[20px] transition-all",
-                  arrival.status === 'departed' 
-                    ? "bg-surface-container-high/30 opacity-60" 
-                    : "bg-surface-container-lowest editorial-shadow hover:translate-x-2"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "h-10 w-10 rounded-full flex items-center justify-center font-label font-bold text-base",
-                    arrival.type === 'tram' ? "bg-tram text-white" : arrival.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
-                  )}>
-                    {arrival.line}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className={cn(
-                      "font-headline font-extrabold text-primary text-sm",
-                      arrival.status === 'departed' && "line-through text-on-surface-variant"
-                    )}>
-                      {arrival.destination}
-                    </span>
-                    <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-widest">
-                      {arrival.type.charAt(0).toUpperCase() + arrival.type.slice(1)} • {arrival.info || 'Local'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end">
-                  {arrival.status === 'departed' ? (
-                    <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
-                  ) : (
-                    <span className="font-headline font-black text-xl text-primary">
-                      {arrival.minutes <= 0 ? 'Now' : arrival.minutes}
-                      {arrival.minutes > 0 && <span className="text-[10px] ml-0.5 font-bold">min</span>}
-                    </span>
-                  )}
-                </div>
-              </div>
+            {departures.map((arrival) => (
+              <ArrivalItem key={`${arrival.type}-${arrival.line}-${arrival.destination}-${arrival.vehicleIndex}`} arrival={arrival} stop={closestStop || undefined} />
             ))}
           </div>
         )}
@@ -477,24 +440,8 @@ export const Dashboard = () => {
                       </div>
                     ) : nearbyDepartures[stop.id]?.length > 0 ? (
                       <div className="space-y-2">
-                        {nearbyDepartures[stop.id].map((arr, i) => (
-                          <div key={i} className="flex items-center justify-between py-2">
-                            <div className="flex items-center gap-3">
-                              <div className={cn(
-                                "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
-                                arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
-                              )}>
-                                {arr.line}
-                              </div>
-                              <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
-                            </div>
-                            <div className="flex items-baseline gap-1">
-                              <span className="font-headline font-black text-lg text-primary">
-                                {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
-                              </span>
-                              {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
-                            </div>
-                          </div>
+                        {nearbyDepartures[stop.id].map((arr) => (
+                          <ArrivalItem key={`${arr.type}-${arr.line}-${arr.destination}-${arr.vehicleIndex}`} arrival={arr} stop={stop} variant="compact" />
                         ))}
                       </div>
                     ) : (
@@ -607,24 +554,8 @@ export const Dashboard = () => {
                     </div>
                   ) : nearbyDepartures[fav.id]?.length > 0 ? (
                     <div className="space-y-2">
-                      {nearbyDepartures[fav.id].map((arr, i) => (
-                        <div key={i} className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
-                              arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
-                            )}>
-                              {arr.line}
-                            </div>
-                            <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
-                          </div>
-                          <div className="flex items-baseline gap-1">
-                            <span className="font-headline font-black text-lg text-primary">
-                              {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
-                            </span>
-                            {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
-                          </div>
-                        </div>
+                      {nearbyDepartures[fav.id].map((arr) => (
+                        <ArrivalItem key={`${arr.type}-${arr.line}-${arr.destination}-${arr.vehicleIndex}`} arrival={arr} stop={fav} variant="compact" />
                       ))}
                     </div>
                   ) : (

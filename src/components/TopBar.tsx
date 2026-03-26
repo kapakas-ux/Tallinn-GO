@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Menu, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export const TopBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -17,11 +18,13 @@ export const TopBar = () => {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <img 
-              src="/logo.png" 
-              alt="Tallinn GO" 
-              className="h-7 object-contain"
-            />
+            <Link to="/" className="flex items-center">
+              <img 
+                src="/logo.png" 
+                alt="Tallinn GO" 
+                className="h-7 object-contain"
+              />
+            </Link>
           </div>
 
           {/* Dropdown Menu */}
