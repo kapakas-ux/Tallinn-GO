@@ -134,6 +134,10 @@ function parseCoordinate(valStr: string, type: 'lat' | 'lng'): number {
   const val10k = val / 10000;
   if (val10k >= min && val10k <= max) return val10k;
 
+  // 5. Check if it's multiplied by 100
+  const val100 = val / 100;
+  if (val100 >= min && val100 <= max) return val100;
+
   return 0; // Invalid or out of range
 }
 
@@ -475,14 +479,41 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
     console.log(`fetchVehicles: received ${lines.length} lines from gps.txt`);
     const vehicles: Vehicle[] = [];
     
+    let detectedLatIdx = -1;
+    let detectedLngIdx = -1;
+
     for (const line of lines) {
       const parts = line.split(',');
-      if (parts.length < 10) continue;
+      if (parts.length < 4) continue;
       
+      // Detect columns on the first valid line if not already done
+      if (detectedLatIdx === -1) {
+        // We skip the first two columns (type, line) and look for coordinates
+        for (let j = 2; j < Math.min(parts.length, 6); j++) {
+          const lat = parseCoordinate(parts[j], 'lat');
+          if (lat !== 0) {
+            for (let k = 2; k < Math.min(parts.length, 6); k++) {
+              if (j === k) continue;
+              const lng = parseCoordinate(parts[k], 'lng');
+              if (lng !== 0) {
+                detectedLatIdx = j;
+                detectedLngIdx = k;
+                console.log(`fetchVehicles: Detected columns - Lat: ${j}, Lng: ${k} from line: ${line}`);
+                break;
+              }
+            }
+            if (detectedLatIdx !== -1) break;
+          }
+        }
+      }
+
+      const latIdx = detectedLatIdx !== -1 ? detectedLatIdx : 3;
+      const lngIdx = detectedLngIdx !== -1 ? detectedLngIdx : 2;
+
       const typeRaw = parts[0];
       const lineNum = parts[1];
-      const lng = parseCoordinate(parts[2], 'lng');
-      const lat = parseCoordinate(parts[3], 'lat');
+      const lng = parseCoordinate(parts[lngIdx], 'lng');
+      const lat = parseCoordinate(parts[latIdx], 'lat');
       
       if (lat === 0 || lng === 0) continue;
       
