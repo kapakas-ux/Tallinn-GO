@@ -114,29 +114,21 @@ function parseCoordinate(valStr: string, type: 'lat' | 'lng'): number {
   const val = parseFloat(valStr);
   if (isNaN(val) || val === 0) return 0;
 
-  // Tallinn range: Lat ~59.4, Lng ~24.7
+  // Tallinn strict range: Lat ~59.4, Lng ~24.7
   const isLat = type === 'lat';
-  const min = isLat ? 58 : 23;
-  const max = isLat ? 61 : 27;
+  const min = isLat ? 59.2 : 24.3;
+  const max = isLat ? 59.6 : 24.9;
 
   // 1. Check if it's already a correct float
   if (val >= min && val <= max) return val;
 
-  // 2. Check if it's multiplied by 100,000 (common in stops.txt)
+  // 2. Check if it's multiplied by 100,000 (standard for Tallinn)
   const val100k = val / 100000;
   if (val100k >= min && val100k <= max) return val100k;
 
-  // 3. Check if it's multiplied by 1,000,000 (common in gps.txt)
+  // 3. Check if it's multiplied by 1,000,000 (also common)
   const val1M = val / 1000000;
   if (val1M >= min && val1M <= max) return val1M;
-
-  // 4. Check if it's multiplied by 10,000
-  const val10k = val / 10000;
-  if (val10k >= min && val10k <= max) return val10k;
-
-  // 5. Check if it's multiplied by 100
-  const val100 = val / 100;
-  if (val100 >= min && val100 <= max) return val100;
 
   return 0; // Invalid or out of range
 }
@@ -479,47 +471,67 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
     console.log(`fetchVehicles: received ${lines.length} lines from gps.txt`);
     const vehicles: Vehicle[] = [];
     
-    let detectedLatIdx = -1;
-    let detectedLngIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
 
-    for (const line of lines) {
-      const parts = line.split(',');
+      const parts = line.split(',').map(p => p.trim());
       if (parts.length < 4) continue;
+
+      const typeRaw = parts[0];
+      const lineNum = parts[1];
+
+      // Try to find Lng/Lat in columns 2,3 or 3,2 (standard for Tallinn)
+      let lng = 0;
+      let lat = 0;
+
+      // Check standard Lng,Lat (2,3)
+      const p2Lng = parseCoordinate(parts[2], 'lng');
+      const p3Lat = parseCoordinate(parts[3], 'lat');
       
-      // Detect columns on the first valid line if not already done
-      if (detectedLatIdx === -1) {
-        // We skip the first two columns (type, line) and look for coordinates
+      if (p2Lng !== 0 && p3Lat !== 0) {
+        lng = p2Lng;
+        lat = p3Lat;
+      } else {
+        // Check swapped Lat,Lng (2,3)
+        const p2Lat = parseCoordinate(parts[2], 'lat');
+        const p3Lng = parseCoordinate(parts[3], 'lng');
+        if (p2Lat !== 0 && p3Lng !== 0) {
+          lat = p2Lat;
+          lng = p3Lng;
+        }
+      }
+
+      // If still not found, search other columns (fallback)
+      if (lng === 0 || lat === 0) {
         for (let j = 2; j < Math.min(parts.length, 6); j++) {
-          const lat = parseCoordinate(parts[j], 'lat');
-          if (lat !== 0) {
+          const foundLat = parseCoordinate(parts[j], 'lat');
+          if (foundLat !== 0) {
             for (let k = 2; k < Math.min(parts.length, 6); k++) {
               if (j === k) continue;
-              const lng = parseCoordinate(parts[k], 'lng');
-              if (lng !== 0) {
-                detectedLatIdx = j;
-                detectedLngIdx = k;
-                console.log(`fetchVehicles: Detected columns - Lat: ${j}, Lng: ${k} from line: ${line}`);
+              const foundLng = parseCoordinate(parts[k], 'lng');
+              if (foundLng !== 0) {
+                lat = foundLat;
+                lng = foundLng;
                 break;
               }
             }
-            if (detectedLatIdx !== -1) break;
+            if (lat !== 0) break;
           }
         }
       }
 
-      const latIdx = detectedLatIdx !== -1 ? detectedLatIdx : 3;
-      const lngIdx = detectedLngIdx !== -1 ? detectedLngIdx : 2;
+      if (lng === 0 || lat === 0) continue;
 
-      const typeRaw = parts[0];
-      const lineNum = parts[1];
-      const lng = parseCoordinate(parts[lngIdx], 'lng');
-      const lat = parseCoordinate(parts[latIdx], 'lat');
-      
-      if (lat === 0 || lng === 0) continue;
-      
+      const type: 'bus' | 'tram' | 'trolley' = 
+        typeRaw === '1' ? 'trolley' : 
+        typeRaw === '3' ? 'tram' : 'bus';
+
       const bearingStr = parts[5];
-      const bearing = bearingStr ? parseInt(bearingStr, 10) : null;
-      const vehicleId = parts[6];
+      const bearing = bearingStr ? parseInt(bearingStr, 10) : 0;
+      const speedStr = parts[4];
+      const speed = speedStr ? parseFloat(speedStr) : 0;
+      const vehicleId = parts[6] || `${type}-${lineNum}-${i}`;
       let destination = parts[9] || '';
       
       const isBadName = (n: string | null | undefined) => !n || /^[\d\s,\-:]+$/.test(n) || (n.includes('-') && !/[a-zA-ZäöüõÄÖÜÕ]/.test(n));
@@ -544,13 +556,17 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
         else if (routesMap[lineNum] && !isBadName(routesMap[lineNum])) destination = routesMap[lineNum];
       }
       
+      // Add a tiny bit of jitter to prevent overlapping markers if they have same coords
+      const jitter = (Math.random() - 0.5) * 0.000001;
+      
       vehicles.push({
-        id: vehicleId || `${lineNum}-${lat}-${lng}`,
-        type: typeRaw === '1' ? 'trolley' : (typeRaw === '3' ? 'tram' : 'bus'),
+        id: vehicleId,
+        type,
         line: lineNum,
-        lat,
-        lng,
-        bearing,
+        lng: lng + jitter,
+        lat: lat + jitter,
+        bearing: bearing || 0,
+        speed: speed || 0,
         destination
       });
     }

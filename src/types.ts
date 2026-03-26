@@ -27,6 +27,7 @@ export interface Vehicle {
   lat: number;
   lng: number;
   bearing: number | null;
+  speed?: number;
   destination: string;
 }
 
