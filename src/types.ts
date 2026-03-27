@@ -17,7 +17,7 @@ export interface Arrival {
   time?: string;
   status: 'on-time' | 'delayed' | 'expected' | 'departed';
   info?: string;
-  vehicleIndex?: number;
+  vehicleId?: string;
 }
 
 export interface Vehicle {
@@ -26,8 +26,7 @@ export interface Vehicle {
   line: string;
   lat: number;
   lng: number;
-  bearing: number | null;
-  speed?: number;
+  bearing: number;
   destination: string;
 }
 

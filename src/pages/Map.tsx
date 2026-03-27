@@ -1,15 +1,17 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes, getRouteStopsForVehicle } from '../services/transportService';
+import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes } from '../services/transportService';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
 import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
 import { Stop, Arrival, Vehicle } from '../types';
-import { Bus, Loader2, Navigation, Footprints } from 'lucide-react';
+import { Bus, Loader2, Navigation, Footprints, Bell } from 'lucide-react';
 import { getDistance } from '../lib/geo';
 import { formatDistance, formatWalkingTime } from '../lib/utils';
+import { scheduleDepartureNotification } from '../services/notificationService';
+import { addActiveAlert, getActiveAlerts, isAlertActive } from '../services/alertService';
 
 const TALLINN_CENTER: [number, number] = [TALLINN_CENTER_COORD.lng, TALLINN_CENTER_COORD.lat]; // [lng, lat]
 
@@ -20,243 +22,24 @@ const isValidLngLat = (lng: number, lat: number) => {
 export const Map = () => {
   console.log('Map component rendering');
   const location = useLocation();
-  const [searchParams] = useSearchParams();
   const mapContainer = useRef(null as HTMLDivElement | null);
   const map = useRef(null as maplibregl.Map | null);
   const markers = useRef([] as maplibregl.Marker[]);
   const vehicleMarkers = useRef({} as { [id: string]: maplibregl.Marker });
+  const vehicleInterpolation = useRef({} as { [id: string]: { current: [number, number], target: [number, number], lastUpdate: number } });
   const userMarker = useRef(null as maplibregl.Marker | null);
-  const targetMarker = useRef(null as maplibregl.Marker | null);
+  const pulsatingMarker = useRef(null as maplibregl.Marker | null);
   const currentPopup = useRef(null as maplibregl.Popup | null);
   const [loadingDepartures, setLoadingDepartures] = useState(false);
   const [userLocation, setUserLocation] = useState(null as [number, number] | null);
+  const [isSimulated, setIsSimulated] = useState(false);
   const [locationError, setLocationError] = useState(null as string | null);
+  const [pulsatingStopId, setPulsatingStopId] = useState(null as string | null);
+  const [scheduledAlerts, setScheduledAlerts] = useState<any[]>([]);
 
   const [stops, setStops] = useState([] as Stop[]);
   const [vehicles, setVehicles] = useState([] as Vehicle[]);
   const [styleLoadCount, setStyleLoadCount] = useState(0);
-
-  const handleStopClick = useCallback(async (e: any) => {
-    const m = map.current;
-    if (!m) return;
-
-    const feature = e.features ? e.features[0] : e;
-    if (!feature) return;
-
-    // Close existing popup if any
-    if (currentPopup.current) {
-      currentPopup.current.remove();
-      currentPopup.current = null;
-    }
-
-    const { id, siriId, name } = feature.properties;
-    const coordinates = (feature.geometry as any).coordinates.slice();
-    
-    const popupContent = document.createElement('div');
-    popupContent.className = 'p-4 pb-8 min-w-[240px] max-h-[50vh] overflow-y-auto overflow-x-hidden font-body no-scrollbar';
-    
-    let intervalId: any;
-
-    const updateContent = async (isLoading: boolean) => {
-      let departures: Arrival[] = [];
-      let errorMsg = '';
-      
-      if (!isLoading) {
-        try {
-          departures = await fetchDepartures(id, siriId);
-        } catch (err: any) {
-          console.error('Error in handleStopClick:', err);
-          errorMsg = err.message || 'No live data';
-        }
-      }
-
-      let departuresHtml = '';
-      if (isLoading) {
-        departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">Loading...</div>`;
-      } else if (errorMsg) {
-        departuresHtml = `<div class="py-4 text-center text-red-500 font-label text-xs uppercase tracking-wider">${errorMsg}</div>`;
-      } else if (departures.length > 0) {
-        departuresHtml = departures.map(d => `
-            <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0">
-              <div class="flex items-center gap-3">
-                <div class="${d.type === 'tram' ? 'bg-tram' : d.type === 'trolley' ? 'bg-trolley' : 'bg-bus'} text-white w-8 h-8 rounded-full flex items-center justify-center font-label font-bold text-xs">
-                  ${d.line}
-                </div>
-                <div class="flex flex-col">
-                  <span class="font-headline font-bold text-sm text-primary">${d.destination}</span>
-                  <span class="text-[9px] font-label uppercase text-secondary font-bold">${d.type}</span>
-                </div>
-              </div>
-              <div class="text-right">
-                <span class="font-headline font-black text-lg text-primary">
-                  ${d.minutes > 60 && d.time ? d.time : (d.minutes <= 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
-                </span>
-              </div>
-            </div>
-          `).join('');
-      } else {
-        departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">No departures scheduled</div>`;
-      }
-
-      const lastUpdated = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const isFav = isFavorite(id);
-
-      let distanceHtml = '';
-      if (userLocation) {
-        const distanceKm = getDistance(userLocation[1], userLocation[0], coordinates[1], coordinates[0]);
-        const distanceM = distanceKm * 1000;
-        
-        distanceHtml = `
-          <div class="flex items-center gap-2 mt-1">
-            <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-              ${formatDistance(distanceM)}
-            </span>
-            <span class="text-secondary opacity-30">•</span>
-            <div class="flex items-center gap-1">
-              <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-                ${formatWalkingTime(distanceM)}
-              </span>
-            </div>
-          </div>
-        `;
-      } else {
-        distanceHtml = `<p class="text-[10px] font-label uppercase tracking-wider text-secondary font-bold">ID: ${siriId || id}</p>`;
-      }
-
-      popupContent.innerHTML = `
-        <div class="mb-3 pl-16 relative pr-8">
-          <button id="refresh-btn" class="absolute top-0 left-0 p-1.5 hover:bg-surface-container-high rounded-full transition-colors group">
-            <svg class="w-4 h-4 text-secondary group-hover:text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
-          </button>
-          <button id="fav-btn" class="absolute top-0 left-8 p-1.5 hover:bg-surface-container-high rounded-full transition-colors group ${isFav ? 'text-amber-400' : 'text-secondary'}">
-            <svg class="w-4 h-4 ${isFav ? 'fill-current' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-          </button>
-          <h3 class="font-headline font-black text-primary text-lg leading-tight">${name}</h3>
-          ${distanceHtml}
-        </div>
-        <div class="space-y-2">
-          ${departuresHtml}
-        </div>
-        <div class="mt-4 pt-2 border-t border-surface-container-high text-[9px] text-secondary font-label uppercase tracking-widest text-center opacity-70">
-          Updated ${lastUpdated}
-        </div>
-      `;
-
-      const refreshBtn = popupContent.querySelector('#refresh-btn');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          updateContent(false);
-        });
-      }
-
-      const favBtn = popupContent.querySelector('#fav-btn');
-      if (favBtn) {
-        favBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const stop: Stop = { id, siriId, name, lat: coordinates[1], lng: coordinates[0] };
-          const newFavs = toggleFavorite(stop);
-          const isNowFav = !!newFavs.find(f => f.id === id);
-          
-          if (isNowFav) {
-            favBtn.classList.remove('text-secondary');
-            favBtn.classList.add('text-amber-400');
-            favBtn.querySelector('svg')?.classList.add('fill-current');
-          } else {
-            favBtn.classList.remove('text-amber-400');
-            favBtn.classList.add('text-secondary');
-            favBtn.querySelector('svg')?.classList.remove('fill-current');
-          }
-        });
-      }
-    };
-
-    setLoadingDepartures(true);
-    await updateContent(false);
-    setLoadingDepartures(false);
-
-    intervalId = setInterval(() => {
-      updateContent(false);
-    }, 10000);
-
-    const popup = new maplibregl.Popup({ offset: 10, maxWidth: '300px' })
-      .setLngLat(coordinates)
-      .setDOMContent(popupContent)
-      .addTo(m);
-    
-    currentPopup.current = popup;
-    
-    popup.on('close', () => {
-      clearInterval(intervalId);
-      if (currentPopup.current === popup) {
-        currentPopup.current = null;
-      }
-    });
-  }, [userLocation]);
-
-  const handleVehicleClick = useCallback(async (vehicle: Vehicle) => {
-    const m = map.current;
-    if (!m) return;
-
-    // Close existing popup if any
-    if (currentPopup.current) {
-      currentPopup.current.remove();
-      currentPopup.current = null;
-    }
-
-    const popupContent = document.createElement('div');
-    popupContent.className = 'p-4 pb-8 min-w-[240px] max-h-[50vh] overflow-y-auto overflow-x-hidden font-body no-scrollbar';
-
-    const updateContent = async () => {
-      const stops = await getRouteStopsForVehicle(vehicle);
-      
-      let stopsHtml = '';
-      if (stops.length > 0) {
-        stopsHtml = stops.map(s => `
-          <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-              </div>
-              <div class="flex flex-col">
-                <span class="font-headline font-bold text-sm text-primary">${s.name}</span>
-                <span class="text-[9px] font-label uppercase text-secondary font-bold">Stop ID: ${s.id}</span>
-              </div>
-            </div>
-          </div>
-        `).join('');
-      } else {
-        stopsHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">No route info available</div>`;
-      }
-
-      popupContent.innerHTML = `
-        <div class="mb-3 pl-4 relative pr-8">
-          <div class="flex items-center gap-3 mb-2">
-            <div class="${vehicle.type === 'tram' ? 'bg-tram' : vehicle.type === 'trolley' ? 'bg-trolley' : 'bg-bus'} text-white w-10 h-10 rounded-full flex items-center justify-center font-label font-black text-sm">
-              ${vehicle.line}
-            </div>
-            <div>
-              <h3 class="font-headline font-black text-primary text-lg leading-tight">${vehicle.destination || 'Unknown Destination'}</h3>
-              <span class="text-[9px] font-label uppercase text-secondary font-bold">${vehicle.type} • Vehicle ID: ${vehicle.id}</span>
-            </div>
-          </div>
-        </div>
-        <div class="space-y-1">
-          <div class="px-1 py-2 font-label text-[10px] font-bold uppercase tracking-widest text-secondary opacity-70">Route Stops</div>
-          ${stopsHtml}
-        </div>
-      `;
-    };
-
-    await updateContent();
-
-    const popup = new maplibregl.Popup({ offset: 10, maxWidth: '300px' })
-      .setLngLat([vehicle.lng, vehicle.lat])
-      .setDOMContent(popupContent)
-      .addTo(m);
-    
-    currentPopup.current = popup;
-  }, []);
 
   useEffect(() => {
     console.log('Map component mounted');
@@ -279,15 +62,44 @@ export const Map = () => {
     };
 
     loadVehicles();
-    const interval = setInterval(loadVehicles, 5000); // Update every 5 seconds
+    const interval = setInterval(loadVehicles, 2000); // Update every 2 seconds
 
-    return () => clearInterval(interval);
+    // Animation loop for smooth vehicle movement
+    let animationFrameId: number;
+    const animate = () => {
+      const now = Date.now();
+      const duration = 2000; // Match fetch interval
+
+      Object.keys(vehicleInterpolation.current).forEach(id => {
+        const data = vehicleInterpolation.current[id];
+        const marker = vehicleMarkers.current[id];
+        if (!marker) return;
+
+        const elapsed = now - data.lastUpdate;
+        const t = Math.min(elapsed / duration, 1);
+        
+        // Linear interpolation
+        const lng = data.current[0] + (data.target[0] - data.current[0]) * t;
+        const lat = data.current[1] + (data.target[1] - data.current[1]) * t;
+        
+        marker.setLngLat([lng, lat]);
+      });
+
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    animationFrameId = requestAnimationFrame(animate);
+
+    return () => {
+      clearInterval(interval);
+      cancelAnimationFrame(animationFrameId);
+    };
   }, []);
 
   // Geolocation tracking
   useEffect(() => {
-    const cleanup = watchLocation((location) => {
+    const cleanup = watchLocation((location, simulated) => {
       setUserLocation([location.lng, location.lat]);
+      setIsSimulated(simulated);
       setLocationError(null);
     });
 
@@ -296,7 +108,13 @@ export const Map = () => {
 
   // Update user marker
   useEffect(() => {
-    if (!map.current || !userLocation || styleLoadCount === 0) return;
+    if (!map.current || !userLocation || styleLoadCount === 0 || isSimulated) {
+      if (userMarker.current) {
+        userMarker.current.remove();
+        userMarker.current = null;
+      }
+      return;
+    }
     
     // Don't show marker at 0,0 (likely invalid/unlocked GPS)
     if (Math.abs(userLocation[0]) < 0.1 && Math.abs(userLocation[1]) < 0.1) {
@@ -347,6 +165,13 @@ export const Map = () => {
       });
 
       map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+      // Double tap to clear pulsating effect
+      map.current.on('dblclick', (e) => {
+        // Prevent default zoom on dblclick if we want to handle it specifically
+        // e.preventDefault(); 
+        setPulsatingStopId(null);
+      });
 
       map.current.on('error', (e) => {
         console.error('MapLibre error:', e.error?.message || e);
@@ -424,23 +249,25 @@ export const Map = () => {
       if (!isValidLngLat(vehicle.lng, vehicle.lat)) return;
 
       if (vehicleMarkers.current[vehicle.id]) {
-        // Update existing
-        vehicleMarkers.current[vehicle.id].setLngLat([vehicle.lng, vehicle.lat]);
-        const el = vehicleMarkers.current[vehicle.id].getElement();
+        // Update existing target for interpolation
+        const prevData = vehicleInterpolation.current[vehicle.id];
+        const currentPos = vehicleMarkers.current[vehicle.id].getLngLat();
         
-        el.className = 'cursor-pointer';
-        el.onclick = (e) => {
-          e.stopPropagation();
-          handleVehicleClick(vehicle);
+        vehicleInterpolation.current[vehicle.id] = {
+          current: [currentPos.lng, currentPos.lat],
+          target: [vehicle.lng, vehicle.lat],
+          lastUpdate: Date.now()
         };
 
+        const el = vehicleMarkers.current[vehicle.id].getElement();
+        
         const currentZoom = map.current?.getZoom() || 0;
         const visible = currentZoom >= 13;
         el.style.display = visible ? 'block' : 'none';
 
         const icon = el.querySelector('.vehicle-icon') as HTMLElement;
         if (icon) {
-          icon.style.transform = `rotate(${(vehicle.bearing || 0) - 45}deg)`;
+          icon.style.transform = `rotate(${vehicle.bearing - 45}deg)`;
         }
         const label = el.querySelector('.vehicle-label') as HTMLElement;
         if (label) {
@@ -449,11 +276,7 @@ export const Map = () => {
       } else {
         // Create new
         const el = document.createElement('div');
-        el.className = 'cursor-pointer';
-        el.onclick = (e) => {
-          e.stopPropagation();
-          handleVehicleClick(vehicle);
-        };
+        el.className = 'pointer-events-none';
         
         const bgColor = vehicle.type === 'tram' ? 'bg-tram' : vehicle.type === 'trolley' ? 'bg-trolley' : 'bg-bus';
         const labelText = vehicle.destination ? `${vehicle.line} ${vehicle.destination}` : vehicle.line;
@@ -463,7 +286,7 @@ export const Map = () => {
             <div class="vehicle-label absolute bottom-full mb-1 text-[8px] font-bold text-white ${bgColor} opacity-80 px-1 py-0.5 rounded-sm shadow-sm whitespace-nowrap">
               ${labelText}
             </div>
-            <div class="vehicle-icon w-5 h-5 ${bgColor} rounded-full flex items-center justify-center shadow-sm border border-white transition-transform duration-1000" style="transform: rotate(${(vehicle.bearing || 0) - 45}deg)">
+            <div class="vehicle-icon w-5 h-5 ${bgColor} rounded-full flex items-center justify-center shadow-sm border border-white" style="transform: rotate(${vehicle.bearing - 45}deg)">
               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
               </svg>
@@ -479,10 +302,42 @@ export const Map = () => {
         const visible = currentZoom >= 13;
         el.style.display = visible ? 'block' : 'none';
           
+        vehicleInterpolation.current[vehicle.id] = {
+          current: [vehicle.lng, vehicle.lat],
+          target: [vehicle.lng, vehicle.lat],
+          lastUpdate: Date.now()
+        };
+
         vehicleMarkers.current[vehicle.id] = marker;
       }
     });
   }, [vehicles, styleLoadCount]);
+
+  // Handle pulsating stop marker
+  useEffect(() => {
+    if (!map.current || styleLoadCount === 0) return;
+
+    if (pulsatingMarker.current) {
+      pulsatingMarker.current.remove();
+      pulsatingMarker.current = null;
+    }
+
+    if (pulsatingStopId && stops.length > 0) {
+      const stop = stops.find(s => s.id === pulsatingStopId);
+      if (stop) {
+        const el = document.createElement('div');
+        el.className = 'relative flex items-center justify-center w-12 h-12 pointer-events-none';
+        el.innerHTML = `
+          <div class="absolute w-full h-full bg-red-500 rounded-full opacity-40 animate-ping"></div>
+          <div class="relative w-4 h-4 bg-red-600 rounded-full border-2 border-white shadow-lg"></div>
+        `;
+
+        pulsatingMarker.current = new maplibregl.Marker({ element: el })
+          .setLngLat([stop.lng, stop.lat])
+          .addTo(map.current);
+      }
+    }
+  }, [pulsatingStopId, stops, styleLoadCount]);
 
   useEffect(() => {
     if (styleLoadCount === 0 || stops.length === 0 || !map.current) {
@@ -637,7 +492,241 @@ export const Map = () => {
     m.on('mouseenter', 'stops-layer', onMouseEnter);
     m.on('mouseleave', 'stops-layer', onMouseLeave);
 
-    m.on('click', 'stops-layer', handleStopClick);
+    const handleStopClick = async (e: any) => {
+      const feature = e.features ? e.features[0] : e;
+      if (!feature) return;
+
+      // Close existing popup if any
+      if (currentPopup.current) {
+        currentPopup.current.remove();
+        currentPopup.current = null;
+      }
+
+      const id = feature.properties?.id || feature.id;
+      const siriId = feature.properties?.siriId || feature.siriId;
+      const name = feature.properties?.name || feature.name;
+      const coordinates = feature.geometry ? (feature.geometry as any).coordinates.slice() : [feature.lng, feature.lat];
+      
+      const popupContent = document.createElement('div');
+      popupContent.className = 'p-4 pb-8 min-w-[240px] max-h-[50vh] overflow-y-auto overflow-x-hidden font-body no-scrollbar';
+      
+      let intervalId: any;
+
+      const updateContent = async (isLoading: boolean) => {
+        let departures: Arrival[] = [];
+        let errorMsg = '';
+        
+        if (!isLoading) {
+          try {
+            departures = await fetchDepartures(id, siriId);
+          } catch (err: any) {
+            console.error('Error in handleStopClick:', err);
+            errorMsg = err.message || 'No live data';
+          }
+        }
+
+        let departuresHtml = '';
+        if (isLoading) {
+          departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">Loading...</div>`;
+        } else if (errorMsg) {
+          departuresHtml = `<div class="py-4 text-center text-red-500 font-label text-xs uppercase tracking-wider">${errorMsg}</div>`;
+        } else if (departures.length > 0) {
+          departuresHtml = departures.map(d => {
+            const isScheduled = isAlertActive(id, d.line, d.minutes);
+            const showAlarm = d.minutes > 15 && d.status !== 'departed';
+            
+            return `
+              <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0 relative">
+                <div class="flex items-center gap-3">
+                  <div class="${d.type === 'tram' ? 'bg-tram' : d.type === 'trolley' ? 'bg-trolley' : 'bg-bus'} text-white w-8 h-8 rounded-full flex items-center justify-center font-label font-bold text-xs">
+                    ${d.line}
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="font-headline font-bold text-sm text-primary">${d.destination}</span>
+                    <span class="text-[9px] font-label uppercase text-secondary font-bold">${d.type}</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  ${showAlarm ? `
+                    <button class="alarm-btn p-1.5 rounded-full transition-all active:scale-90 ${isScheduled ? 'bg-amber-500 text-white' : 'bg-surface-container-high text-secondary'}" 
+                            data-line="${d.line}" data-dest="${d.destination}" data-mins="${d.minutes}">
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+                    </button>
+                  ` : ''}
+                  <div class="text-right">
+                    <span class="font-headline font-black text-lg text-primary">
+                      ${d.minutes > 60 && d.time ? d.time : (d.minutes <= 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">No departures scheduled</div>`;
+        }
+
+        const lastUpdated = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const isFav = isFavorite(id);
+
+        let distanceHtml = '';
+        if (userLocation) {
+          const distanceKm = getDistance(userLocation[1], userLocation[0], coordinates[1], coordinates[0]);
+          const distanceM = distanceKm * 1000;
+          
+          distanceHtml = `
+            <div class="flex items-center gap-2 mt-1">
+              <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
+                ${formatDistance(distanceM)}
+              </span>
+              <span class="text-secondary opacity-30">•</span>
+              <div class="flex items-center gap-1">
+                <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
+                  ${formatWalkingTime(distanceM)}
+                </span>
+              </div>
+            </div>
+          `;
+        } else {
+          distanceHtml = `<p class="text-[10px] font-label uppercase tracking-wider text-secondary font-bold">ID: ${siriId || id}</p>`;
+        }
+
+        popupContent.innerHTML = `
+          <div class="mb-3 pl-16 relative pr-8">
+            <button id="refresh-btn" class="absolute top-0 left-0 p-1.5 hover:bg-surface-container-high rounded-full transition-colors group">
+              <svg class="w-4 h-4 text-secondary group-hover:text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+            </button>
+            <button id="fav-btn" class="absolute top-0 left-8 p-1.5 hover:bg-surface-container-high rounded-full transition-colors group ${isFav ? 'text-amber-400' : 'text-secondary'}">
+              <svg class="w-4 h-4 ${isFav ? 'fill-current' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </button>
+            <h3 class="font-headline font-black text-primary text-lg leading-tight">${name}</h3>
+            ${distanceHtml}
+          </div>
+          <div class="space-y-2">
+            ${departuresHtml}
+          </div>
+          <div class="mt-4 pt-2 border-t border-surface-container-high text-[9px] text-secondary font-label uppercase tracking-widest text-center opacity-70">
+            Updated ${lastUpdated}
+          </div>
+        `;
+
+        const refreshBtn = popupContent.querySelector('#refresh-btn');
+        if (refreshBtn) {
+          refreshBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateContent(false);
+          });
+        }
+
+        const alarmBtns = popupContent.querySelectorAll('.alarm-btn');
+        alarmBtns.forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const line = btn.getAttribute('data-line') || '';
+            const dest = btn.getAttribute('data-dest') || '';
+            const mins = parseInt(btn.getAttribute('data-mins') || '0');
+            const alertId = btn.getAttribute('data-alert-id') || '';
+
+            // Create a temporary overlay for selection
+            const overlay = document.createElement('div');
+            overlay.className = 'absolute inset-0 bg-surface-container-lowest/95 z-50 flex flex-col items-center justify-center p-4 text-center rounded-[20px]';
+            overlay.innerHTML = `
+              <h4 class="font-headline font-bold text-xs text-primary uppercase tracking-widest mb-2">Set Alert</h4>
+              <p class="text-[10px] text-secondary mb-4 leading-tight">Notify me before ${line} to ${dest} departs.</p>
+              <div class="flex flex-col gap-2 w-full">
+                <button id="alert-5" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">5 Mins Before</button>
+                <button id="alert-10" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">10 Mins Before</button>
+                <button id="alert-cancel" class="py-1 text-[10px] text-secondary hover:text-primary mt-1 uppercase font-bold tracking-widest">Cancel</button>
+              </div>
+            `;
+            popupContent.appendChild(overlay);
+
+            const handleChoice = async (minutesBefore: number) => {
+              const success = await scheduleDepartureNotification(name, line, dest, mins, minutesBefore);
+              if (success) {
+                addActiveAlert({
+                  id: Math.random().toString(36).substr(2, 9),
+                  stopId: id,
+                  stopName: name,
+                  line: line,
+                  destination: dest,
+                  departureTimestamp: Date.now() + mins * 60 * 1000,
+                  minutesBefore
+                });
+                setScheduledAlerts(getActiveAlerts());
+                btn.classList.remove('bg-surface-container-high', 'text-secondary');
+                btn.classList.add('bg-amber-500', 'text-white');
+              }
+              overlay.remove();
+            };
+
+            overlay.querySelector('#alert-5')?.addEventListener('click', () => handleChoice(5));
+            overlay.querySelector('#alert-10')?.addEventListener('click', () => handleChoice(10));
+            overlay.querySelector('#alert-cancel')?.addEventListener('click', () => overlay.remove());
+          });
+        });
+
+        const favBtn = popupContent.querySelector('#fav-btn');
+        if (favBtn) {
+          favBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const stop: Stop = { id, siriId, name, lat: coordinates[1], lng: coordinates[0] };
+            const newFavs = toggleFavorite(stop);
+            const isNowFav = !!newFavs.find(f => f.id === id);
+            
+            if (isNowFav) {
+              favBtn.classList.remove('text-secondary');
+              favBtn.classList.add('text-amber-400');
+              favBtn.querySelector('svg')?.classList.add('fill-current');
+            } else {
+              favBtn.classList.remove('text-amber-400');
+              favBtn.classList.add('text-secondary');
+              favBtn.querySelector('svg')?.classList.remove('fill-current');
+            }
+          });
+        }
+      };
+
+      setLoadingDepartures(true);
+      await updateContent(false);
+      setLoadingDepartures(false);
+
+      intervalId = setInterval(() => {
+        updateContent(false);
+      }, 10000);
+
+      const popup = new maplibregl.Popup({ offset: 10, maxWidth: '300px' })
+        .setLngLat(coordinates)
+        .setDOMContent(popupContent)
+        .addTo(m);
+      
+      currentPopup.current = popup;
+      
+      popup.on('close', () => {
+        clearInterval(intervalId);
+        if (currentPopup.current === popup) {
+          currentPopup.current = null;
+        }
+      });
+    };
+
+    m.on('click', 'stops-layer', (e) => {
+      handleStopClick(e);
+    });
+
+    // Handle initial stopId from URL
+    const searchParams = new URLSearchParams(location.search);
+    const stopIdFromUrl = searchParams.get('stopId');
+    if (stopIdFromUrl && stops.length > 0) {
+      const stop = stops.find(s => s.id === stopIdFromUrl);
+      if (stop) {
+        setPulsatingStopId(stopIdFromUrl);
+        // Small delay to ensure map is ready to show popup
+        setTimeout(() => {
+          handleStopClick(stop);
+        }, 500);
+      }
+    }
 
     return () => {
       m.off('click', 'stops-layer', handleStopClick);
@@ -648,45 +737,7 @@ export const Map = () => {
         currentPopup.current = null;
       }
     };
-  }, [styleLoadCount, stops, userLocation]);
-
-  // Handle target stop from URL
-  useEffect(() => {
-    if (!map.current || styleLoadCount === 0 || stops.length === 0) return;
-
-    const stopId = searchParams.get('stopId');
-    if (!stopId) {
-      if (targetMarker.current) {
-        targetMarker.current.remove();
-        targetMarker.current = null;
-      }
-      return;
-    }
-
-    const stop = stops.find(s => s.id === stopId);
-    if (stop) {
-      if (targetMarker.current) {
-        targetMarker.current.remove();
-      }
-
-      const el = document.createElement('div');
-      el.className = 'relative flex items-center justify-center w-12 h-12 pointer-events-none';
-      el.innerHTML = `
-        <div class="absolute w-full h-full bg-primary rounded-full opacity-40 animate-ping"></div>
-        <div class="relative w-4 h-4 bg-primary rounded-full border-2 border-white shadow-lg"></div>
-      `;
-
-      targetMarker.current = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([stop.lng, stop.lat])
-        .addTo(map.current);
-
-      // Also open the popup for the stop
-      handleStopClick({
-        properties: { id: stop.id, siriId: stop.siriId, name: stop.name },
-        geometry: { coordinates: [stop.lng, stop.lat] }
-      });
-    }
-  }, [searchParams, stops, styleLoadCount, handleStopClick]);
+  }, [styleLoadCount, stops]);
 
   const handleLocateMe = () => {
     if (userLocation && map.current) {

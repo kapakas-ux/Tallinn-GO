@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, CheckCircle2, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon } from 'lucide-react';
+import { Star, CheckCircle2, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Bell } from 'lucide-react';
 import { cn, formatDistance, formatWalkingTime } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
@@ -7,7 +7,10 @@ import { getFavorites, isFavorite, toggleFavorite as toggleFavService, updateFav
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { Stop, Arrival } from '../types';
-import { ArrivalItem } from '../components/ArrivalItem';
+import { getActiveAlerts, isAlertActive } from '../services/alertService';
+import { NotificationSelector } from '../components/NotificationSelector';
+import { ActiveAlerts } from '../components/ActiveAlerts';
+import { AnimatePresence } from 'motion/react';
 
 export const Dashboard = () => {
   const [closestStop, setClosestStop] = useState(null as Stop | null);
@@ -28,6 +31,8 @@ export const Dashboard = () => {
   const [editingFav, setEditingFav] = useState(null as Stop | null);
   const [editName, setEditName] = useState('');
   const [editEmoji, setEditEmoji] = useState('');
+  const [alertingArrival, setAlertingArrival] = useState<{ stop: Stop; arrival: Arrival } | null>(null);
+  const [scheduledAlerts, setScheduledAlerts] = useState<any[]>([]);
 
   const emojiOptions = [
     { label: 'Home', emoji: '🏠' },
@@ -41,6 +46,7 @@ export const Dashboard = () => {
 
   useEffect(() => {
     setFavorites(getFavorites());
+    setScheduledAlerts(getActiveAlerts());
   }, []);
 
   // Continuous geolocation tracking
@@ -192,7 +198,7 @@ export const Dashboard = () => {
           }).catch(err => console.error("Failed to refresh nearby departures", err));
         }
       }
-    }, 20000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [closestStop, expandedNearby, allStops, favorites]);
@@ -273,6 +279,9 @@ export const Dashboard = () => {
         </div>
       )}
 
+      {/* Active Alerts Section */}
+      <ActiveAlerts onAlertsChange={() => setScheduledAlerts(getActiveAlerts())} />
+
       {/* Hero Section: Stop Identity */}
       <section className="mb-10">
         <div className="flex justify-between items-start">
@@ -282,13 +291,15 @@ export const Dashboard = () => {
             </div>
             <div className={cn(
               "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-widest mb-1",
-              !userLocation ? "bg-blue-50 border-blue-100 text-blue-600 animate-pulse" : (isSimulated ? "bg-amber-50 border-amber-100 text-amber-600" : "bg-blue-50 border-blue-100 text-blue-600")
+              !userLocation ? "bg-blue-50 border-blue-100 text-blue-600 animate-pulse" : (isSimulated ? "bg-error/10 border-error/20 text-error" : "bg-blue-50 border-blue-100 text-blue-600")
             )}>
               <Navigation className={cn("w-2.5 h-2.5", userLocation && "fill-current")} />
-              {!userLocation ? 'Acquiring GPS...' : (isSimulated ? 'Simulated Tallinn Location' : 'Live Location Active')}
+              {!userLocation ? 'Acquiring GPS...' : (isSimulated ? 'GPS Disabled' : 'Live Location Active')}
             </div>
             <h2 className="font-headline font-black text-primary text-5xl md:text-6xl tracking-tighter leading-none flex items-center gap-3">
-              {closestStop ? (
+              {isSimulated ? (
+                <span className="text-error">Please enable GPS</span>
+              ) : closestStop ? (
                 <>
                   {favorites.find(f => f.id === closestStop.id)?.emoji && (
                     <span className="text-4xl md:text-5xl">{favorites.find(f => f.id === closestStop.id)?.emoji}</span>
@@ -297,7 +308,7 @@ export const Dashboard = () => {
                 </>
               ) : 'Locating...'}
             </h2>
-            {closestStop?.distance !== undefined && (
+            {closestStop?.distance !== undefined && !isSimulated && (
               <div className="flex items-center gap-2 pt-1.5">
                 <div className="font-label text-secondary text-[11px] uppercase tracking-wider font-bold">
                   {formatDistance(closestStop.distance * 1000)}
@@ -312,16 +323,16 @@ export const Dashboard = () => {
             )}
           </div>
           <div className="flex gap-2">
-            {closestStop && (
+            {closestStop && !isSimulated && (
               <Link
-                to={`/map?lat=${closestStop.lat}&lng=${closestStop.lng}&zoom=20`}
+                to={`/map?lat=${closestStop.lat}&lng=${closestStop.lng}&zoom=20&stopId=${closestStop.id}`}
                 className="bg-surface-container-lowest editorial-shadow h-12 w-12 rounded-full flex items-center justify-center active:scale-90 transition-all text-secondary hover:text-primary"
                 title="View on Map"
               >
                 <MapIcon className="w-5 h-5" />
               </Link>
             )}
-            {closestStop && (
+            {closestStop && !isSimulated && (
               <button 
                 onClick={() => toggleFavorite(closestStop)}
                 className={cn(
@@ -353,6 +364,16 @@ export const Dashboard = () => {
             <Loader2 className="w-8 h-8 animate-spin mb-4" />
             <p>Finding closest stop and departures...</p>
           </div>
+        ) : isSimulated ? (
+          <div className="p-12 bg-surface-container-low rounded-[32px] text-center space-y-4 border border-outline-variant/10">
+            <div className="w-16 h-16 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-2">
+              <Navigation className="w-8 h-8" />
+            </div>
+            <h4 className="font-headline font-bold text-xl text-primary">GPS is required</h4>
+            <p className="text-secondary text-sm max-w-[240px] mx-auto">
+              Please enable location services to see live arrivals for your closest stop.
+            </p>
+          </div>
         ) : error ? (
           <div className="p-6 bg-error/10 text-error rounded-[20px] text-center">
             {error}
@@ -363,8 +384,74 @@ export const Dashboard = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {departures.map((arrival) => (
-              <ArrivalItem key={`${arrival.type}-${arrival.line}-${arrival.destination}-${arrival.vehicleIndex}`} arrival={arrival} stop={closestStop || undefined} />
+            {departures.map((arrival, idx) => (
+              <div
+                key={idx}
+                className={cn(
+                  "group flex items-center justify-between p-3 rounded-[20px] transition-all relative",
+                  arrival.status === 'departed' 
+                    ? "bg-surface-container-high/30 opacity-60" 
+                    : "bg-surface-container-lowest editorial-shadow hover:translate-x-2"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "h-10 w-10 rounded-full flex items-center justify-center font-label font-bold text-base",
+                    arrival.type === 'tram' ? "bg-tram text-white" : arrival.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                  )}>
+                    {arrival.line}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={cn(
+                      "font-headline font-extrabold text-primary text-sm",
+                      arrival.status === 'departed' && "line-through text-on-surface-variant"
+                    )}>
+                      {arrival.destination}
+                    </span>
+                    <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-widest">
+                      {arrival.type.charAt(0).toUpperCase() + arrival.type.slice(1)} • {arrival.info || 'Local'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {arrival.minutes > 15 && arrival.status !== 'departed' && closestStop && (
+                    <button 
+                      onClick={() => setAlertingArrival({ stop: closestStop, arrival })}
+                      className={cn(
+                        "p-2 rounded-full transition-all active:scale-90",
+                        isAlertActive(closestStop.id, arrival.line, arrival.minutes) 
+                          ? "bg-amber-500 text-white" 
+                          : "bg-surface-container-high text-secondary hover:text-primary"
+                      )}
+                    >
+                      <Bell className="w-4 h-4" />
+                    </button>
+                  )}
+                  <div className="flex flex-col items-end">
+                    {arrival.status === 'departed' ? (
+                      <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
+                    ) : (
+                      <span className="font-headline font-black text-xl text-primary">
+                        {arrival.minutes <= 0 ? 'Now' : arrival.minutes}
+                        {arrival.minutes > 0 && <span className="text-[10px] ml-0.5 font-bold">min</span>}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <AnimatePresence>
+                  {alertingArrival?.arrival === arrival && alertingArrival?.stop === closestStop && (
+                    <NotificationSelector 
+                      stop={closestStop}
+                      arrival={arrival}
+                      onClose={() => setAlertingArrival(null)}
+                      onScheduled={() => {
+                        setScheduledAlerts(getActiveAlerts());
+                      }}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
             ))}
           </div>
         )}
@@ -374,7 +461,7 @@ export const Dashboard = () => {
       {nearbyStops.length > 0 && (
         <section className="mb-12 space-y-4">
           <div className="flex items-baseline justify-between">
-            <h3 className="font-headline font-bold text-2xl text-primary">Nearby stops</h3>
+            <h3 className="font-headline font-bold text-2xl text-primary">Nearby Stops</h3>
           </div>
           <div className="grid grid-cols-1 gap-3">
             {nearbyStops.map((stop) => (
@@ -385,7 +472,7 @@ export const Dashboard = () => {
                 >
                   <div className="flex items-center gap-4">
                     <Link 
-                      to={`/map?lat=${stop.lat}&lng=${stop.lng}&zoom=20`}
+                      to={`/map?lat=${stop.lat}&lng=${stop.lng}&zoom=20&stopId=${stop.id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="h-10 w-10 rounded-full bg-primary/5 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-colors active:scale-90"
                       title="View on Map"
@@ -440,8 +527,52 @@ export const Dashboard = () => {
                       </div>
                     ) : nearbyDepartures[stop.id]?.length > 0 ? (
                       <div className="space-y-2">
-                        {nearbyDepartures[stop.id].map((arr) => (
-                          <ArrivalItem key={`${arr.type}-${arr.line}-${arr.destination}-${arr.vehicleIndex}`} arrival={arr} stop={stop} variant="compact" />
+                        {nearbyDepartures[stop.id].map((arr, i) => (
+                          <div key={i} className="flex items-center justify-between py-2 relative">
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
+                                arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                              )}>
+                                {arr.line}
+                              </div>
+                              <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {arr.minutes > 15 && arr.status !== 'departed' && (
+                                <button 
+                                  onClick={() => setAlertingArrival({ stop, arrival: arr })}
+                                  className={cn(
+                                    "p-1.5 rounded-full transition-all active:scale-90",
+                                    isAlertActive(stop.id, arr.line, arr.minutes) 
+                                      ? "bg-amber-500 text-white" 
+                                      : "bg-surface-container-high text-secondary hover:text-primary"
+                                  )}
+                                >
+                                  <Bell className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <div className="flex items-baseline gap-1">
+                                <span className="font-headline font-black text-lg text-primary">
+                                  {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
+                                </span>
+                                {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
+                              </div>
+                            </div>
+
+                            <AnimatePresence>
+                              {alertingArrival?.arrival === arr && alertingArrival?.stop === stop && (
+                                <NotificationSelector 
+                                  stop={stop}
+                                  arrival={arr}
+                                  onClose={() => setAlertingArrival(null)}
+                                  onScheduled={() => {
+                                    setScheduledAlerts(getActiveAlerts());
+                                  }}
+                                />
+                              )}
+                            </AnimatePresence>
+                          </div>
                         ))}
                       </div>
                     ) : (
@@ -490,7 +621,7 @@ export const Dashboard = () => {
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <Link 
-                      to={`/map?lat=${fav.lat}&lng=${fav.lng}&zoom=20`}
+                      to={`/map?lat=${fav.lat}&lng=${fav.lng}&zoom=20&stopId=${fav.id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="h-10 w-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center hover:bg-amber-500 hover:text-white transition-colors active:scale-90"
                       title="View on Map"
@@ -554,8 +685,52 @@ export const Dashboard = () => {
                     </div>
                   ) : nearbyDepartures[fav.id]?.length > 0 ? (
                     <div className="space-y-2">
-                      {nearbyDepartures[fav.id].map((arr) => (
-                        <ArrivalItem key={`${arr.type}-${arr.line}-${arr.destination}-${arr.vehicleIndex}`} arrival={arr} stop={fav} variant="compact" />
+                      {nearbyDepartures[fav.id].map((arr, i) => (
+                        <div key={i} className="flex items-center justify-between py-2 relative">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
+                              arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                            )}>
+                              {arr.line}
+                            </div>
+                            <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {arr.minutes > 15 && arr.status !== 'departed' && (
+                              <button 
+                                onClick={() => setAlertingArrival({ stop: fav, arrival: arr })}
+                                className={cn(
+                                  "p-1.5 rounded-full transition-all active:scale-90",
+                                  scheduledAlerts.includes(`${fav.id}-${arr.line}-${arr.minutes}`) 
+                                    ? "bg-amber-500 text-white" 
+                                    : "bg-surface-container-high text-secondary hover:text-primary"
+                                )}
+                              >
+                                <Bell className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <div className="flex items-baseline gap-1">
+                              <span className="font-headline font-black text-lg text-primary">
+                                {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
+                              </span>
+                              {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
+                            </div>
+                          </div>
+
+                          <AnimatePresence>
+                            {alertingArrival?.arrival === arr && alertingArrival?.stop === fav && (
+                              <NotificationSelector 
+                                stop={fav}
+                                arrival={arr}
+                                onClose={() => setAlertingArrival(null)}
+                                onScheduled={() => {
+                                  setScheduledAlerts(prev => [...prev, `${fav.id}-${arr.line}-${arr.minutes}`]);
+                                }}
+                              />
+                            )}
+                          </AnimatePresence>
+                        </div>
                       ))}
                     </div>
                   ) : (

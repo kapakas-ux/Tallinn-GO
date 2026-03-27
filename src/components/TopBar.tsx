@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Menu, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Menu, X } from 'lucide-react';
 
 export const TopBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -18,7 +18,7 @@ export const TopBar = () => {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <Link to="/" className="flex items-center">
+            <Link to="/" className="flex items-center active:scale-95 transition-transform">
               <img 
                 src="/logo.png" 
                 alt="Tallinn GO" 

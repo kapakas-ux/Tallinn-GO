@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Star, Navigation as NearMe, ChevronRight, Loader2, X, Bus, Train, Zap, Trash2, Map as MapIcon, MapPin, ChevronDown, ChevronUp, Footprints, Edit, X as CloseIcon } from 'lucide-react';
+import { Search, Star, Navigation as NearMe, ChevronRight, Loader2, X, Bus, Train, Zap, Trash2, Map as MapIcon, MapPin, ChevronDown, ChevronUp, Footprints, Edit, X as CloseIcon, Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { fetchStops, fetchDepartures, fetchRoutes, getRouteStopsForArrival } from '../services/transportService';
+import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
 import { getFavorites, toggleFavorite as toggleFavService, isFavorite, updateFavorite } from '../services/favoritesService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { MiniMap } from '../components/MiniMap';
-import { VehicleMap } from '../components/VehicleMap';
 import { Stop, Arrival } from '../types';
 import { cn, formatDistance, formatWalkingTime } from '../lib/utils';
+import { NotificationSelector } from '../components/NotificationSelector';
+import { getActiveAlerts, isAlertActive } from '../services/alertService';
+import { AnimatePresence } from 'motion/react';
 
 export const Stops = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,12 +22,12 @@ export const Stops = () => {
   const [departures, setDepartures] = useState([] as Arrival[]);
   const [isDeparturesLoading, setIsDeparturesLoading] = useState(false);
   const [favorites, setFavorites] = useState([] as Stop[]);
-  const [favDepartures, setFavDepartures] = useState({} as { [key: string]: Arrival[] });
-  const [favLoading, setFavLoading] = useState({} as { [key: string]: boolean });
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingFav, setEditingFav] = useState(null as Stop | null);
   const [editName, setEditName] = useState('');
   const [editEmoji, setEditEmoji] = useState('');
+  const [alertingArrival, setAlertingArrival] = useState<{ stop: Stop; arrival: Arrival } | null>(null);
+  const [scheduledAlerts, setScheduledAlerts] = useState<any[]>([]);
 
   const emojiOptions = [
     { label: 'Home', emoji: '🏠' },
@@ -37,16 +39,24 @@ export const Stops = () => {
     { label: 'Heart', emoji: '❤️' },
   ];
 
+  useEffect(() => {
+    setScheduledAlerts(getActiveAlerts());
+  }, []);
+
+  const [favDepartures, setFavDepartures] = useState({} as { [key: string]: Arrival[] });
+  const [favLoading, setFavLoading] = useState({} as { [key: string]: boolean });
+
   const [userLocation, setUserLocation] = useState(null as { lat: number; lng: number } | null);
   const [nearbyStops, setNearbyStops] = useState([] as Stop[]);
-  
-  const [expandedArrivalId, setExpandedArrivalId] = useState(null as string | null);
-  const [expandedRouteStops, setExpandedRouteStops] = useState({} as { [key: string]: Stop[] });
-  const [expandedRouteLoading, setExpandedRouteLoading] = useState({} as { [key: string]: boolean });
+  const [expandedNearby, setExpandedNearby] = useState(null as string | null);
+  const [nearbyDepartures, setNearbyDepartures] = useState({} as { [key: string]: Arrival[] });
+  const [nearbyLoading, setNearbyLoading] = useState({} as { [key: string]: boolean });
+  const [isSimulated, setIsSimulated] = useState(false);
 
   useEffect(() => {
-    const cleanup = watchLocation((location) => {
+    const cleanup = watchLocation((location, simulated) => {
       setUserLocation(location);
+      setIsSimulated(simulated);
     });
     return cleanup;
   }, []);
@@ -78,7 +88,25 @@ export const Stops = () => {
   }, [userLocation, allStops]);
 
   const handleNearbyClick = async (stop: Stop) => {
-    handleStopClick(stop);
+    const stopId = stop.id;
+    if (expandedNearby === stopId) {
+      setExpandedNearby(null);
+      return;
+    }
+    
+    setExpandedNearby(stopId);
+    
+    if (!nearbyDepartures[stopId]) {
+      setNearbyLoading(prev => ({ ...prev, [stopId]: true }));
+      try {
+        const deps = await fetchDepartures(stopId, stop.siriId);
+        setNearbyDepartures(prev => ({ ...prev, [stopId]: deps.slice(0, 6) }));
+      } catch (err) {
+        console.error("Failed to load nearby departures", err);
+      } finally {
+        setNearbyLoading(prev => ({ ...prev, [stopId]: false }));
+      }
+    }
   };
 
   useEffect(() => {
@@ -93,11 +121,32 @@ export const Stops = () => {
     setFilteredStops(results);
   }, [searchQuery, allStops]);
 
+  useEffect(() => {
+    if (favorites.length === 0) return;
+
+    const fetchFavDeps = async () => {
+      await Promise.all(favorites.map(async (fav) => {
+        if (favDepartures[fav.id]) return;
+        
+        setFavLoading(prev => ({ ...prev, [fav.id]: true }));
+        try {
+          const deps = await fetchDepartures(fav.id, fav.siriId);
+          setFavDepartures(prev => ({ ...prev, [fav.id]: deps.slice(0, 3) }));
+        } catch (err) {
+          console.error(`Failed to fetch departures for favorite ${fav.name}`, err);
+        } finally {
+          setFavLoading(prev => ({ ...prev, [fav.id]: false }));
+        }
+      }));
+    };
+
+    fetchFavDeps();
+  }, [favorites]);
+
   const handleStopClick = async (stop: Stop) => {
     setSelectedStop(stop);
     setIsDeparturesLoading(true);
     setDepartures([]);
-    setExpandedArrivalId(null); // Reset expanded arrival when changing stops
     try {
       // Fetching with time=0 to get full day schedule if possible
       const deps = await fetchDepartures(stop.id, stop.siriId, '0');
@@ -132,30 +181,30 @@ export const Stops = () => {
     handleStopClick(fav);
   };
 
-  const handleArrivalClick = async (arrival: Arrival) => {
-    const arrivalId = `${arrival.line}-${arrival.destination}-${arrival.time || arrival.minutes}`;
-    if (expandedArrivalId === arrivalId) {
-      setExpandedArrivalId(null);
-      return;
-    }
-
-    setExpandedArrivalId(arrivalId);
-
-    if (!expandedRouteStops[arrivalId]) {
-      setExpandedRouteLoading(prev => ({ ...prev, [arrivalId]: true }));
-      try {
-        const stops = await getRouteStopsForArrival(arrival);
-        setExpandedRouteStops(prev => ({ ...prev, [arrivalId]: stops }));
-      } catch (err) {
-        console.error("Failed to fetch route stops", err);
-      } finally {
-        setExpandedRouteLoading(prev => ({ ...prev, [arrivalId]: false }));
-      }
-    }
-  };
-
   useEffect(() => {
     const interval = setInterval(() => {
+      // Refresh favorites
+      if (favorites.length > 0) {
+        favorites.forEach(async (fav) => {
+          try {
+            const deps = await fetchDepartures(fav.id, fav.siriId);
+            setFavDepartures(prev => ({ ...prev, [fav.id]: deps.slice(0, 3) }));
+          } catch (err) {
+            console.error(`Failed to refresh departures for favorite ${fav.name}`, err);
+          }
+        });
+      }
+
+      // Refresh expanded nearby stop
+      if (expandedNearby) {
+        const stop = allStops.find(s => s.id === expandedNearby);
+        if (stop) {
+          fetchDepartures(stop.id, stop.siriId).then(deps => {
+            setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
+          }).catch(err => console.error("Failed to refresh nearby departures", err));
+        }
+      }
+
       // Refresh selected stop (modal)
       if (selectedStop) {
         fetchDepartures(selectedStop.id, selectedStop.siriId, '0').then(deps => {
@@ -165,47 +214,7 @@ export const Stops = () => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [selectedStop, allStops]);
-
-  useEffect(() => {
-    if (favorites.length === 0) return;
-
-    const fetchAllFavDepartures = async () => {
-      const results = await Promise.all(
-        favorites.map(async (fav) => {
-          try {
-            const deps = await fetchDepartures(fav.id, fav.siriId);
-            return { id: fav.id, deps: deps.slice(0, 3) };
-          } catch (err) {
-            console.error(`Failed to fetch departures for ${fav.name}`, err);
-            return { id: fav.id, deps: [] };
-          }
-        })
-      );
-
-      const newDeps: { [key: string]: Arrival[] } = {};
-      results.forEach(res => {
-        newDeps[res.id] = res.deps;
-      });
-      setFavDepartures(prev => ({ ...prev, ...newDeps }));
-      
-      const newLoading: { [key: string]: boolean } = {};
-      favorites.forEach(f => { newLoading[f.id] = false; });
-      setFavLoading(prev => ({ ...prev, ...newLoading }));
-    };
-
-    // Initial load for missing ones
-    const missing = favorites.filter(f => favDepartures[f.id] === undefined);
-    if (missing.length > 0) {
-      const initialLoading: { [key: string]: boolean } = {};
-      missing.forEach(f => { initialLoading[f.id] = true; });
-      setFavLoading(prev => ({ ...prev, ...initialLoading }));
-    }
-
-    fetchAllFavDepartures();
-    const interval = setInterval(fetchAllFavDepartures, 30000);
-    return () => clearInterval(interval);
-  }, [favorites]);
+  }, [favorites, expandedNearby, selectedStop, allStops]);
 
   const handleSaveEdit = () => {
     if (editingFav) {
@@ -359,9 +368,27 @@ export const Stops = () => {
                 </span>
                 <h2 className="font-headline text-3xl font-extrabold tracking-tight">Nearby Stops</h2>
               </div>
+              {isSimulated && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-error/10 text-error rounded-full text-[10px] font-bold uppercase tracking-widest border border-error/20">
+                  <NearMe className="w-2.5 h-2.5" />
+                  GPS Disabled
+                </div>
+              )}
             </div>
             
-            {nearbyStops.length > 0 ? (
+            {isSimulated ? (
+              <div className="px-6">
+                <div className="bg-surface-container-low rounded-[32px] p-8 text-center space-y-3 border border-outline-variant/10">
+                  <div className="w-12 h-12 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-1">
+                    <NearMe className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-headline font-bold text-lg text-primary">Location required</h4>
+                  <p className="text-secondary text-xs max-w-[200px] mx-auto">
+                    Please enable GPS to find stops near your current location.
+                  </p>
+                </div>
+              </div>
+            ) : nearbyStops.length > 0 ? (
               <div className="space-y-3 px-6">
                 {nearbyStops.map((stop) => (
                   <div key={stop.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] overflow-hidden transition-all">
@@ -371,7 +398,7 @@ export const Stops = () => {
                     >
                       <div className="flex items-center gap-4">
                         <Link 
-                          to={`/map?lat=${stop.lat}&lng=${stop.lng}&zoom=20`}
+                          to={`/map?lat=${stop.lat}&lng=${stop.lng}&zoom=20&stopId=${stop.id}`}
                           onClick={(e) => e.stopPropagation()}
                           className="h-10 w-10 rounded-full bg-primary/5 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-colors active:scale-90"
                           title="View on Map"
@@ -407,10 +434,75 @@ export const Stops = () => {
                           <Star className={cn("w-5 h-5", isFavorite(stop.id) && "fill-current")} />
                         </button>
                         <div className="text-secondary ml-1">
-                          <ChevronRight className="w-5 h-5" />
+                          {expandedNearby === stop.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                         </div>
                       </div>
                     </div>
+
+                    {/* Expanded Nearby Departures */}
+                    {expandedNearby === stop.id && (
+                      <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50">
+                        {nearbyLoading[stop.id] ? (
+                          <div className="flex justify-center py-4">
+                            <Loader2 className="w-5 h-5 animate-spin text-secondary" />
+                          </div>
+                        ) : nearbyDepartures[stop.id]?.length > 0 ? (
+                          <div className="space-y-2">
+                            {nearbyDepartures[stop.id].map((arr, i) => (
+                              <div key={i} className="flex items-center justify-between py-2 relative">
+                                <div className="flex items-center gap-3">
+                                  <div className={cn(
+                                    "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
+                                    arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                                  )}>
+                                    {arr.line}
+                                  </div>
+                                  <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  {arr.minutes > 15 && arr.status !== 'departed' && (
+                                    <button 
+                                      onClick={() => setAlertingArrival({ stop, arrival: arr })}
+                                      className={cn(
+                                        "p-1.5 rounded-full transition-all active:scale-90",
+                                        isAlertActive(stop.id, arr.line, arr.minutes) 
+                                          ? "bg-amber-500 text-white" 
+                                          : "bg-surface-container-high text-secondary hover:text-primary"
+                                      )}
+                                    >
+                                      <Bell className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="font-headline font-black text-lg text-primary">
+                                      {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
+                                    </span>
+                                    {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
+                                  </div>
+                                </div>
+
+                                <AnimatePresence>
+                                  {alertingArrival?.arrival === arr && alertingArrival?.stop === stop && (
+                                    <NotificationSelector 
+                                      stop={stop}
+                                      arrival={arr}
+                                      onClose={() => setAlertingArrival(null)}
+                                      onScheduled={() => {
+                                        setScheduledAlerts(getActiveAlerts());
+                                      }}
+                                    />
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="py-4 text-center text-sm text-secondary">
+                            No upcoming departures
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -480,59 +572,92 @@ export const Stops = () => {
                         <Star className="text-amber-400 w-6 h-6 fill-current" />
                       )}
                     </div>
-                      <div>
-                        <h3 className="font-headline text-lg font-black text-primary leading-tight pr-16 flex items-center gap-2">
-                          {stop.emoji && <span className="text-xl">{stop.emoji}</span>}
-                          {stop.customName || stop.name}
-                        </h3>
-                        {userLocation ? (
-                          <div className="flex items-center gap-2 mt-1">
+                    <div>
+                      <h3 className="font-headline text-lg font-black text-primary leading-tight pr-16 flex items-center gap-2">
+                        {stop.emoji && <span className="text-xl">{stop.emoji}</span>}
+                        {stop.customName || stop.name}
+                      </h3>
+                      {userLocation ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
+                            {(getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000).toFixed(0)}m
+                          </span>
+                          <span className="text-secondary opacity-30">•</span>
+                          <div className="flex items-center gap-1">
                             <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
-                              {(getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000).toFixed(0)}m
+                              {Math.round((getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000) / 83.33)} min
                             </span>
-                            <span className="text-secondary opacity-30">•</span>
-                            <div className="flex items-center gap-1">
-                              <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
-                                {Math.round((getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000) / 83.33)} min
-                              </span>
-                              <Footprints className="w-3 h-3 text-secondary/60" />
-                            </div>
+                            <Footprints className="w-3 h-3 text-secondary/60" />
                           </div>
-                        ) : (
-                          <p className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest mt-1">ID: {stop.id}</p>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <p className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest mt-1">ID: {stop.id}</p>
+                      )}
+                    </div>
 
-                      {/* Next 3 Departures */}
-                      {!isEditMode && (
-                        <div className="mt-4 space-y-2">
-                          {favLoading[stop.id] ? (
-                            <div className="flex items-center gap-2 py-2">
-                              <Loader2 className="w-3 h-3 animate-spin text-secondary/40" />
-                              <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary/40">Loading...</span>
-                            </div>
-                          ) : favDepartures[stop.id]?.length > 0 ? (
-                            favDepartures[stop.id].map((arr, idx) => (
-                              <div key={idx} className="flex items-center justify-between bg-surface-container-low/50 px-3 py-2 rounded-xl">
-                                <div className="flex items-center gap-2">
-                                  <div className={cn(
-                                    "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white",
-                                    arr.type === 'tram' ? "bg-tram" : arr.type === 'trolley' ? "bg-trolley" : "bg-bus"
-                                  )}>
-                                    {arr.line}
-                                  </div>
-                                  <span className="font-headline font-bold text-xs text-primary truncate max-w-[80px]">{arr.destination}</span>
-                                </div>
-                                <span className="font-headline font-black text-xs text-primary">
-                                  {arr.minutes <= 0 ? 'Now' : `${arr.minutes}m`}
-                                </span>
+                    <div className="mt-4 space-y-2">
+                      {favLoading[stop.id] ? (
+                        <div className="flex items-center gap-2 py-2">
+                          <Loader2 className="w-3 h-3 animate-spin text-secondary" />
+                          <span className="text-[9px] font-label font-bold uppercase tracking-widest text-secondary opacity-50">Loading...</span>
+                        </div>
+                      ) : favDepartures[stop.id]?.length > 0 ? (
+                        favDepartures[stop.id].map((arr, i) => (
+                          <div key={i} className="flex items-center justify-between relative">
+                            <div className="flex items-center gap-2">
+                              <div className={cn(
+                                "h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px]",
+                                arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                              )}>
+                                {arr.line}
                               </div>
-                            ))
-                          ) : (
-                            <p className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary/40 py-2">No departures</p>
-                          )}
+                              <span className="font-headline font-bold text-primary text-xs truncate max-w-[120px]">{arr.destination}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {arr.minutes > 15 && arr.status !== 'departed' && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAlertingArrival({ stop, arrival: arr });
+                                  }}
+                                  className={cn(
+                                    "p-1 rounded-full transition-all active:scale-90",
+                                    isAlertActive(stop.id, arr.line, arr.minutes) 
+                                      ? "bg-amber-500 text-white" 
+                                      : "bg-surface-container-high text-secondary hover:text-primary"
+                                  )}
+                                >
+                                  <Bell className="w-3 h-3" />
+                                </button>
+                              )}
+                              <div className="flex items-baseline gap-0.5">
+                                <span className="font-headline font-black text-sm text-primary">
+                                  {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
+                                </span>
+                                {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[8px] font-bold text-secondary uppercase">min</span>}
+                              </div>
+                            </div>
+
+                            <AnimatePresence>
+                              {alertingArrival?.arrival === arr && alertingArrival?.stop === stop && (
+                                <NotificationSelector 
+                                  stop={stop}
+                                  arrival={arr}
+                                  onClose={() => setAlertingArrival(null)}
+                                  onScheduled={() => {
+                                    setScheduledAlerts(getActiveAlerts());
+                                  }}
+                                />
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-2">
+                          <span className="text-[9px] font-label font-bold uppercase tracking-widest text-secondary opacity-50">No departures</span>
                         </div>
                       )}
+                    </div>
 
                     <div className="mt-4 pt-3 border-t border-outline-variant/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -617,7 +742,7 @@ export const Stops = () => {
                     onStopClick={() => {}} 
                   />
                   <Link 
-                    to={`/map?lat=${selectedStop.lat}&lng=${selectedStop.lng}&zoom=20`}
+                    to={`/map?lat=${selectedStop.lat}&lng=${selectedStop.lng}&zoom=20&stopId=${selectedStop.id}`}
                     className="absolute bottom-3 right-3 bg-surface/90 backdrop-blur-md p-3 rounded-full shadow-xl text-primary active:scale-90 transition-transform"
                     title="Open in full map"
                   >
@@ -634,111 +759,64 @@ export const Stops = () => {
               ) : departures.length > 0 ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">Live Arrivals</span>
+                    <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">Daily Departures</span>
                     <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{departures.length} found</span>
                   </div>
-                  {departures.map((arr, i) => {
-                    const arrivalId = `${arr.line}-${arr.destination}-${arr.time || arr.minutes}`;
-                    const isExpanded = expandedArrivalId === arrivalId;
-                    const routeStops = expandedRouteStops[arrivalId] || [];
-                    const isLoadingRoute = expandedRouteLoading[arrivalId];
-
-                    return (
-                      <div key={i} className="flex flex-col bg-surface-container-low rounded-[20px] border border-outline-variant/5 overflow-hidden transition-all">
-                        <div 
-                          onClick={() => handleArrivalClick(arr)}
-                          className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-container-highest/5"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className={cn(
-                              "h-10 w-10 rounded-full flex items-center justify-center text-white",
-                              arr.type === 'tram' ? "bg-tram" : arr.type === 'trolley' ? "bg-trolley" : "bg-bus"
-                            )}>
-                              <span className="font-label font-black text-sm">{arr.line}</span>
-                            </div>
-                            <div>
-                              <p className="font-headline font-bold text-primary">{arr.destination}</p>
-                              <div className="flex items-center gap-1.5 text-secondary">
-                                {getIcon(arr.type)}
-                                <span className="font-label text-[10px] font-bold uppercase tracking-widest">{arr.type}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p className="font-headline font-black text-xl text-primary">
-                                {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : `${arr.minutes}m`)}
-                              </p>
-                            </div>
-                            {isExpanded ? <ChevronUp className="w-5 h-5 text-outline-variant" /> : <ChevronDown className="w-5 h-5 text-outline-variant" />}
+                  {departures.map((arr, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-surface-container-low rounded-[20px] border border-outline-variant/5 relative">
+                      <div className="flex items-center gap-4">
+                        <div className={cn(
+                          "h-10 w-10 rounded-full flex items-center justify-center text-white",
+                          arr.type === 'tram' ? "bg-tram" : arr.type === 'trolley' ? "bg-trolley" : "bg-bus"
+                        )}>
+                          <span className="font-label font-black text-sm">{arr.line}</span>
+                        </div>
+                        <div>
+                          <p className="font-headline font-bold text-primary">{arr.destination}</p>
+                          <div className="flex items-center gap-1.5 text-secondary">
+                            {getIcon(arr.type)}
+                            <span className="font-label text-[10px] font-bold uppercase tracking-widest">{arr.type}</span>
                           </div>
                         </div>
-
-                        {isExpanded && (
-                          <div className="px-4 pb-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div className="h-48 w-full rounded-[20px] overflow-hidden bg-surface-container-high border border-outline-variant/10">
-                              {isLoadingRoute ? (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <Loader2 className="w-6 h-6 animate-spin text-secondary" />
-                                </div>
-                              ) : routeStops.length > 0 ? (
-                                <VehicleMap 
-                                  routeStops={routeStops} 
-                                  targetStop={selectedStop || undefined} 
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-secondary text-xs font-label uppercase tracking-widest">
-                                  Route map unavailable
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="space-y-3">
-                              <h4 className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary px-2">Route Stops</h4>
-                              {isLoadingRoute ? (
-                                <div className="flex justify-center py-4">
-                                  <Loader2 className="w-5 h-5 animate-spin text-secondary" />
-                                </div>
-                              ) : routeStops.length > 0 ? (
-                                <div className="relative pl-6 space-y-4">
-                                  {/* Vertical line */}
-                                  <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-outline-variant/20" />
-                                  
-                                  {routeStops.map((stop, idx) => {
-                                    const isCurrentStop = selectedStop && (
-                                      stop.id === selectedStop.id || 
-                                      stop.id.startsWith(selectedStop.id.split('-')[0] + '-')
-                                    );
-                                    
-                                    return (
-                                      <div key={idx} className="relative flex items-center gap-3 group">
-                                        <div className={cn(
-                                          "absolute left-[-23px] w-4 h-4 rounded-full border-2 bg-surface transition-all flex items-center justify-center",
-                                          isCurrentStop ? "border-primary scale-110" : "border-outline-variant/40"
-                                        )}>
-                                          {isCurrentStop && <div className="w-1.5 h-1.5 bg-primary rounded-full" />}
-                                        </div>
-                                        <span className={cn(
-                                          "font-headline text-sm transition-colors",
-                                          isCurrentStop ? "font-bold text-primary" : "text-secondary hover:text-primary"
-                                        )}>
-                                          {stop.name}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="text-center py-4 text-secondary text-xs font-label uppercase tracking-widest">
-                                  No stops found
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-4">
+                        {arr.minutes > 15 && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAlertingArrival({ stop: selectedStop, arrival: arr });
+                            }}
+                            className={cn(
+                              "h-8 w-8 rounded-full flex items-center justify-center transition-all",
+                              isAlertActive(selectedStop.id, arr.line, arr.minutes) 
+                                ? "bg-amber-500 text-white" 
+                                : "bg-surface-container-high text-secondary hover:text-primary"
+                            )}
+                          >
+                            <Bell className="w-3 h-3" />
+                          </button>
+                        )}
+                        <div className="text-right">
+                          <p className="font-headline font-black text-xl text-primary">
+                            {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : `${arr.minutes}m`)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <AnimatePresence>
+                        {alertingArrival?.arrival === arr && alertingArrival?.stop === selectedStop && (
+                          <NotificationSelector 
+                            stop={selectedStop}
+                            arrival={arr}
+                            onClose={() => setAlertingArrival(null)}
+                            onScheduled={() => {
+                              setScheduledAlerts(getActiveAlerts());
+                            }}
+                          />
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="py-20 text-center text-secondary">

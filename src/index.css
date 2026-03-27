@@ -47,6 +47,10 @@
   box-shadow: 0 24px 48px -12px rgba(28, 28, 26, 0.06);
 }
 
+.vehicle-icon {
+  transition: transform 2000ms linear;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
