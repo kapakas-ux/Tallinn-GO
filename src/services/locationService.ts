@@ -39,29 +39,43 @@ export const watchLocation = (callback: (location: Location, isSimulated: boolea
 
     const startWatching = async () => {
       try {
+        console.log('watchLocation (native): Checking permissions...');
         const permissions = await Geolocation.checkPermissions();
+        console.log('watchLocation (native): Current permissions:', JSON.stringify(permissions));
+        
         if (permissions.location !== 'granted') {
-          await Geolocation.requestPermissions();
+          console.log('watchLocation (native): Requesting permissions...');
+          const requestResult = await Geolocation.requestPermissions();
+          console.log('watchLocation (native): Request result:', JSON.stringify(requestResult));
+          if (requestResult.location !== 'granted') {
+            console.warn('watchLocation (native): Permission denied by user');
+            callback(TALLINN_CENTER, true);
+            return;
+          }
         }
 
         // Get initial position quickly (even if cached)
         try {
+          console.log('watchLocation (native): Getting initial position...');
           const initialPosition = await Geolocation.getCurrentPosition({
             ...options,
             enableHighAccuracy: false, // Faster first fix
             timeout: 5000
           });
           if (initialPosition) {
+            console.log('watchLocation (native): Initial position received:', initialPosition.coords.latitude, initialPosition.coords.longitude);
             callback(getEffectiveLocation(initialPosition.coords), false);
           }
         } catch (e) {
-          console.log('Initial fast location failed, waiting for watch...');
+          console.log('Initial fast location failed, waiting for watch...', e);
         }
 
+        console.log('watchLocation (native): Starting watchPosition...');
         watchId = await Geolocation.watchPosition(
           options,
           (position) => {
             if (position) {
+              console.log('watchLocation (native): Watch update:', position.coords.latitude, position.coords.longitude);
               callback(getEffectiveLocation(position.coords), false);
             }
           }

@@ -141,7 +141,7 @@ export async function fetchRoutes(): Promise<void> {
   routesPromise = (async () => {
     try {
       const url = Capacitor.isNativePlatform() 
-        ? `${API_BASE}/api/transport/routes` // Force proxy on native
+        ? `https://transport.tallinn.ee/data/routes.txt?t=${Date.now()}`
         : `${API_BASE}/api/transport/routes`;
       const text = await universalFetch(url);
       const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
@@ -223,7 +223,7 @@ export async function fetchStops(): Promise<Stop[]> {
     
     try {
       const url = Capacitor.isNativePlatform() 
-        ? `${API_BASE}/api/transport/stops` // Force proxy on native
+        ? `https://transport.tallinn.ee/data/stops.txt?t=${Date.now()}`
         : `${API_BASE}/api/transport/stops`;
       const text = await universalFetch(url);
       
@@ -464,7 +464,7 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
     if (Object.keys(routesMap).length === 0) await fetchRoutes();
 
     const url = Capacitor.isNativePlatform() 
-      ? `${API_BASE}/api/transport/gps` // Force proxy on native to avoid caching/format issues
+      ? `https://transport.tallinn.ee/gps.txt?t=${Date.now()}`
       : `${API_BASE}/api/transport/gps`;
     const text = await universalFetch(url);
     const lines = text.split(/\r\n|\r|\n/).filter(l => l.trim().length > 0);

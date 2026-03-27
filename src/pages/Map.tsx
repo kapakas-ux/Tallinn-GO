@@ -251,10 +251,13 @@ export const Map = () => {
       if (vehicleMarkers.current[vehicle.id]) {
         // Update existing target for interpolation
         const prevData = vehicleInterpolation.current[vehicle.id];
-        const currentPos = vehicleMarkers.current[vehicle.id].getLngLat();
+        
+        // Use the previous target as the new start point to avoid jumping
+        // or drifting when the map moves.
+        const startPos = prevData ? prevData.target : [vehicle.lng, vehicle.lat];
         
         vehicleInterpolation.current[vehicle.id] = {
-          current: [currentPos.lng, currentPos.lat],
+          current: startPos,
           target: [vehicle.lng, vehicle.lat],
           lastUpdate: Date.now()
         };
