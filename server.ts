@@ -326,6 +326,39 @@ async function startServer() {
     }
   });
 
+  // Proxy for Digitransit vehicle positions (avoids CORS on native)
+  app.get("/api/transport/vehicles", async (req, res) => {
+    const query = `{
+      vehicles {
+        vehicleId
+        lat
+        lon
+        heading
+        speed
+        route { shortName mode }
+        trip { tripHeadsign }
+      }
+    }`;
+    try {
+      const response = await axios.post(
+        'https://api.digitransit.fi/routing/v2/routers/hsl/index/graphql',
+        { query },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'digitransit-subscription-key': 'c7143fd8a1d841dd89a40bf8072ff73d'
+          },
+          timeout: 10000
+        }
+      );
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.json(response.data);
+    } catch (error: any) {
+      console.error("Digitransit vehicles proxy error:", error.message);
+      res.status(500).json({ error: "Failed to fetch vehicles from Digitransit", details: error.message });
+    }
+  });
+
   app.get("/api/transport/gps", async (req, res) => {
     try {
       const response = await axios.get("https://transport.tallinn.ee/gps.txt", {
