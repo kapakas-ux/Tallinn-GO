@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Navigation, ArrowUpDown, History, Filter, Bus, TrainFront as Tram, MoveRight, Footprints, Search, X, Loader2 } from 'lucide-react';
 import { MOCK_ROUTES } from '../mockData';
-import { cn } from '../lib/utils';
+import { cn, getVehicleColorClass } from '../lib/utils';
 import { fetchStops } from '../services/transportService';
 import { watchLocation } from '../services/locationService';
 import { Stop } from '../types';
@@ -322,10 +322,10 @@ export const Planner = () => {
                         </div>
                       ) : (
                         <div className={cn(
-                          "h-7 px-2.5 rounded-full flex items-center justify-center gap-1 text-white",
-                          segment.type === 'tram' ? "bg-tram" : segment.type === 'trolley' ? "bg-trolley" : "bg-bus"
+                          "h-7 px-2.5 rounded-full flex items-center justify-center gap-1",
+                          getVehicleColorClass(segment.type)
                         )}>
-                          {segment.type === 'bus' ? <Bus className="w-3.5 h-3.5" /> : <Tram className="w-3.5 h-3.5" />}
+                          {segment.type === 'walk' ? <Footprints className="w-3.5 h-3.5" /> : segment.type === 'bus' || segment.type === 'countybus' ? <Bus className="w-3.5 h-3.5" /> : <Tram className="w-3.5 h-3.5" />}
                           <span className="font-label font-bold text-[10px]">{segment.line}</span>
                         </div>
                       )}
@@ -351,10 +351,9 @@ export const Planner = () => {
                           <div className={cn(
                             "w-8 h-8 rounded-full flex items-center justify-center",
                             segment.type === 'walk' ? "bg-surface-container-high" : 
-                            segment.type === 'tram' ? "bg-tram text-white" : 
-                            segment.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                            getVehicleColorClass(segment.type)
                           )}>
-                            {segment.type === 'walk' ? <Footprints className="w-4 h-4" /> : segment.type === 'bus' ? <Bus className="w-4 h-4" /> : <Tram className="w-4 h-4" />}
+                            {segment.type === 'walk' ? <Footprints className="w-4 h-4" /> : segment.type === 'bus' || segment.type === 'countybus' ? <Bus className="w-4 h-4" /> : <Tram className="w-4 h-4" />}
                           </div>
                           {idx < route.segments.length - 1 && <div className="w-0.5 h-full bg-outline-variant/30 my-1" />}
                         </div>

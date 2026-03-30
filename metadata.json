@@ -1,6 +1,6 @@
 {
-  "name": "Tallinn GO",
-  "description": "Real-time municipal transit companion for Tallinn, featuring live arrivals, route planning, and stop discovery.",
+  "name": "GO NOW",
+  "description": "Real-time municipal transit companion for Estonia, featuring live arrivals, route planning, and stop discovery.",
   "requestFramePermissions": [
     "geolocation"
   ]

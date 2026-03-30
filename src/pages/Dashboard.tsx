@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Star, CheckCircle2, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Bell } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { cn, formatDistance, formatWalkingTime } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
 import { getFavorites, isFavorite, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
@@ -243,43 +243,7 @@ export const Dashboard = () => {
 
   return (
     <div className="max-w-screen-md mx-auto px-6 mt-8 pb-10">
-      {/* Debug Info (only in dev/emulator) */}
-      { (Capacitor.isNativePlatform() || (import.meta as any).env.DEV) && (
-        <div className="mb-6 p-4 bg-surface-container-high rounded-[24px] border border-outline-variant/20 text-[10px] font-mono shadow-sm">
-          <div className="flex justify-between mb-2">
-            <span className="text-secondary uppercase font-bold tracking-wider">API Status:</span>
-            <span className={debugInfo.status === 'Connected' ? 'text-green-600 font-black' : 'text-red-600 font-black'}>{debugInfo.status}</span>
-          </div>
-          <div className="break-all mb-2">
-            <span className="text-secondary uppercase font-bold tracking-wider">URL:</span> {debugInfo.url}
-          </div>
-          {debugInfo.lastError && (
-            <div className="text-red-500 break-words mt-2 p-2 bg-red-50 rounded-lg border border-red-100">
-              <span className="text-red-700 uppercase font-bold tracking-wider">Error:</span> {debugInfo.lastError}
-            </div>
-          )}
-          <div className="mt-3 pt-3 border-t border-outline-variant/10 flex gap-2">
-            <button 
-              onClick={() => {
-                const tallinn = { lat: 59.4372, lng: 24.7552 };
-                setUserLocation(tallinn);
-                setIsSimulated(true);
-              }}
-              className="px-2 py-1 bg-primary/10 text-primary rounded-md font-bold uppercase tracking-tighter"
-            >
-              Simulate Tallinn
-            </button>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-2 py-1 bg-secondary/10 text-secondary rounded-md font-bold uppercase tracking-tighter"
-            >
-              Reload App
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Favorite Modal */}
+     {/* Edit Favorite Modal */}
       {editingFav && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
           <div className="bg-surface-container-lowest editorial-shadow w-full max-w-sm rounded-[32px] overflow-hidden">
@@ -461,7 +425,7 @@ export const Dashboard = () => {
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     "h-10 w-10 rounded-full flex items-center justify-center font-label font-bold text-base",
-                    arrival.type === 'tram' ? "bg-tram text-white" : arrival.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                    getVehicleColorClass(arrival.type)
                   )}>
                     {arrival.line}
                   </div>
@@ -596,7 +560,7 @@ export const Dashboard = () => {
                             <div className="flex items-center gap-3">
                               <div className={cn(
                                 "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
-                                arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                                getVehicleColorClass(arr.type)
                               )}>
                                 {arr.line}
                               </div>
@@ -754,7 +718,7 @@ export const Dashboard = () => {
                           <div className="flex items-center gap-3">
                             <div className={cn(
                               "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
-                              arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                              getVehicleColorClass(arr.type)
                             )}>
                               {arr.line}
                             </div>

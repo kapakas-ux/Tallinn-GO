@@ -9,7 +9,7 @@ import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../servic
 import { Stop, Arrival, Vehicle } from '../types';
 import { Bus, Loader2, Navigation, Footprints, Bell } from 'lucide-react';
 import { getDistance } from '../lib/geo';
-import { formatDistance, formatWalkingTime } from '../lib/utils';
+import { formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
 import { scheduleDepartureNotification } from '../services/notificationService';
 import { addActiveAlert, getActiveAlerts, isAlertActive } from '../services/alertService';
 
@@ -281,7 +281,7 @@ export const Map = () => {
         const el = document.createElement('div');
         el.className = 'pointer-events-none';
         
-        const bgColor = vehicle.type === 'tram' ? 'bg-tram' : vehicle.type === 'trolley' ? 'bg-trolley' : 'bg-bus';
+        const bgColor = getVehicleColorClass(vehicle.type).split(' ')[0];
         const labelText = vehicle.destination ? `${vehicle.line} ${vehicle.destination}` : vehicle.line;
 
         el.innerHTML = `
@@ -541,7 +541,7 @@ export const Map = () => {
             return `
               <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0 relative">
                 <div class="flex items-center gap-3">
-                  <div class="${d.type === 'tram' ? 'bg-tram' : d.type === 'trolley' ? 'bg-trolley' : 'bg-bus'} text-white w-8 h-8 rounded-full flex items-center justify-center font-label font-bold text-xs">
+                  <div class="${getVehicleColorClass(d.type)} w-8 h-8 rounded-full flex items-center justify-center font-label font-bold text-xs">
                     ${d.line}
                   </div>
                   <div class="flex flex-col">

@@ -21,7 +21,7 @@ export const TopBar = () => {
             <Link to="/" className="flex items-center active:scale-95 transition-transform">
               <img 
                 src="/logo.png" 
-                alt="Tallinn GO" 
+                alt="GO NOW" 
                 className="h-7 object-contain"
               />
             </Link>
@@ -132,7 +132,7 @@ export const TopBar = () => {
 
               <div>
                 <h3 className="font-bold text-primary mb-1">9. Contact Information</h3>
-                <p>For any questions regarding these Terms, please contact us via tallinngoapp@gmail.com</p>
+                <p>For any questions regarding these Terms, please contact us via gonowestonia@gmail.com</p>
               </div>
             </div>
             <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">
@@ -190,7 +190,7 @@ export const TopBar = () => {
 
               <div>
                 <h3 className="font-bold text-primary mb-1">Contact Us</h3>
-                <p>Questions? Email to us at tallinngoapp@gmail.com.</p>
+                <p>Questions? Email to us at gonowestonia@gmail.com.</p>
               </div>
             </div>
             <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">

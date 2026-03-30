@@ -7,7 +7,7 @@ import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { MiniMap } from '../components/MiniMap';
 import { Stop, Arrival } from '../types';
-import { cn, formatDistance, formatWalkingTime } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
 import { NotificationSelector } from '../components/NotificationSelector';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { AnimatePresence } from 'motion/react';
@@ -167,6 +167,8 @@ export const Stops = () => {
     switch (type) {
       case 'tram': return <Train className="w-4 h-4" />;
       case 'trolley': return <Zap className="w-4 h-4" />;
+      case 'train': return <Train className="w-4 h-4" />;
+      case 'countybus': return <Bus className="w-4 h-4" />;
       default: return <Bus className="w-4 h-4" />;
     }
   };
@@ -453,7 +455,7 @@ export const Stops = () => {
                                 <div className="flex items-center gap-3">
                                   <div className={cn(
                                     "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
-                                    arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                                    getVehicleColorClass(arr.type)
                                   )}>
                                     {arr.line}
                                   </div>
@@ -607,7 +609,7 @@ export const Stops = () => {
                             <div className="flex items-center gap-2">
                               <div className={cn(
                                 "h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px]",
-                                arr.type === 'tram' ? "bg-tram text-white" : arr.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+                                getVehicleColorClass(arr.type)
                               )}>
                                 {arr.line}
                               </div>
@@ -766,8 +768,8 @@ export const Stops = () => {
                     <div key={i} className="flex items-center justify-between p-4 bg-surface-container-low rounded-[20px] border border-outline-variant/5 relative">
                       <div className="flex items-center gap-4">
                         <div className={cn(
-                          "h-10 w-10 rounded-full flex items-center justify-center text-white",
-                          arr.type === 'tram' ? "bg-tram" : arr.type === 'trolley' ? "bg-trolley" : "bg-bus"
+                          "h-10 w-10 rounded-full flex items-center justify-center",
+                          getVehicleColorClass(arr.type)
                         )}>
                           <span className="font-label font-black text-sm">{arr.line}</span>
                         </div>

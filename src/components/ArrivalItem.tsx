@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Arrival, Stop } from '../types';
 import { getRouteStopsForArrival } from '../services/transportService';
-import { cn } from '../lib/utils';
+import { cn, getVehicleColorClass } from '../lib/utils';
 import { CheckCircle2, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import { VehicleMap } from './VehicleMap';
 
@@ -71,7 +71,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main' }: ArrivalItemProp
           <div className={cn(
             "rounded-full flex items-center justify-center font-label font-bold",
             isCompact ? "h-8 w-8 text-xs" : "h-10 w-10 text-base",
-            arrival.type === 'tram' ? "bg-tram text-white" : arrival.type === 'trolley' ? "bg-trolley text-white" : "bg-bus text-white"
+            getVehicleColorClass(arrival.type)
           )}>
             {arrival.line}
           </div>

@@ -17,7 +17,7 @@ export const scheduleDepartureNotification = async (
           const delayMs = (minutesToDeparture - minutesBefore) * 60 * 1000;
           if (delayMs > 0) {
             setTimeout(() => {
-              new Notification(`Tallinn GO: ${line} to ${destination}`, {
+              new Notification(`GO NOW: ${line} to ${destination}`, {
                 body: `Your bus from ${stopName} is arriving in ${minutesBefore} minutes!`,
                 icon: '/logo.png'
               });
@@ -43,7 +43,7 @@ export const scheduleDepartureNotification = async (
     await LocalNotifications.schedule({
       notifications: [
         {
-          title: `Tallinn GO: ${line} to ${destination}`,
+          title: `GO NOW: ${line} to ${destination}`,
           body: `Your bus from ${stopName} is arriving in ${minutesBefore} minutes!`,
           id: Math.floor(Math.random() * 1000000),
           schedule: { at: scheduleDate },

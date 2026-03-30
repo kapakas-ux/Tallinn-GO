@@ -25,6 +25,8 @@
   --color-tram: #d9531e;
   --color-trolley: #003571;
   --color-bus: #003571;
+  --color-train: #f37021;
+  --color-countybus: #059669;
 }
 
 @layer base {

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.tallinngo.app',
-  appName: 'Tallinn GO',
+  appName: 'GO NOW',
   webDir: 'dist',
   server: {
     cleartext: true,

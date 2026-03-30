@@ -12,6 +12,16 @@ export function formatDistance(meters: number): string {
   return `${Math.round(meters)} m`;
 }
 
+export function getVehicleColorClass(type: string): string {
+  switch (type) {
+    case 'tram': return 'bg-tram text-white';
+    case 'trolley': return 'bg-trolley text-white';
+    case 'train': return 'bg-train text-white';
+    case 'countybus': return 'bg-countybus text-white';
+    default: return 'bg-bus text-white';
+  }
+}
+
 export function formatWalkingTime(meters: number): string {
   const minutes = Math.round(meters / 83.33);
   if (minutes >= 60) {
