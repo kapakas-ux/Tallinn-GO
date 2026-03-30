@@ -31,7 +31,8 @@ const getApiBaseUrl = () => {
 const API_BASE = getApiBaseUrl();
 
 const DIGITRANSIT_API_KEY = 'c7143fd8a1d841dd89a40bf8072ff73d';
-const DIGITRANSIT_URL = 'https://api.digitransit.fi/routing-data/v3/finland/';
+const DIGITRANSIT_API_KEY_SECONDARY = '08dc855ceb0b4fe6bea457bac2f8eade';
+const DIGITRANSIT_VEHICLES_URL = 'https://api.digitransit.fi/routing/v2/routers/hsl/index/graphql';
 
 /**
  * Universal fetch that uses CapacitorHttp on native to bypass CORS
@@ -290,6 +291,71 @@ export async function fetchStops(): Promise<Stop[]> {
 let cachedVehicles: Vehicle[] = [];
 let lastVehiclesFetch = 0;
 
+const DIGITRANSIT_VEHICLES_QUERY = `
+  {
+    vehicles {
+      vehicleId
+      lat
+      lon
+      heading
+      speed
+      route {
+        shortName
+        mode
+      }
+      trip {
+        tripHeadsign
+      }
+    }
+  }
+`;
+
+function parseGpsTxt(text: string): Vehicle[] {
+  const vehicles: Vehicle[] = [];
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const parts = trimmed.split(',');
+    if (parts.length < 6) continue;
+
+    const typeCode = parts[0].trim();
+    const vehicleId = parts[1].trim();
+    const lineNum = parts[2].trim();
+    const latStr = parts[3].trim();
+    const lngStr = parts[4].trim();
+    const bearingStr = parts[5].trim();
+    const speedStr = parts[6]?.trim() || '0';
+
+    const lat = parseCoordinate(latStr, 'lat');
+    const lng = parseCoordinate(lngStr, 'lng');
+
+    if (!lat || !lng) continue;
+
+    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' = 'bus';
+    if (typeCode === '2') type = 'tram';
+    else if (typeCode === '3') type = 'trolley';
+    else if (typeCode === '5') type = 'train';
+
+    const normLine = lineNum.replace(/^0+/, '') || lineNum;
+
+    vehicles.push({
+      id: vehicleId || `v${Math.random().toString(36).substr(2, 9)}`,
+      type,
+      line: normLine,
+      lat,
+      lng,
+      bearing: parseInt(bearingStr, 10) || 0,
+      speed: parseFloat(speedStr) || 0,
+      destination: ''
+    });
+  }
+
+  return vehicles;
+}
+
 export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
     const now = Date.now();
@@ -297,74 +363,85 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       return cachedVehicles;
     }
 
-    const query = `
-      {
-        vehicles {
-          id
-          lat
-          lon
-          heading
-          speed
-          route {
-            shortName
-            mode
-          }
-          trip {
-            tripHeadsign
-          }
+    // --- Primary: Digitransit.fi API ---
+    try {
+      let digitransitData: any = null;
+
+      if (Capacitor.isNativePlatform()) {
+        // On native, use server proxy to avoid CORS
+        const proxyResponse = await fetch(`${API_BASE}/api/transport/vehicles`);
+        if (proxyResponse.ok) {
+          digitransitData = await proxyResponse.json();
+        }
+      } else {
+        // On web, call Digitransit routing API directly
+        const dtResponse = await fetch(DIGITRANSIT_VEHICLES_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'digitransit-subscription-key': DIGITRANSIT_API_KEY
+          },
+          body: JSON.stringify({ query: DIGITRANSIT_VEHICLES_QUERY })
+        });
+        if (dtResponse.ok) {
+          digitransitData = await dtResponse.json();
         }
       }
-    `;
 
-    const response = await fetch(`${DIGITRANSIT_URL}index/graphql`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'digitransit-subscription-key': DIGITRANSIT_API_KEY
-      },
-      body: JSON.stringify({ query })
-    });
+      const rawVehicles: any[] = digitransitData?.data?.vehicles || [];
+      const vehicles: Vehicle[] = [];
 
-    if (!response.ok) {
-      throw new Error(`Digitransit API error: ${response.status}`);
+      for (const raw of rawVehicles) {
+        if (!raw.lat || !raw.lon) continue;
+
+        // Keep only vehicles in the Tallinn/Estonia area
+        if (raw.lat < 59.0 || raw.lat > 60.2 || raw.lon < 23.5 || raw.lon > 26.5) continue;
+
+        const modeStr = (raw.route?.mode || '').toLowerCase();
+        let type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' = 'bus';
+        if (modeStr.includes('tram')) type = 'tram';
+        else if (modeStr.includes('trolley')) type = 'trolley';
+        else if (modeStr.includes('rail') || modeStr.includes('train')) type = 'train';
+
+        vehicles.push({
+          id: raw.vehicleId || raw.id || Math.random().toString(),
+          type,
+          line: raw.route?.shortName || '',
+          lat: raw.lat,
+          lng: raw.lon,
+          bearing: raw.heading || 0,
+          speed: raw.speed || 0,
+          destination: raw.trip?.tripHeadsign || ''
+        });
+      }
+
+      if (vehicles.length > 0) {
+        console.log(`fetchVehicles: ${vehicles.length} vehicles from Digitransit`);
+        cachedVehicles = vehicles;
+        lastVehiclesFetch = now;
+        return vehicles;
+      }
+
+      console.log('fetchVehicles: no Tallinn-area vehicles from Digitransit, falling back to gps.txt');
+    } catch (dtError) {
+      console.warn('fetchVehicles: Digitransit unavailable, falling back to gps.txt:', dtError);
     }
 
-    const data = await response.json();
-    const rawVehicles = data?.data?.vehicles || [];
+    // --- Fallback: transport.tallinn.ee/gps.txt ---
+    const gpsUrl = Capacitor.isNativePlatform()
+      ? `${API_BASE}/api/transport/gps`
+      : '/api/transport/gps';
 
-    const vehicles: Vehicle[] = [];
-    
-    for (const raw of rawVehicles) {
-      if (!raw.lat || !raw.lon) continue;
+    const gpsText = await universalFetch(gpsUrl);
+    const vehicles = parseGpsTxt(gpsText);
 
-      const modeStr = raw.route?.mode?.toLowerCase() || 'bus';
-      let type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' = 'bus';
-      
-      if (modeStr.includes('tram')) type = 'tram';
-      else if (modeStr.includes('trolley')) type = 'trolley';
-      else if (modeStr.includes('rail') || modeStr.includes('train')) type = 'train';
-
-      const jitter = (Math.random() - 0.5) * 0.000001;
-      
-      vehicles.push({
-        id: raw.id || Math.random().toString(),
-        type,
-        line: raw.route?.shortName || '',
-        lng: raw.lon + jitter,
-        lat: raw.lat + jitter,
-        bearing: raw.heading || 0,
-        speed: raw.speed || 0,
-        destination: raw.trip?.tripHeadsign || ''
-      });
-    }
-    
-    console.log(`fetchVehicles: parsed ${vehicles.length} vehicles successfully from digitransit`);
+    console.log(`fetchVehicles: ${vehicles.length} vehicles from gps.txt`);
     cachedVehicles = vehicles;
     lastVehiclesFetch = now;
     return vehicles;
   } catch (error) {
-    console.error('Error fetching vehicles from digitransit:', error);
-    return cachedVehicles; // Return cached if fetch fails
+    console.error('Error fetching vehicles:', error);
+    return cachedVehicles;
   }
 }
 
