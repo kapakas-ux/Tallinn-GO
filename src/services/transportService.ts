@@ -287,6 +287,83 @@ export async function fetchStops(): Promise<Stop[]> {
 let cachedVehicles: Vehicle[] = [];
 let lastVehiclesFetch = 0;
 
+const TALLINN_BOUNDS = { latMin: 59.3, latMax: 59.6, lonMin: 24.4, lonMax: 24.95 };
+
+async function fetchGisEeTallinn(): Promise<Vehicle[]> {
+  const response = await fetch('https://gis.ee/tallinn/gps.php', { cache: 'no-store' });
+  if (!response.ok) throw new Error(`gis.ee error: ${response.status}`);
+  const data = await response.json();
+  const vehicles: Vehicle[] = [];
+  for (const feature of (data?.features || [])) {
+    const props = feature.properties;
+    const coords = feature.geometry?.coordinates;
+    if (!coords || coords.length < 2) continue;
+    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' = 'bus';
+    if (props.type === 1) type = 'trolley';
+    else if (props.type === 3) type = 'tram';
+    else if (props.type === 7) type = 'bus';
+    else if (props.type === 10) type = 'train';
+    else if (props.type === 20) type = 'countybus';
+    const jitter = (Math.random() - 0.5) * 0.000001;
+    vehicles.push({
+      id: `gis_${props.id}`,
+      type,
+      line: props.line?.toString() || '',
+      lng: coords[0] + jitter,
+      lat: coords[1] + jitter,
+      bearing: props.direction || 0,
+      speed: 0,
+      destination: props.destination || ''
+    });
+  }
+  return vehicles;
+}
+
+async function fetchPeatusVehicles(): Promise<Vehicle[]> {
+  const query = `{
+    vehicles {
+      id lat lon heading speed
+      route { shortName mode }
+      trip { tripHeadsign }
+    }
+  }`;
+  const response = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query })
+  });
+  if (!response.ok) throw new Error(`peatus.ee vehicles error: ${response.status}`);
+  const data = await response.json();
+  const rawVehicles: any[] = data?.data?.vehicles || [];
+  const vehicles: Vehicle[] = [];
+  for (const raw of rawVehicles) {
+    if (!raw.lat || !raw.lon) continue;
+    const mode = (raw.route?.mode || '').toUpperCase();
+    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' = 'bus';
+    if (mode === 'TRAM') type = 'tram';
+    else if (mode === 'RAIL' || mode === 'SUBWAY') type = 'train';
+    else if (mode === 'TROLLEYBUS') type = 'trolley';
+    else if (mode === 'BUS') {
+      // City buses stay in known urban areas; everything else is a county bus
+      const inTallinn = raw.lat >= TALLINN_BOUNDS.latMin && raw.lat <= TALLINN_BOUNDS.latMax &&
+                        raw.lon >= TALLINN_BOUNDS.lonMin && raw.lon <= TALLINN_BOUNDS.lonMax;
+      const inTartu = raw.lat >= 58.32 && raw.lat <= 58.45 && raw.lon >= 26.65 && raw.lon <= 26.82;
+      if (!inTallinn && !inTartu) type = 'countybus';
+    }
+    vehicles.push({
+      id: `otp_${raw.id}`,
+      type,
+      line: raw.route?.shortName || '',
+      lat: raw.lat,
+      lng: raw.lon,
+      bearing: raw.heading || 0,
+      speed: raw.speed || 0,
+      destination: raw.trip?.tripHeadsign || ''
+    });
+  }
+  return vehicles;
+}
+
 export async function fetchVehicles(): Promise<Vehicle[]> {
   try {
     const now = Date.now();
@@ -294,55 +371,43 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       return cachedVehicles;
     }
 
-    const response = await fetch('https://gis.ee/tallinn/gps.php', {
-      cache: 'no-store'
-    });
-
-    if (!response.ok) {
-      throw new Error(`gis.ee API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const features = data?.features || [];
+    // Fetch Tallinn (gis.ee) and all-Estonia (peatus.ee) in parallel
+    const [tallinnResult, estoniaResult] = await Promise.allSettled([
+      fetchGisEeTallinn(),
+      fetchPeatusVehicles()
+    ]);
 
     const vehicles: Vehicle[] = [];
-    
-    for (const feature of features) {
-      const props = feature.properties;
-      const coords = feature.geometry?.coordinates;
-      
-      if (!coords || coords.length < 2) continue;
 
-      let type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' = 'bus';
-      
-      if (props.type === 1) type = 'trolley';
-      else if (props.type === 2) type = 'bus';
-      else if (props.type === 3) type = 'tram';
-      else if (props.type === 7) type = 'bus'; // nightbus
-      else if (props.type === 10) type = 'train';
-      else if (props.type === 20) type = 'countybus';
-
-      const jitter = (Math.random() - 0.5) * 0.000001;
-      
-      vehicles.push({
-        id: props.id?.toString() || Math.random().toString(),
-        type,
-        line: props.line?.toString() || '',
-        lng: coords[0] + jitter,
-        lat: coords[1] + jitter,
-        bearing: props.direction || 0,
-        speed: 0,
-        destination: props.destination || ''
-      });
+    // Add gis.ee Tallinn vehicles (accurate real-time)
+    if (tallinnResult.status === 'fulfilled') {
+      vehicles.push(...tallinnResult.value);
+      console.log(`fetchVehicles: ${tallinnResult.value.length} from gis.ee/tallinn`);
+    } else {
+      console.warn('fetchVehicles: gis.ee failed:', tallinnResult.reason);
     }
-    
-    console.log(`fetchVehicles: parsed ${vehicles.length} vehicles successfully from gis.ee`);
-    cachedVehicles = vehicles;
-    lastVehiclesFetch = now;
-    return vehicles;
+
+    // Add peatus.ee vehicles OUTSIDE Tallinn area (avoid duplicates)
+    if (estoniaResult.status === 'fulfilled') {
+      const regional = estoniaResult.value.filter(v => {
+        const inTallinn = v.lat >= TALLINN_BOUNDS.latMin && v.lat <= TALLINN_BOUNDS.latMax &&
+                          v.lng >= TALLINN_BOUNDS.lonMin && v.lng <= TALLINN_BOUNDS.lonMax;
+        return !inTallinn;
+      });
+      vehicles.push(...regional);
+      console.log(`fetchVehicles: ${regional.length} regional from peatus.ee`);
+    } else {
+      console.warn('fetchVehicles: peatus.ee failed:', estoniaResult.reason);
+    }
+
+    if (vehicles.length > 0) {
+      cachedVehicles = vehicles;
+      lastVehiclesFetch = now;
+    }
+    return vehicles.length > 0 ? vehicles : cachedVehicles;
   } catch (error) {
-    console.error('Error fetching vehicles from gis.ee:', error);
-    return cachedVehicles; // Return cached if fetch fails
+    console.error('Error fetching vehicles:', error);
+    return cachedVehicles;
   }
 }
 
