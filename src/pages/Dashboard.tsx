@@ -417,8 +417,9 @@ export const Dashboard = () => {
                 key={idx}
                 className={cn(
                   "group flex items-center justify-between p-3 rounded-[20px] transition-all relative",
-                  arrival.status === 'departed' 
-                    ? "bg-surface-container-high/30 opacity-60" 
+                  alertingArrival?.arrival === arrival ? "z-20" : "z-0",
+                  arrival.status === 'departed'
+                    ? "bg-surface-container-high/30 opacity-60"
                     : "bg-surface-container-lowest editorial-shadow hover:translate-x-2"
                 )}
               >
@@ -556,7 +557,7 @@ export const Dashboard = () => {
                     ) : nearbyDepartures[stop.id]?.length > 0 ? (
                       <div className="space-y-2">
                         {nearbyDepartures[stop.id].map((arr, i) => (
-                          <div key={i} className="flex items-center justify-between py-2 relative">
+                          <div key={i} className={cn("flex items-center justify-between py-2 relative", alertingArrival?.arrival === arr ? "z-20" : "z-0")}>
                             <div className="flex items-center gap-3">
                               <div className={cn(
                                 "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
@@ -714,7 +715,7 @@ export const Dashboard = () => {
                   ) : nearbyDepartures[fav.id]?.length > 0 ? (
                     <div className="space-y-2">
                       {nearbyDepartures[fav.id].map((arr, i) => (
-                        <div key={i} className="flex items-center justify-between py-2 relative">
+                        <div key={i} className={cn("flex items-center justify-between py-2 relative", alertingArrival?.arrival === arr ? "z-20" : "z-0")}>
                           <div className="flex items-center gap-3">
                             <div className={cn(
                               "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
