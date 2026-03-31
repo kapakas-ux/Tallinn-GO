@@ -293,9 +293,27 @@ const TALLINN_BOUNDS = { latMin: 59.3, latMax: 59.6, lonMin: 24.4, lonMax: 24.95
 const GIS_EE_CITIES = ['tallinn'];
 
 async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
-  const response = await fetch(`https://gis.ee/${city}/gps.php`, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`gis.ee/${city} error: ${response.status}`);
-  const data = await response.json();
+  const url = `https://gis.ee/${city}/gps.php?_=${Date.now()}`;
+  let data: any;
+  if (Capacitor.isNativePlatform()) {
+    // CapacitorHttp with browser-like headers so gis.ee returns full dataset including county buses
+    const resp = await CapacitorHttp.get({
+      url,
+      headers: {
+        'Referer': `https://gis.ee/${city}/`,
+        'Accept': 'application/json, */*',
+        'Cache-Control': 'no-cache'
+      },
+      connectTimeout: 20000,
+      readTimeout: 20000
+    });
+    if (resp.status >= 400) throw new Error(`gis.ee/${city} error: ${resp.status}`);
+    data = typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data;
+  } else {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`gis.ee/${city} error: ${response.status}`);
+    data = await response.json();
+  }
   const vehicles: Vehicle[] = [];
   for (const feature of (data?.features || [])) {
     const props = feature.properties;
