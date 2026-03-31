@@ -205,7 +205,7 @@ export const Map = () => {
 
       map.current.on('zoom', () => {
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= 10;
+        const visible = currentZoom >= 13;
         Object.values(vehicleMarkers.current).forEach((marker: maplibregl.Marker) => {
           marker.getElement().style.display = visible ? 'block' : 'none';
         });
@@ -213,7 +213,7 @@ export const Map = () => {
 
       map.current.on('move', () => {
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= 10;
+        const visible = currentZoom >= 13;
         Object.values(vehicleMarkers.current).forEach((marker: maplibregl.Marker) => {
           marker.getElement().style.display = visible ? 'block' : 'none';
         });
@@ -265,7 +265,7 @@ export const Map = () => {
         const el = vehicleMarkers.current[vehicle.id].getElement();
         
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= 10;
+        const visible = currentZoom >= 13;
         el.style.display = visible ? 'block' : 'none';
 
         const icon = el.querySelector('.vehicle-icon') as HTMLElement;
@@ -302,7 +302,7 @@ export const Map = () => {
           .addTo(map.current!);
           
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= 10;
+        const visible = currentZoom >= 13;
         el.style.display = visible ? 'block' : 'none';
           
         vehicleInterpolation.current[vehicle.id] = {
