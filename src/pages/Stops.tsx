@@ -12,6 +12,34 @@ import { NotificationSelector } from '../components/NotificationSelector';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { AnimatePresence } from 'motion/react';
 
+const ESTONIAN_COUNTIES = [
+  { name: 'Harjumaa',      lat: 59.35, lng: 24.85 },
+  { name: 'Lääne-Virumaa', lat: 59.35, lng: 26.20 },
+  { name: 'Ida-Virumaa',   lat: 59.35, lng: 27.40 },
+  { name: 'Raplamaa',      lat: 59.00, lng: 24.75 },
+  { name: 'Järvamaa',      lat: 58.90, lng: 25.50 },
+  { name: 'Jõgevamaa',     lat: 58.60, lng: 26.40 },
+  { name: 'Tartumaa',      lat: 58.38, lng: 26.72 },
+  { name: 'Põlvamaa',      lat: 58.07, lng: 27.05 },
+  { name: 'Võrumaa',       lat: 57.83, lng: 27.00 },
+  { name: 'Valgamaa',      lat: 57.78, lng: 26.05 },
+  { name: 'Viljandimaa',   lat: 58.37, lng: 25.60 },
+  { name: 'Pärnumaa',      lat: 58.37, lng: 24.50 },
+  { name: 'Läänemaa',      lat: 58.95, lng: 23.70 },
+  { name: 'Hiiumaa',       lat: 58.93, lng: 22.60 },
+  { name: 'Saaremaa',      lat: 58.25, lng: 22.50 },
+];
+
+function getEstonianCounty(lat: number, lng: number): string {
+  let closest = ESTONIAN_COUNTIES[0];
+  let minDist = Infinity;
+  for (const county of ESTONIAN_COUNTIES) {
+    const d = Math.sqrt((lat - county.lat) ** 2 + (lng - county.lng) ** 2);
+    if (d < minDist) { minDist = d; closest = county; }
+  }
+  return closest.name;
+}
+
 export const Stops = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [allStops, setAllStops] = useState([] as Stop[]);
@@ -115,11 +143,18 @@ export const Stops = () => {
       return;
     }
     const query = searchQuery.toLowerCase();
-    const results = allStops.filter(stop => 
+    let results = allStops.filter(stop =>
       stop.name.toLowerCase().includes(query) || stop.id.includes(query)
-    ).slice(0, 20); // limit to 20 results for performance
-    setFilteredStops(results);
-  }, [searchQuery, allStops]);
+    );
+    // Sort by distance from user when location is available
+    if (userLocation) {
+      results = results.map(s => ({
+        ...s,
+        distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng)
+      })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    }
+    setFilteredStops(results.slice(0, 20));
+  }, [searchQuery, allStops, userLocation]);
 
   useEffect(() => {
     if (favorites.length === 0) return;
@@ -331,22 +366,19 @@ export const Stops = () => {
                     </div>
                     <div>
                       <h4 className="font-headline font-bold text-lg text-primary">{stop.name}</h4>
-                      {userLocation ? (
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
-                            {(getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000).toFixed(0)}m
-                          </span>
-                          <span className="text-secondary opacity-30">•</span>
-                          <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
+                          {getEstonianCounty(stop.lat, stop.lng)}
+                        </span>
+                        {userLocation && (
+                          <>
+                            <span className="text-secondary opacity-30">•</span>
                             <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
-                              {Math.round((getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000) / 83.33)} min
+                              {(getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000).toFixed(0)}m
                             </span>
-                            <Footprints className="w-3 h-3 text-secondary/60" />
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="font-label text-xs text-secondary mt-0.5">Stop ID: {stop.id}</p>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <ChevronRight className="text-outline-variant w-5 h-5" />
