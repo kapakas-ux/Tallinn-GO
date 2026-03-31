@@ -397,7 +397,8 @@ export const Map = () => {
           siriId: stop.siriId,
           name: stop.name,
           originalLat: (stop as any).originalLat || stop.lat,
-          originalLng: (stop as any).originalLng || stop.lng
+          originalLng: (stop as any).originalLng || stop.lng,
+          stopType: stop.vehicleTypes?.every(t => t === 'TRAM') ? 'tram' : 'bus'
         }
       }))
     };
@@ -427,7 +428,11 @@ export const Map = () => {
               13, 4,
               16, 10
             ],
-            'circle-color': '#ff4444',
+            'circle-color': [
+              'match', ['get', 'stopType'],
+              'tram', '#B71C1C',
+              '#1976D2'
+            ],
             'circle-stroke-width': 2,
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 0.9

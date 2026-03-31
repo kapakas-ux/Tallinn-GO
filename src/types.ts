@@ -7,6 +7,7 @@ export interface Stop {
   distance?: number;
   customName?: string;
   emoji?: string;
+  vehicleTypes?: string[];
 }
 
 export interface Arrival {

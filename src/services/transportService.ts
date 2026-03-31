@@ -226,7 +226,7 @@ export async function fetchStops(): Promise<Stop[]> {
       const response = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: '{ stops { gtfsId name lat lon code } }' })
+        body: JSON.stringify({ query: '{ stops { gtfsId name lat lon code routes { mode } } }' })
       });
       
       const data = await response.json();
@@ -263,12 +263,17 @@ export async function fetchStops(): Promise<Stop[]> {
           });
         }
         
+        const vehicleTypes: string[] = [...new Set(
+          (raw.routes || []).map((r: any) => r.mode as string).filter(Boolean)
+        )];
+
         stops.push({
           id: internalId,
           siriId: siriId,
           name: name,
           lat: lat,
-          lng: lng
+          lng: lng,
+          vehicleTypes
         });
       }
       
