@@ -307,6 +307,12 @@ async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
     else if (props.type === 7) type = 'bus';
     else if (props.type === 10) type = 'train';
     else if (props.type === 20) type = 'countybus';
+    // County buses (Maakonnabuss) are type 2 in gis.ee but use line numbers 100+
+    // Tallinn city buses use lines 1-89
+    if (type === 'bus') {
+      const lineNum = parseInt(props.line?.toString() || '0', 10);
+      if (lineNum >= 100) type = 'countybus';
+    }
     const jitter = (Math.random() - 0.5) * 0.000001;
     vehicles.push({
       id: `gis_${city}_${props.id}`,
