@@ -168,7 +168,7 @@ export const Stops = () => {
       case 'tram': return <Train className="w-4 h-4" />;
       case 'trolley': return <Zap className="w-4 h-4" />;
       case 'train': return <Train className="w-4 h-4" />;
-      case 'countybus': return <Bus className="w-4 h-4" />;
+      case 'regional': return <Bus className="w-4 h-4" />;
       default: return <Bus className="w-4 h-4" />;
     }
   };

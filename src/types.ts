@@ -12,7 +12,7 @@ export interface Stop {
 export interface Arrival {
   line: string;
   destination: string;
-  type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus';
+  type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional';
   minutes: number;
   time?: string;
   status: 'on-time' | 'delayed' | 'expected' | 'departed';
@@ -23,7 +23,7 @@ export interface Arrival {
 
 export interface Vehicle {
   id: string;
-  type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus';
+  type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional';
   line: string;
   lat: number;
   lng: number;
@@ -41,7 +41,7 @@ export interface RouteOption {
   transfers: number;
   via?: string;
   segments: {
-    type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' | 'walk';
+    type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' | 'walk';
     line?: string;
     distance?: number;
   }[];

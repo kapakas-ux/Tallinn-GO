@@ -17,7 +17,7 @@ export function getVehicleColorClass(type: string): string {
     case 'tram': return 'bg-tram text-white';
     case 'trolley': return 'bg-trolley text-white';
     case 'train': return 'bg-train text-white';
-    case 'countybus': return 'bg-countybus text-white';
+    case 'regional': return 'bg-regional text-white';
     default: return 'bg-bus text-white';
   }
 }

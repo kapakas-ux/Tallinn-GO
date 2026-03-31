@@ -319,7 +319,7 @@ async function fetchTransportTallinnCountyBuses(): Promise<Vehicle[]> {
     if (lat < 57.5 || lat > 60.0 || lng < 21.0 || lng > 28.5) continue;
     vehicles.push({
       id: `tt_county_${lineNum}_${vehicleId}`,
-      type: 'countybus',
+      type: 'regional',
       line: lineNum.toString(),
       lat,
       lng,
@@ -359,17 +359,17 @@ async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
     const props = feature.properties;
     const coords = feature.geometry?.coordinates;
     if (!coords || coords.length < 2) continue;
-    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' = 'bus';
+    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
     if (props.type === 1) type = 'trolley';
     else if (props.type === 3) type = 'tram';
     else if (props.type === 7) type = 'bus';
     else if (props.type === 10) type = 'train';
-    else if (props.type === 20) type = 'countybus';
+    else if (props.type === 20) type = 'regional';
     // County buses (Maakonnabuss) are type 2 in gis.ee but use line numbers 100+
     // Tallinn city buses use lines 1-89
     if (type === 'bus') {
       const lineNum = parseInt(props.line?.toString() || '0', 10);
-      if (lineNum >= 100) type = 'countybus';
+      if (lineNum >= 100) type = 'regional';
     }
     const jitter = (Math.random() - 0.5) * 0.000001;
     vehicles.push({
@@ -389,10 +389,10 @@ async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
     byType[t] = (byType[t] || 0) + 1;
   }
   console.log(`gis.ee/${city} type breakdown:`, JSON.stringify(byType));
-  const countyBuses = vehicles.filter(v => v.type === 'countybus');
+  const countyBuses = vehicles.filter(v => v.type === 'regional');
   console.log(`gis.ee/${city} county buses found: ${countyBuses.length} out of ${vehicles.length} total`);
   if (countyBuses.length > 0) {
-    console.log(`gis.ee/${city} countybus sample:`, JSON.stringify(countyBuses[0]));
+    console.log(`gis.ee/${city} regional sample:`, JSON.stringify(countyBuses[0]));
   } else {
     // Log full properties of first 3 type-2 vehicles to find county bus identifier
     const type2Samples = (data?.features || [])
@@ -424,7 +424,7 @@ async function fetchPeatusVehicles(): Promise<Vehicle[]> {
   for (const raw of rawVehicles) {
     if (!raw.lat || !raw.lon) continue;
     const mode = (raw.route?.mode || '').toUpperCase();
-    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' = 'bus';
+    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
     if (mode === 'TRAM') type = 'tram';
     else if (mode === 'RAIL' || mode === 'SUBWAY') type = 'train';
     else if (mode === 'TROLLEYBUS') type = 'trolley';
@@ -433,7 +433,7 @@ async function fetchPeatusVehicles(): Promise<Vehicle[]> {
       const inTallinn = raw.lat >= TALLINN_BOUNDS.latMin && raw.lat <= TALLINN_BOUNDS.latMax &&
                         raw.lon >= TALLINN_BOUNDS.lonMin && raw.lon <= TALLINN_BOUNDS.lonMax;
       const inTartu = raw.lat >= 58.32 && raw.lat <= 58.45 && raw.lon >= 26.65 && raw.lon <= 26.82;
-      if (!inTallinn && !inTartu) type = 'countybus';
+      if (!inTallinn && !inTartu) type = 'regional';
     }
     vehicles.push({
       id: `otp_${raw.id}`,
@@ -903,7 +903,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     for (const st of stoptimes) {
       const modeStr = st.trip?.route?.mode?.toLowerCase() || 'bus';
       const agencyName = st.trip?.route?.agency?.name || '';
-      let type: 'bus' | 'tram' | 'trolley' | 'train' | 'countybus' = 'bus';
+      let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
       
       if (modeStr.includes('tram')) type = 'tram';
       else if (modeStr.includes('trolley')) type = 'trolley';
@@ -911,7 +911,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       else if (modeStr.includes('bus')) {
         // Distinguish city buses from county buses
         if (agencyName && !agencyName.toLowerCase().includes('tallinna linnatranspordi')) {
-          type = 'countybus';
+          type = 'regional';
         }
       }
 

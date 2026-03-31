@@ -325,7 +325,7 @@ export const Planner = () => {
                           "h-7 px-2.5 rounded-full flex items-center justify-center gap-1",
                           getVehicleColorClass(segment.type)
                         )}>
-                          {segment.type === 'walk' ? <Footprints className="w-3.5 h-3.5" /> : segment.type === 'bus' || segment.type === 'countybus' ? <Bus className="w-3.5 h-3.5" /> : <Tram className="w-3.5 h-3.5" />}
+                          {segment.type === 'walk' ? <Footprints className="w-3.5 h-3.5" /> : segment.type === 'bus' || segment.type === 'regional' ? <Bus className="w-3.5 h-3.5" /> : <Tram className="w-3.5 h-3.5" />}
                           <span className="font-label font-bold text-[10px]">{segment.line}</span>
                         </div>
                       )}
@@ -353,7 +353,7 @@ export const Planner = () => {
                             segment.type === 'walk' ? "bg-surface-container-high" : 
                             getVehicleColorClass(segment.type)
                           )}>
-                            {segment.type === 'walk' ? <Footprints className="w-4 h-4" /> : segment.type === 'bus' || segment.type === 'countybus' ? <Bus className="w-4 h-4" /> : <Tram className="w-4 h-4" />}
+                            {segment.type === 'walk' ? <Footprints className="w-4 h-4" /> : segment.type === 'bus' || segment.type === 'regional' ? <Bus className="w-4 h-4" /> : <Tram className="w-4 h-4" />}
                           </div>
                           {idx < route.segments.length - 1 && <div className="w-0.5 h-full bg-outline-variant/30 my-1" />}
                         </div>
