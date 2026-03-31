@@ -319,6 +319,16 @@ async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
       destination: props.destination || ''
     });
   }
+  const byType: Record<number, number> = {};
+  for (const f of (data?.features || [])) {
+    const t = f.properties?.type ?? -1;
+    byType[t] = (byType[t] || 0) + 1;
+  }
+  console.log(`gis.ee/${city} type breakdown:`, JSON.stringify(byType));
+  const countyBuses = vehicles.filter(v => v.type === 'countybus');
+  if (countyBuses.length > 0) {
+    console.log(`gis.ee/${city} countybus sample:`, JSON.stringify(countyBuses[0]));
+  }
   return vehicles;
 }
 
