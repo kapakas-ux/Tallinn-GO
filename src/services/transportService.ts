@@ -292,6 +292,46 @@ const TALLINN_BOUNDS = { latMin: 59.3, latMax: 59.6, lonMin: 24.4, lonMax: 24.95
 // Only 'tallinn' exists on gis.ee — other city endpoints return 404
 const GIS_EE_CITIES = ['tallinn'];
 
+// Fetch county buses (Maakonnabuss) from transport.tallinn.ee/gps.txt
+// County buses are type 2 with line numbers >= 100
+async function fetchTransportTallinnCountyBuses(): Promise<Vehicle[]> {
+  const url = Capacitor.isNativePlatform()
+    ? `https://transport.tallinn.ee/gps.txt?t=${Date.now()}`
+    : `${API_BASE}/api/transport/gps`;
+  const text = await universalFetch(url);
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  const vehicles: Vehicle[] = [];
+  for (const line of lines) {
+    const parts = line.split(',');
+    if (parts.length < 9) continue;
+    const typeCode = parseInt(parts[0], 10);
+    if (typeCode !== 2) continue; // only buses
+    const vehicleId = parts[1]?.trim();
+    const lngRaw = parseInt(parts[2], 10);
+    const latRaw = parseInt(parts[3], 10);
+    const bearing = parseInt(parts[5], 10) || 0;
+    const lineNum = parseInt(parts[8], 10);
+    if (isNaN(lineNum) || lineNum < 100) continue; // only county buses
+    const destination = parts.slice(9).join(',').trim();
+    const lat = latRaw / 1000000;
+    const lng = lngRaw / 1000000;
+    // Validate Estonia bounds
+    if (lat < 57.5 || lat > 60.0 || lng < 21.0 || lng > 28.5) continue;
+    vehicles.push({
+      id: `tt_county_${vehicleId}`,
+      type: 'countybus',
+      line: lineNum.toString(),
+      lat,
+      lng,
+      bearing,
+      speed: 0,
+      destination
+    });
+  }
+  console.log(`transport.tallinn.ee county buses: ${vehicles.length} (from ${lines.length} total lines)`);
+  return vehicles;
+}
+
 async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
   const url = `https://gis.ee/${city}/gps.php?ver=${Date.now()}`;
   let data: any;
@@ -416,10 +456,11 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       return cachedVehicles;
     }
 
-    // Fetch all gis.ee cities + peatus.ee all-Estonia in parallel
+    // Fetch all gis.ee cities + peatus.ee all-Estonia + transport.tallinn.ee county buses in parallel
     const cityPromises = GIS_EE_CITIES.map(city => fetchGisEeCity(city));
-    const [estoniaResult, ...cityResults] = await Promise.allSettled([
+    const [estoniaResult, countyBusResult, ...cityResults] = await Promise.allSettled([
       fetchPeatusVehicles(),
+      fetchTransportTallinnCountyBuses(),
       ...cityPromises
     ]);
 
@@ -450,6 +491,13 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       console.log(`fetchVehicles: ${extra.length} extra from peatus.ee`);
     } else {
       console.warn('fetchVehicles: peatus.ee failed:', estoniaResult.reason);
+    }
+
+    // Add county buses from transport.tallinn.ee
+    if (countyBusResult.status === 'fulfilled') {
+      vehicles.push(...countyBusResult.value);
+    } else {
+      console.warn('fetchVehicles: county buses failed:', countyBusResult.reason);
     }
 
     if (vehicles.length > 0) {
