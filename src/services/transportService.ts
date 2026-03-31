@@ -289,9 +289,11 @@ let lastVehiclesFetch = 0;
 
 const TALLINN_BOUNDS = { latMin: 59.3, latMax: 59.6, lonMin: 24.4, lonMax: 24.95 };
 
-async function fetchGisEeTallinn(): Promise<Vehicle[]> {
-  const response = await fetch('https://gis.ee/tallinn/gps.php', { cache: 'no-store' });
-  if (!response.ok) throw new Error(`gis.ee error: ${response.status}`);
+const GIS_EE_CITIES = ['tallinn', 'tartu', 'parnu', 'narva'];
+
+async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
+  const response = await fetch(`https://gis.ee/${city}/gps.php`, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`gis.ee/${city} error: ${response.status}`);
   const data = await response.json();
   const vehicles: Vehicle[] = [];
   for (const feature of (data?.features || [])) {
@@ -306,7 +308,7 @@ async function fetchGisEeTallinn(): Promise<Vehicle[]> {
     else if (props.type === 20) type = 'countybus';
     const jitter = (Math.random() - 0.5) * 0.000001;
     vehicles.push({
-      id: `gis_${props.id}`,
+      id: `gis_${city}_${props.id}`,
       type,
       line: props.line?.toString() || '',
       lng: coords[0] + jitter,
@@ -371,31 +373,38 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       return cachedVehicles;
     }
 
-    // Fetch Tallinn (gis.ee) and all-Estonia (peatus.ee) in parallel
-    const [tallinnResult, estoniaResult] = await Promise.allSettled([
-      fetchGisEeTallinn(),
-      fetchPeatusVehicles()
+    // Fetch all gis.ee cities + peatus.ee all-Estonia in parallel
+    const cityPromises = GIS_EE_CITIES.map(city => fetchGisEeCity(city));
+    const [estoniaResult, ...cityResults] = await Promise.allSettled([
+      fetchPeatusVehicles(),
+      ...cityPromises
     ]);
 
     const vehicles: Vehicle[] = [];
+    const gisIds = new Set<string>();
 
-    // Add gis.ee Tallinn vehicles (accurate real-time)
-    if (tallinnResult.status === 'fulfilled') {
-      vehicles.push(...tallinnResult.value);
-      console.log(`fetchVehicles: ${tallinnResult.value.length} from gis.ee/tallinn`);
-    } else {
-      console.warn('fetchVehicles: gis.ee failed:', tallinnResult.reason);
+    // Add gis.ee vehicles from all cities
+    for (let i = 0; i < cityResults.length; i++) {
+      const result = cityResults[i];
+      const city = GIS_EE_CITIES[i];
+      if (result.status === 'fulfilled') {
+        vehicles.push(...result.value);
+        result.value.forEach(v => gisIds.add(v.id));
+        console.log(`fetchVehicles: ${result.value.length} from gis.ee/${city}`);
+      } else {
+        console.warn(`fetchVehicles: gis.ee/${city} failed:`, result.reason);
+      }
     }
 
-    // Add peatus.ee vehicles OUTSIDE Tallinn area (avoid duplicates)
+    // Add peatus.ee vehicles not already covered by gis.ee (deduplicate Tallinn area)
     if (estoniaResult.status === 'fulfilled') {
-      const regional = estoniaResult.value.filter(v => {
+      const extra = estoniaResult.value.filter(v => {
         const inTallinn = v.lat >= TALLINN_BOUNDS.latMin && v.lat <= TALLINN_BOUNDS.latMax &&
                           v.lng >= TALLINN_BOUNDS.lonMin && v.lng <= TALLINN_BOUNDS.lonMax;
-        return !inTallinn;
+        return !inTallinn; // Tallinn is covered by gis.ee; add everything else
       });
-      vehicles.push(...regional);
-      console.log(`fetchVehicles: ${regional.length} regional from peatus.ee`);
+      vehicles.push(...extra);
+      console.log(`fetchVehicles: ${extra.length} extra from peatus.ee`);
     } else {
       console.warn('fetchVehicles: peatus.ee failed:', estoniaResult.reason);
     }
