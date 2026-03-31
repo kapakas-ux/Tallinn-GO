@@ -289,7 +289,8 @@ let lastVehiclesFetch = 0;
 
 const TALLINN_BOUNDS = { latMin: 59.3, latMax: 59.6, lonMin: 24.4, lonMax: 24.95 };
 
-const GIS_EE_CITIES = ['tallinn', 'tartu', 'parnu', 'narva'];
+// Only 'tallinn' exists on gis.ee — other city endpoints return 404
+const GIS_EE_CITIES = ['tallinn'];
 
 async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
   const response = await fetch(`https://gis.ee/${city}/gps.php`, { cache: 'no-store' });
