@@ -460,8 +460,8 @@ export const Dashboard = () => {
                       <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
                     ) : (
                       <span className="font-headline font-black text-xl text-primary">
-                        {arrival.minutes <= 0 ? 'Now' : arrival.minutes}
-                        {arrival.minutes > 0 && <span className="text-[10px] ml-0.5 font-bold">min</span>}
+                        {arrival.minutes > 60 && arrival.time ? arrival.time : (arrival.minutes <= 0 ? 'Now' : arrival.minutes)}
+                        {arrival.minutes > 0 && !(arrival.minutes > 60 && arrival.time) && <span className="text-[10px] ml-0.5 font-bold">min</span>}
                       </span>
                     )}
                   </div>
