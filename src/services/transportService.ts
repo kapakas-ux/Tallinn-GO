@@ -332,8 +332,16 @@ async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
   }
   console.log(`gis.ee/${city} type breakdown:`, JSON.stringify(byType));
   const countyBuses = vehicles.filter(v => v.type === 'countybus');
+  console.log(`gis.ee/${city} county buses found: ${countyBuses.length} out of ${vehicles.length} total`);
   if (countyBuses.length > 0) {
     console.log(`gis.ee/${city} countybus sample:`, JSON.stringify(countyBuses[0]));
+  } else {
+    // Show line numbers of type-2 (bus) vehicles to debug why none qualify as county buses
+    const type2Lines = (data?.features || [])
+      .filter((f: any) => f.properties?.type === 2)
+      .map((f: any) => f.properties?.line)
+      .slice(0, 20);
+    console.log(`gis.ee/${city} type-2 line samples (first 20):`, JSON.stringify(type2Lines));
   }
   return vehicles;
 }
