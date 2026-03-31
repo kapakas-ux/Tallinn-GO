@@ -918,12 +918,15 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       const line = st.trip?.route?.shortName || '';
       const destination = st.headsign || '';
 
-      // Calculate time
-      const departureTimeSeconds = st.serviceDay + (st.realtimeDeparture || st.scheduledDeparture);
+      // Calculate time — use ?? so realtimeDeparture=0 (midnight) isn't dropped
+      const isRealTime = st.realtime === true;
+      const departureTimeSeconds = st.serviceDay + (st.realtimeDeparture ?? st.scheduledDeparture);
       let minutes = Math.floor((departureTimeSeconds - nowSeconds) / 60);
-      
-      // If it's already departed (negative minutes), skip or show 0
-      if (minutes < -2) continue; // Skip if departed more than 2 minutes ago
+
+      // Scheduled-only trips may be running late — give a 10-min grace period.
+      // Real-time trips have accurate data so a 2-min grace is enough.
+      const gracePeriod = isRealTime ? 2 : 10;
+      if (minutes < -gracePeriod) continue;
       if (minutes < 0) minutes = 0;
 
       const depDate = new Date(departureTimeSeconds * 1000);
@@ -931,7 +934,6 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       const mins = String(depDate.getMinutes()).padStart(2, '0');
       const timeStr = `${hours}:${mins}`;
 
-      const isRealTime = st.realtime === true;
       let status: 'on-time' | 'delayed' | 'expected' | 'departed' = 'expected';
       if (isRealTime) {
         if (st.realtimeState === 'UPDATED' && st.realtimeDeparture > st.scheduledDeparture + 60) {
@@ -947,7 +949,8 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
         type,
         minutes,
         time: timeStr,
-        status
+        status,
+        info: isRealTime ? undefined : 'Scheduled'
       });
     }
 
