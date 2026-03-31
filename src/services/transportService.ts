@@ -318,7 +318,7 @@ async function fetchTransportTallinnCountyBuses(): Promise<Vehicle[]> {
     // Validate Estonia bounds
     if (lat < 57.5 || lat > 60.0 || lng < 21.0 || lng > 28.5) continue;
     vehicles.push({
-      id: `tt_county_${vehicleId}`,
+      id: `tt_county_${lineNum}_${vehicleId}`,
       type: 'countybus',
       line: lineNum.toString(),
       lat,
