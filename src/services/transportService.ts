@@ -267,6 +267,8 @@ export async function fetchStops(): Promise<Stop[]> {
           (raw.routes || []).map((r: any) => r.mode as string).filter(Boolean)
         )];
 
+        if (vehicleTypes.length === 0) continue; // ghost stop — no active routes
+
         stops.push({
           id: internalId,
           siriId: siriId,
