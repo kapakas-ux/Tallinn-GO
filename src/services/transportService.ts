@@ -501,8 +501,12 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
     }
 
     // Add county buses from transport.tallinn.ee
+    // Deduplicate: if gis.ee already has vehicles for a line number, it's a city bus
     if (countyBusResult.status === 'fulfilled') {
-      vehicles.push(...countyBusResult.value);
+      const gisLines = new Set(vehicles.map(v => v.line));
+      const regional = countyBusResult.value.filter(v => !gisLines.has(v.line));
+      vehicles.push(...regional);
+      console.log(`fetchVehicles: ${regional.length} regional from transport.tallinn.ee (${countyBusResult.value.length - regional.length} skipped as city bus lines)`);
     } else {
       console.warn('fetchVehicles: county buses failed:', countyBusResult.reason);
     }
