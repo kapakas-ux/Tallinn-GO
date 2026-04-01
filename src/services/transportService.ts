@@ -332,13 +332,6 @@ async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
     else if (props.type === 3) type = 'tram';
     else if (props.type === 7) type = 'bus';
     else if (props.type === 10) type = 'train';
-    else if (props.type === 20) type = 'regional';
-    // County buses (Maakonnabuss) are type 2 in gis.ee but use line numbers 100+
-    // Tallinn city buses use lines 1-89
-    if (type === 'bus') {
-      const lineNum = parseInt(props.line?.toString() || '0', 10);
-      if (lineNum >= 100) type = 'regional';
-    }
     const jitter = (Math.random() - 0.5) * 0.000001;
     vehicles.push({
       id: `gis_${city}_${props.id}`,
@@ -356,19 +349,7 @@ async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
     const t = f.properties?.type ?? -1;
     byType[t] = (byType[t] || 0) + 1;
   }
-  console.log(`gis.ee/${city} type breakdown:`, JSON.stringify(byType));
-  const countyBuses = vehicles.filter(v => v.type === 'regional');
-  console.log(`gis.ee/${city} county buses found: ${countyBuses.length} out of ${vehicles.length} total`);
-  if (countyBuses.length > 0) {
-    console.log(`gis.ee/${city} regional sample:`, JSON.stringify(countyBuses[0]));
-  } else {
-    // Log full properties of first 3 type-2 vehicles to find county bus identifier
-    const type2Samples = (data?.features || [])
-      .filter((f: any) => f.properties?.type === 2)
-      .slice(0, 3)
-      .map((f: any) => f.properties);
-    console.log(`gis.ee/${city} type-2 full props samples:`, JSON.stringify(type2Samples));
-  }
+  console.log(`gis.ee/${city}: ${vehicles.length} vehicles`);
   return vehicles;
 }
 
