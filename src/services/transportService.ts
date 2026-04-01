@@ -410,12 +410,11 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       lat >= TARTU_BOUNDS.latMin && lat <= TARTU_BOUNDS.latMax &&
       lng >= TARTU_BOUNDS.lonMin && lng <= TARTU_BOUNDS.lonMax;
 
-    // Fetch all gis.ee cities + peatus.ee all-Estonia in parallel
-    // TODO: add fetchTartuVehicles() once correct Ridango vehicle-positions endpoint is found
+    // Fetch all gis.ee cities + peatus.ee all-Estonia + Tartu Ridango in parallel
     const cityPromises = GIS_EE_CITIES.map(city => fetchGisEeCity(city));
-    const tartuResult: PromiseSettledResult<Vehicle[]> = { status: 'fulfilled', value: [] };
-    const [estoniaResult, ...cityResults] = await Promise.allSettled([
+    const [estoniaResult, tartuResult, ...cityResults] = await Promise.allSettled([
       fetchPeatusVehicles(),
+      fetchTartuVehicles(),
       ...cityPromises
     ]);
 
@@ -944,32 +943,40 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
  * Endpoint: https://wmb-public-api-tartu.eu-prod.ridango.cloud/tenant/7/v1/vehicle-positions
  */
 async function fetchTartuVehicles(): Promise<Vehicle[]> {
-  const url = 'https://wmb-public-api-tartu.eu-prod.ridango.cloud/tenant/7/v1/vehicle-positions';
+  const BASE = 'https://wmb-public-api-tartu.eu-prod.ridango.cloud/tenant/7';
+  const CANDIDATE_PATHS = [
+    '/v1/vehicles',
+    '/v2/vehicle-positions',
+    '/v1/vehicles/positions',
+    '/v1/vehicle-monitoring',
+    '/v2/vehicles',
+  ];
+  const headers = {
+    'Origin': 'https://www.tartulinnaliin.ee',
+    'Referer': 'https://www.tartulinnaliin.ee/',
+    'Accept': 'application/json',
+  };
+
+  if (!Capacitor.isNativePlatform()) return [];
+
   try {
     let data: any;
-    if (Capacitor.isNativePlatform()) {
-      const response = await CapacitorHttp.get({
-        url,
-        headers: {
-          'Origin': 'https://www.tartulinnaliin.ee',
-          'Referer': 'https://www.tartulinnaliin.ee/',
-          'Accept': 'application/json',
-        },
-        connectTimeout: 10000,
-        readTimeout: 10000,
-      });
-      console.log(`Tartu API status: ${response.status}`);
-      if (response.status !== 200) {
-        const body = typeof response.data === 'string' ? response.data.substring(0, 300) : JSON.stringify(response.data).substring(0, 300);
-        console.warn(`Tartu API non-200: ${response.status} - ${body}`);
-        return [];
+    let foundUrl = '';
+
+    for (const path of CANDIDATE_PATHS) {
+      const url = BASE + path;
+      const response = await CapacitorHttp.get({ url, headers, connectTimeout: 6000, readTimeout: 6000 });
+      console.log(`Tartu probe ${path}: ${response.status}`);
+      if (response.status === 200) {
+        const rawStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+        console.log(`Tartu API FOUND at ${path}: ${rawStr.substring(0, 300)}`);
+        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+        foundUrl = url;
+        break;
       }
-      const rawStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-      console.log(`Tartu API raw sample: ${rawStr.substring(0, 300)}`);
-      data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-    } else {
-      return []; // CORS blocked in browser — only works on native
     }
+
+    if (!data) return [];
 
     // Ridango returns array of vehicle position objects
     const items: any[] = Array.isArray(data) ? data : (data.vehicles || data.data || data.features || []);
