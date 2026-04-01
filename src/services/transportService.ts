@@ -405,15 +405,32 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       return cachedVehicles;
     }
 
-    // Fetch all gis.ee cities + peatus.ee all-Estonia in parallel
+    const TARTU_BOUNDS = { latMin: 58.32, latMax: 58.45, lonMin: 26.65, lonMax: 26.82 };
+    const inTartu = (lat: number, lng: number) =>
+      lat >= TARTU_BOUNDS.latMin && lat <= TARTU_BOUNDS.latMax &&
+      lng >= TARTU_BOUNDS.lonMin && lng <= TARTU_BOUNDS.lonMax;
+
+    // Fetch all gis.ee cities + peatus.ee all-Estonia + Tartu Ridango in parallel
     const cityPromises = GIS_EE_CITIES.map(city => fetchGisEeCity(city));
-    const [estoniaResult, ...cityResults] = await Promise.allSettled([
+    const [estoniaResult, tartuResult, ...cityResults] = await Promise.allSettled([
       fetchPeatusVehicles(),
+      fetchTartuVehicles(),
       ...cityPromises
     ]);
 
     const vehicles: Vehicle[] = [];
     const gisIds = new Set<string>();
+
+    // Add Tartu Ridango vehicles first (most accurate for Tartu city buses)
+    const tartuIds = new Set<string>();
+    const hasTartuData = tartuResult.status === 'fulfilled' && tartuResult.value.length > 0;
+    if (hasTartuData) {
+      vehicles.push(...tartuResult.value);
+      tartuResult.value.forEach(v => tartuIds.add(v.id));
+      console.log(`fetchVehicles: ${tartuResult.value.length} from Tartu Ridango`);
+    } else if (tartuResult.status === 'rejected') {
+      console.warn('fetchVehicles: Tartu Ridango failed:', tartuResult.reason);
+    }
 
     // Add gis.ee vehicles from all cities
     for (let i = 0; i < cityResults.length; i++) {
@@ -428,12 +445,15 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       }
     }
 
-    // Add peatus.ee vehicles not already covered by gis.ee (deduplicate Tallinn area)
+    // Add peatus.ee vehicles not already covered by gis.ee or Tartu Ridango
     if (estoniaResult.status === 'fulfilled') {
       const extra = estoniaResult.value.filter(v => {
         const inTallinn = v.lat >= TALLINN_BOUNDS.latMin && v.lat <= TALLINN_BOUNDS.latMax &&
                           v.lng >= TALLINN_BOUNDS.lonMin && v.lng <= TALLINN_BOUNDS.lonMax;
-        return !inTallinn; // Tallinn is covered by gis.ee; add everything else
+        // Skip Tallinn (covered by gis.ee) and Tartu if Ridango data is available
+        if (inTallinn) return false;
+        if (hasTartuData && inTartu(v.lat, v.lng)) return false;
+        return true;
       });
       vehicles.push(...extra);
       console.log(`fetchVehicles: ${extra.length} extra from peatus.ee`);
@@ -916,4 +936,114 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     console.error('Error fetching departures from peatus.ee:', error);
     return [];
   }
+}
+
+/**
+ * Fetches live vehicle positions from Tartu city bus API (Ridango).
+ * Endpoint: https://wmb-public-api-tartu.eu-prod.ridango.cloud/tenant/7/v1/vehicle-positions
+ */
+async function fetchTartuVehicles(): Promise<Vehicle[]> {
+  const url = 'https://wmb-public-api-tartu.eu-prod.ridango.cloud/tenant/7/v1/vehicle-positions';
+  try {
+    let data: any;
+    if (Capacitor.isNativePlatform()) {
+      const response = await CapacitorHttp.get({
+        url,
+        headers: {
+          'Origin': 'https://www.tartulinnaliin.ee',
+          'Referer': 'https://www.tartulinnaliin.ee/',
+          'Accept': 'application/json',
+        },
+        connectTimeout: 10000,
+        readTimeout: 10000,
+      });
+      if (response.status !== 200) return [];
+      data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+    } else {
+      return []; // CORS blocked in browser — only works on native
+    }
+
+    // Ridango returns array of vehicle position objects
+    // Shape may vary; adapt to actual response structure
+    const items: any[] = Array.isArray(data) ? data : (data.vehicles || data.data || data.features || []);
+    const vehicles: Vehicle[] = [];
+
+    for (const item of items) {
+      // Support both flat and nested GeoJSON-style responses
+      const props = item.properties || item;
+      const coords = item.geometry?.coordinates;
+      const lat = coords ? coords[1] : (props.latitude ?? props.lat);
+      const lng = coords ? coords[0] : (props.longitude ?? props.lng);
+
+      if (!lat || !lng) continue;
+
+      const line = String(props.line_name || props.lineName || props.route_short_name || props.line || '');
+      const bearing = Number(props.bearing || props.heading || props.direction || 0);
+      const speed = Number(props.speed || 0);
+      const destination = String(props.destination || props.trip_headsign || props.headsign || '');
+      const vehicleId = String(props.vehicle_id || props.vehicleId || props.id || item.id || '');
+
+      if (!line || !vehicleId) continue;
+
+      vehicles.push({
+        id: `tartu_${vehicleId}`,
+        type: 'bus',
+        line,
+        lat: Number(lat),
+        lng: Number(lng),
+        bearing,
+        speed,
+        destination,
+      });
+    }
+
+    console.log(`Tartu vehicles fetched: ${vehicles.length}`);
+    return vehicles;
+  } catch (err) {
+    console.error('Error fetching Tartu vehicles:', err);
+    return [];
+  }
+}
+
+/**
+ * Improves scheduled (non-realtime) arrival times using live vehicle positions.
+ * For each unconfirmed arrival, finds a matching vehicle heading toward the stop
+ * and replaces the scheduled ETA with a distance-based estimate.
+ */
+export function adjustArrivalsWithVehicles(
+  arrivals: Arrival[],
+  vehicles: Vehicle[],
+  stop: Stop
+): Arrival[] {
+  return arrivals.map(arrival => {
+    if (arrival.status !== 'expected') return arrival; // already has real-time data
+
+    const matching = vehicles.filter(v => v.line === arrival.line);
+    if (matching.length === 0) return arrival;
+
+    let bestEta: number | null = null;
+
+    for (const v of matching) {
+      const distKm = getDistance(v.lat, v.lng, stop.lat, stop.lng);
+      const distM = distKm * 1000;
+      if (distM > 5000) continue; // ignore vehicles more than 5km away
+
+      // Check vehicle is heading roughly toward the stop (within ±90°)
+      const bearingToStop = getBearing(v.lat, v.lng, stop.lat, stop.lng);
+      const diff = Math.abs(((v.bearing - bearingToStop) + 180) % 360 - 180);
+      if (diff > 90) continue;
+
+      // ETA: use reported speed or default 20 km/h city speed
+      const speedMps = (v.speed && v.speed > 1) ? v.speed : (20000 / 3600);
+      const etaMinutes = Math.round(distM / speedMps / 60);
+
+      if (bestEta === null || etaMinutes < bestEta) bestEta = etaMinutes;
+    }
+
+    if (bestEta !== null && bestEta < arrival.minutes) {
+      return { ...arrival, minutes: bestEta, status: 'on-time' as const };
+    }
+
+    return arrival;
+  });
 }

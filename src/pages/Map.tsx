@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { useLocation } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes } from '../services/transportService';
+import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes, adjustArrivalsWithVehicles } from '../services/transportService';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
 import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
 import { Stop, Arrival, Vehicle } from '../types';
@@ -39,6 +39,7 @@ export const Map = () => {
 
   const [stops, setStops] = useState([] as Stop[]);
   const [vehicles, setVehicles] = useState([] as Vehicle[]);
+  const vehiclesRef = useRef([] as Vehicle[]);
   const [styleLoadCount, setStyleLoadCount] = useState(0);
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export const Map = () => {
     };
 
     loadVehicles();
-    const interval = setInterval(loadVehicles, 2000); // Update every 2 seconds
+    const interval = setInterval(loadVehicles, 2000);
 
     // Animation loop for smooth vehicle movement
     let animationFrameId: number;
@@ -229,6 +230,11 @@ export const Map = () => {
       map.current = null;
     };
   }, []);
+
+  // Keep vehiclesRef in sync so stop popups always use latest vehicle data
+  useEffect(() => {
+    vehiclesRef.current = vehicles;
+  }, [vehicles]);
 
   // Update vehicle markers
   useEffect(() => {
@@ -527,6 +533,8 @@ export const Map = () => {
         if (!isLoading) {
           try {
             departures = await fetchDepartures(id, siriId);
+            const stopObj = { id, siriId, name, lat: coordinates[1], lng: coordinates[0] };
+            departures = adjustArrivalsWithVehicles(departures, vehiclesRef.current, stopObj);
           } catch (err: any) {
             console.error('Error in handleStopClick:', err);
             errorMsg = err.message || 'No live data';
