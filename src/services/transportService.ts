@@ -957,15 +957,22 @@ async function fetchTartuVehicles(): Promise<Vehicle[]> {
         connectTimeout: 10000,
         readTimeout: 10000,
       });
-      if (response.status !== 200) return [];
+      console.log(`Tartu API status: ${response.status}`);
+      if (response.status !== 200) {
+        const body = typeof response.data === 'string' ? response.data.substring(0, 300) : JSON.stringify(response.data).substring(0, 300);
+        console.warn(`Tartu API non-200: ${response.status} - ${body}`);
+        return [];
+      }
+      const rawStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+      console.log(`Tartu API raw sample: ${rawStr.substring(0, 300)}`);
       data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
     } else {
       return []; // CORS blocked in browser — only works on native
     }
 
     // Ridango returns array of vehicle position objects
-    // Shape may vary; adapt to actual response structure
     const items: any[] = Array.isArray(data) ? data : (data.vehicles || data.data || data.features || []);
+    console.log(`Tartu API items count: ${items.length}, sample: ${JSON.stringify(items[0]).substring(0, 300)}`);
     const vehicles: Vehicle[] = [];
 
     for (const item of items) {
