@@ -410,11 +410,12 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
       lat >= TARTU_BOUNDS.latMin && lat <= TARTU_BOUNDS.latMax &&
       lng >= TARTU_BOUNDS.lonMin && lng <= TARTU_BOUNDS.lonMax;
 
-    // Fetch all gis.ee cities + peatus.ee all-Estonia + Tartu Ridango in parallel
+    // Fetch all gis.ee cities + peatus.ee all-Estonia in parallel
+    // TODO: add fetchTartuVehicles() once correct Ridango vehicle-positions endpoint is found
     const cityPromises = GIS_EE_CITIES.map(city => fetchGisEeCity(city));
-    const [estoniaResult, tartuResult, ...cityResults] = await Promise.allSettled([
+    const tartuResult: PromiseSettledResult<Vehicle[]> = { status: 'fulfilled', value: [] };
+    const [estoniaResult, ...cityResults] = await Promise.allSettled([
       fetchPeatusVehicles(),
-      fetchTartuVehicles(),
       ...cityPromises
     ]);
 
