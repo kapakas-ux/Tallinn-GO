@@ -1031,6 +1031,9 @@ export function adjustArrivalsWithVehicles(
     let bestEta: number | null = null;
 
     for (const v of matching) {
+      // Skip vehicles with unknown bearing (bearing=0 and not moving means no direction data)
+      if (v.bearing === 0 && (!v.speed || v.speed < 1)) continue;
+
       const distKm = getDistance(v.lat, v.lng, stop.lat, stop.lng);
       const distM = distKm * 1000;
       if (distM > 5000) continue; // ignore vehicles more than 5km away
@@ -1042,12 +1045,14 @@ export function adjustArrivalsWithVehicles(
 
       // ETA: use reported speed or default 20 km/h city speed
       const speedMps = (v.speed && v.speed > 1) ? v.speed : (20000 / 3600);
-      const etaMinutes = Math.round(distM / speedMps / 60);
+      const etaMinutes = Math.max(1, Math.round(distM / speedMps / 60));
 
       if (bestEta === null || etaMinutes < bestEta) bestEta = etaMinutes;
     }
 
-    if (bestEta !== null && bestEta < arrival.minutes) {
+    // Update ETA when GPS gives a better estimate — including when bus is running late
+    // (schedule says "Now" but GPS shows bus is still several minutes away)
+    if (bestEta !== null && (bestEta !== arrival.minutes)) {
       return { ...arrival, minutes: bestEta, status: 'on-time' as const };
     }
 
