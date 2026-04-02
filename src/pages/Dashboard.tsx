@@ -313,6 +313,14 @@ export const Dashboard = () => {
       <ActiveAlerts onAlertsChange={() => setScheduledAlerts(getActiveAlerts())} />
 
       {/* Hero Section: Stop Identity */}
+      {/* Daily Fact */}
+      <section className="mb-8">
+        <div className="px-4 py-3 bg-surface-container-lowest editorial-shadow rounded-[20px] border-l-2 border-primary/30">
+          <p className="font-label text-[9px] font-bold uppercase tracking-widest text-primary/50 mb-1">Did you know?</p>
+          <p className="font-body text-[11px] text-secondary leading-relaxed">{getDailyFact()}</p>
+        </div>
+      </section>
+
       <section className="mb-10">
         <div className="flex justify-between items-start">
           <div className="space-y-1">
@@ -710,13 +718,6 @@ export const Dashboard = () => {
         )}
       </section>
 
-      {/* Daily Fact */}
-      <section className="mb-4">
-        <div className="px-4 py-3 bg-surface-container-lowest editorial-shadow rounded-[20px] border-l-2 border-primary/30">
-          <p className="font-label text-[9px] font-bold uppercase tracking-widest text-primary/50 mb-1">Did you know?</p>
-          <p className="font-body text-[11px] text-secondary leading-relaxed">{getDailyFact()}</p>
-        </div>
-      </section>
     </div>
   );
 };
