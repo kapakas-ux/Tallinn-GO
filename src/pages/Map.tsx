@@ -820,7 +820,7 @@ export const Map = () => {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="absolute bottom-0 left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col max-h-[80vh]"
+            className="absolute bottom-0 left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col max-h-[calc(100%-3rem)]"
           >
             <div className="w-full flex justify-center pt-3 pb-2" onClick={() => setSelectedVehicle(null)}>
               <div className="w-12 h-1.5 bg-outline-variant/30 rounded-full" />
