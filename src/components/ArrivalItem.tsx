@@ -12,9 +12,10 @@ interface ArrivalItemProps {
   variant?: 'main' | 'compact';
   onAlertClick?: (e: React.MouseEvent) => void;
   isAlertActive?: boolean;
+  expandable?: boolean;
 }
 
-export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive }: ArrivalItemProps) {
+export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive, expandable = true }: ArrivalItemProps) {
   const [expanded, setExpanded] = useState(false);
   const [routeStops, setRouteStops] = useState<Stop[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
   return (
     <div className="flex flex-col gap-2">
       <div
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => expandable && setExpanded(!expanded)}
         className={cn(
           "group flex items-center justify-between transition-all cursor-pointer",
           isCompact ? "py-2" : "p-3 rounded-[20px]",
@@ -124,13 +125,13 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                   <span className={cn("font-bold text-secondary uppercase", isCompact ? "text-[10px]" : "text-[10px] ml-0.5")}>min</span>
                 )}
               </div>
-              {expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />}
+              {expandable && (expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />)}
             </div>
           )}
         </div>
       </div>
 
-      {expanded && (
+      {expanded && expandable && (
         <div className={cn(
           "bg-surface-container-lowest rounded-[20px] p-4 animate-in slide-in-from-top-2",
           !isCompact && "editorial-shadow"

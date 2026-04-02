@@ -12,6 +12,7 @@ import { Stop, Arrival } from '../types';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { NotificationSelector } from '../components/NotificationSelector';
 import { ActiveAlerts } from '../components/ActiveAlerts';
+import { MiniMap } from '../components/MiniMap';
 import { AnimatePresence } from 'motion/react';
 
 export const Dashboard = () => {
@@ -642,6 +643,18 @@ export const Dashboard = () => {
               {/* Expanded Departures */}
               {expandedNearby === fav.id && (
                 <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
+                  {/* Stop minimap */}
+                  <div className="h-40 w-full rounded-[20px] overflow-hidden mb-3 bg-surface-container-high relative border border-outline-variant/10">
+                    <MiniMap userLocation={userLocation} stops={[fav]} onStopClick={() => {}} />
+                    <Link
+                      to={`/map?lat=${fav.lat}&lng=${fav.lng}&zoom=20&stopId=${fav.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute bottom-2 right-2 bg-surface/90 backdrop-blur-md p-2 rounded-full shadow-lg text-primary active:scale-90 transition-transform"
+                      title="Open in full map"
+                    >
+                      <MapIcon className="w-4 h-4" />
+                    </Link>
+                  </div>
                   {nearbyLoading[fav.id] ? (
                     <div className="flex justify-center py-4">
                       <Loader2 className="w-5 h-5 animate-spin text-secondary" />
@@ -650,10 +663,11 @@ export const Dashboard = () => {
                     <div className="space-y-2">
                       {nearbyDepartures[fav.id].map((arr, i) => (
                         <div key={i} className="relative">
-                          <ArrivalItem 
-                            arrival={arr} 
-                            stop={fav} 
+                          <ArrivalItem
+                            arrival={arr}
+                            stop={fav}
                             variant="compact"
+                            expandable={false}
                             isAlertActive={isAlertActive(fav.id, arr.line, arr.minutes)}
                             onAlertClick={() => setAlertingArrival({ stop: fav, arrival: arr })}
                           />
