@@ -892,6 +892,13 @@ export async function computeEtaToStop(
     // Vehicle has already passed the stop, or can't resolve position — fall back to sched
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
+
+  // 4b. If the vehicle is more than 500m from its closest route stop it is
+  // almost certainly parked at a depot and not currently in service.
+  // Fall back to schedule so we don't produce fake GPS ETAs at night.
+  if (minVehicleDist > 0.5) {
+    return { etaMinutes: scheduleEta, source: 'schedule' };
+  }
   
   // 5. Compute path distance: vehicle -> closest stop -> ... -> target stop
   // First leg: vehicle to its closest stop (partial segment)
