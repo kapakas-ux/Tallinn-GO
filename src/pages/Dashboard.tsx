@@ -13,6 +13,7 @@ import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { NotificationSelector } from '../components/NotificationSelector';
 import { ActiveAlerts } from '../components/ActiveAlerts';
 import { AnimatePresence } from 'motion/react';
+import { getDailyFact } from '../services/dailyFactService';
 
 export const Dashboard = () => {
   const [closestStop, setClosestStop] = useState(null as Stop | null);
@@ -707,6 +708,14 @@ export const Dashboard = () => {
             </p>
           </div>
         )}
+      </section>
+
+      {/* Daily Fact */}
+      <section className="mb-4">
+        <div className="px-4 py-3 bg-surface-container-lowest editorial-shadow rounded-[20px] border-l-2 border-primary/30">
+          <p className="font-label text-[9px] font-bold uppercase tracking-widest text-primary/50 mb-1">Did you know?</p>
+          <p className="font-body text-[11px] text-secondary leading-relaxed">{getDailyFact()}</p>
+        </div>
       </section>
     </div>
   );
