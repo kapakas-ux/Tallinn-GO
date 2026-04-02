@@ -2,7 +2,7 @@ import React from 'react';
 import { Bell, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Stop, Arrival } from '../types';
-import { scheduleDepartureNotification } from '../services/notificationService';
+import { scheduleDepartureNotification, requestBatteryOptimisationExemption } from '../services/notificationService';
 import { addActiveAlert } from '../services/alertService';
 
 interface NotificationSelectorProps {
@@ -14,6 +14,9 @@ interface NotificationSelectorProps {
 
 export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: NotificationSelectorProps) => {
   const handleSchedule = async (minutesBefore: number) => {
+    // Request battery optimization exemption before scheduling
+    await requestBatteryOptimisationExemption();
+
     const success = await scheduleDepartureNotification(
       stop.name,
       arrival.line,
@@ -43,7 +46,7 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
-      className="absolute right-0 top-0 mt-12 z-50 bg-surface-container-lowest editorial-shadow rounded-2xl p-4 w-48 border border-outline-variant/20"
+      className="absolute right-0 top-0 mt-12 z-[100] bg-surface-container-lowest editorial-shadow rounded-2xl p-4 w-48 border border-outline-variant/20"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between mb-3">

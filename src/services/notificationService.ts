@@ -1,5 +1,20 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
+import { getSettings, ALARM_SOUNDS } from './settingsService';
+
+export async function requestBatteryOptimisationExemption(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    // Opens the system battery optimisation settings page for this app.
+    // The user can tap "Don't optimise" to ensure exact alarms fire on time.
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.open({
+      url: 'package:ee.tallinngo.app' // replace with your actual package name
+    });
+  } catch (e) {
+    console.warn('Could not open battery settings', e);
+  }
+}
 
 export const scheduleDepartureNotification = async (
   stopName: string,
@@ -40,6 +55,15 @@ export const scheduleDepartureNotification = async (
 
     if (scheduleDate <= new Date()) return true;
 
+    // ─── NEW: resolve selected alarm sound ────────────────────────────────
+    const { alarmSound } = getSettings();
+    const soundEntry = ALARM_SOUNDS.find(s => s.id === alarmSound);
+    // Android: sound filename (no extension) must exist in res/raw/
+    const sound = soundEntry?.id === 'default' || !soundEntry?.file
+      ? 'default'
+      : soundEntry.id;
+    // ──────────────────────────────────────────────────────────────────────
+
     await LocalNotifications.schedule({
       notifications: [
         {
@@ -47,7 +71,7 @@ export const scheduleDepartureNotification = async (
           body: `Your bus from ${stopName} is arriving in ${minutesBefore} minutes!`,
           id: Math.floor(Math.random() * 1000000),
           schedule: { at: scheduleDate },
-          sound: 'default',
+          sound,
           attachments: [],
           actionTypeId: '',
           extra: null

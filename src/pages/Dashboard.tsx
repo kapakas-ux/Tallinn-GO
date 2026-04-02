@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Star, CheckCircle2, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Bell } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getVehicleColorClass, getStopColorClass } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
 import { getFavorites, isFavorite, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
+import { ArrivalItem } from '../components/ArrivalItem';
 import { Stop, Arrival } from '../types';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { NotificationSelector } from '../components/NotificationSelector';
@@ -417,10 +418,10 @@ export const Dashboard = () => {
                 key={idx}
                 className={cn(
                   "group flex items-center justify-between p-3 rounded-[20px] transition-all relative",
-                  alertingArrival?.arrival === arrival ? "z-20" : "z-0",
-                  arrival.status === 'departed'
-                    ? "bg-surface-container-high/30 opacity-60"
-                    : "bg-surface-container-lowest editorial-shadow hover:translate-x-2"
+                  arrival.status === 'departed' 
+                    ? "bg-surface-container-high/30 opacity-60" 
+                    : "bg-surface-container-lowest editorial-shadow hover:translate-x-2",
+                  alertingArrival?.arrival === arrival && alertingArrival?.stop === closestStop ? "z-50" : "z-10"
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -460,10 +461,15 @@ export const Dashboard = () => {
                     {arrival.status === 'departed' ? (
                       <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
                     ) : (
-                      <span className="font-headline font-black text-xl text-primary">
-                        {arrival.minutes > 60 && arrival.time ? arrival.time : (arrival.minutes <= 0 ? 'Now' : arrival.minutes)}
+                      <div className="flex items-baseline gap-1">
+                        {arrival.isRealtime && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center" />
+                        )}
+                        <span className="font-headline font-black text-xl text-primary">
+                          {arrival.minutes > 60 && arrival.time ? arrival.time : (arrival.minutes === 0 ? 'Now' : arrival.minutes)}
+                        </span>
                         {arrival.minutes > 0 && !(arrival.minutes > 60 && arrival.time) && <span className="text-[10px] ml-0.5 font-bold">min</span>}
-                      </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -494,16 +500,22 @@ export const Dashboard = () => {
           </div>
           <div className="grid grid-cols-1 gap-3">
             {nearbyStops.map((stop) => (
-              <div key={stop.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] overflow-hidden transition-all">
+              <div key={stop.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all">
                 <div 
-                  className="p-3 flex items-center justify-between hover:bg-surface-container-low transition-colors cursor-pointer group"
+                  className={cn(
+                    "p-3 flex items-center justify-between hover:bg-surface-container-low transition-colors cursor-pointer group",
+                    expandedNearby === stop.id ? "rounded-t-[20px]" : "rounded-[20px]"
+                  )}
                   onClick={() => handleNearbyClick(stop)}
                 >
                   <div className="flex items-center gap-4">
                     <Link 
                       to={`/map?lat=${stop.lat}&lng=${stop.lng}&zoom=20&stopId=${stop.id}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="h-10 w-10 rounded-full bg-primary/5 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-colors active:scale-90"
+                      className={cn(
+                        "h-10 w-10 rounded-full flex items-center justify-center transition-colors active:scale-90",
+                        getStopColorClass(stop)
+                      )}
                       title="View on Map"
                     >
                       <MapPin className="w-5 h-5" />
@@ -549,7 +561,7 @@ export const Dashboard = () => {
 
                 {/* Expanded Nearby Departures */}
                 {expandedNearby === stop.id && (
-                  <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50">
+                  <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
                     {nearbyLoading[stop.id] ? (
                       <div className="flex justify-center py-4">
                         <Loader2 className="w-5 h-5 animate-spin text-secondary" />
@@ -557,38 +569,14 @@ export const Dashboard = () => {
                     ) : nearbyDepartures[stop.id]?.length > 0 ? (
                       <div className="space-y-2">
                         {nearbyDepartures[stop.id].map((arr, i) => (
-                          <div key={i} className={cn("flex items-center justify-between py-2 relative", alertingArrival?.arrival === arr ? "z-20" : "z-0")}>
-                            <div className="flex items-center gap-3">
-                              <div className={cn(
-                                "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
-                                getVehicleColorClass(arr.type)
-                              )}>
-                                {arr.line}
-                              </div>
-                              <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {arr.minutes > 15 && arr.status !== 'departed' && (
-                                <button 
-                                  onClick={() => setAlertingArrival({ stop, arrival: arr })}
-                                  className={cn(
-                                    "p-1.5 rounded-full transition-all active:scale-90",
-                                    isAlertActive(stop.id, arr.line, arr.minutes) 
-                                      ? "bg-amber-500 text-white" 
-                                      : "bg-surface-container-high text-secondary hover:text-primary"
-                                  )}
-                                >
-                                  <Bell className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              <div className="flex items-baseline gap-1">
-                                <span className="font-headline font-black text-lg text-primary">
-                                  {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
-                                </span>
-                                {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
-                              </div>
-                            </div>
-
+                          <div key={i} className="relative">
+                            <ArrivalItem 
+                              arrival={arr} 
+                              stop={stop} 
+                              variant="compact"
+                              isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
+                              onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
+                            />
                             <AnimatePresence>
                               {alertingArrival?.arrival === arr && alertingArrival?.stop === stop && (
                                 <NotificationSelector 
@@ -637,14 +625,15 @@ export const Dashboard = () => {
         <div className="grid grid-cols-1 gap-3">
           {visibleFavs.map((fav) => (
             <div key={fav.id} className={cn(
-              "bg-surface-container-lowest editorial-shadow rounded-[20px] overflow-hidden transition-all",
+              "bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all",
               isEditingFavs && "ring-2 ring-primary/20"
             )}>
               <div 
                 onClick={() => handleFavClick(fav)}
                 className={cn(
                   "p-3 flex items-center justify-between cursor-pointer hover:bg-surface-container-low transition-colors active:scale-[0.98]",
-                  isEditingFavs && "bg-primary/5"
+                  isEditingFavs && "bg-primary/5",
+                  expandedNearby === fav.id ? "rounded-t-[20px]" : "rounded-[20px]"
                 )}
               >
                 <div className="flex items-center gap-4">
@@ -707,7 +696,7 @@ export const Dashboard = () => {
               
               {/* Expanded Departures */}
               {expandedNearby === fav.id && (
-                <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50">
+                <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
                   {nearbyLoading[fav.id] ? (
                     <div className="flex justify-center py-4">
                       <Loader2 className="w-5 h-5 animate-spin text-secondary" />
@@ -715,38 +704,14 @@ export const Dashboard = () => {
                   ) : nearbyDepartures[fav.id]?.length > 0 ? (
                     <div className="space-y-2">
                       {nearbyDepartures[fav.id].map((arr, i) => (
-                        <div key={i} className={cn("flex items-center justify-between py-2 relative", alertingArrival?.arrival === arr ? "z-20" : "z-0")}>
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
-                              getVehicleColorClass(arr.type)
-                            )}>
-                              {arr.line}
-                            </div>
-                            <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {arr.minutes > 15 && arr.status !== 'departed' && (
-                              <button 
-                                onClick={() => setAlertingArrival({ stop: fav, arrival: arr })}
-                                className={cn(
-                                  "p-1.5 rounded-full transition-all active:scale-90",
-                                  scheduledAlerts.includes(`${fav.id}-${arr.line}-${arr.minutes}`) 
-                                    ? "bg-amber-500 text-white" 
-                                    : "bg-surface-container-high text-secondary hover:text-primary"
-                                )}
-                              >
-                                <Bell className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <div className="flex items-baseline gap-1">
-                              <span className="font-headline font-black text-lg text-primary">
-                                {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
-                              </span>
-                              {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
-                            </div>
-                          </div>
-
+                        <div key={i} className="relative">
+                          <ArrivalItem 
+                            arrival={arr} 
+                            stop={fav} 
+                            variant="compact"
+                            isAlertActive={isAlertActive(fav.id, arr.line, arr.minutes)}
+                            onAlertClick={() => setAlertingArrival({ stop: fav, arrival: arr })}
+                          />
                           <AnimatePresence>
                             {alertingArrival?.arrival === arr && alertingArrival?.stop === fav && (
                               <NotificationSelector 
@@ -754,7 +719,7 @@ export const Dashboard = () => {
                                 arrival={arr}
                                 onClose={() => setAlertingArrival(null)}
                                 onScheduled={() => {
-                                  setScheduledAlerts(prev => [...prev, `${fav.id}-${arr.line}-${arr.minutes}`]);
+                                  setScheduledAlerts(getActiveAlerts());
                                 }}
                               />
                             )}

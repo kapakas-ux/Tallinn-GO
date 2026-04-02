@@ -7,7 +7,8 @@ export interface Stop {
   distance?: number;
   customName?: string;
   emoji?: string;
-  vehicleTypes?: string[];
+  desc?: string;
+  modes?: ('bus' | 'tram' | 'trolley' | 'train' | 'regional')[];
 }
 
 export interface Arrival {
@@ -17,6 +18,7 @@ export interface Arrival {
   minutes: number;
   time?: string;
   status: 'on-time' | 'delayed' | 'expected' | 'departed';
+  isRealtime?: boolean;
   info?: string;
   vehicleId?: string;
   vehicleIndex?: number;

@@ -6,39 +6,12 @@ import { getFavorites, toggleFavorite as toggleFavService, isFavorite, updateFav
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { MiniMap } from '../components/MiniMap';
+import { ArrivalItem } from '../components/ArrivalItem';
 import { Stop, Arrival } from '../types';
-import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getVehicleColorClass, getStopColorClass } from '../lib/utils';
 import { NotificationSelector } from '../components/NotificationSelector';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { AnimatePresence } from 'motion/react';
-
-const ESTONIAN_COUNTIES = [
-  { name: 'Harjumaa',      lat: 59.35, lng: 24.85 },
-  { name: 'Lääne-Virumaa', lat: 59.35, lng: 26.20 },
-  { name: 'Ida-Virumaa',   lat: 59.35, lng: 27.40 },
-  { name: 'Raplamaa',      lat: 59.00, lng: 24.75 },
-  { name: 'Järvamaa',      lat: 58.90, lng: 25.50 },
-  { name: 'Jõgevamaa',     lat: 58.60, lng: 26.40 },
-  { name: 'Tartumaa',      lat: 58.38, lng: 26.72 },
-  { name: 'Põlvamaa',      lat: 58.07, lng: 27.05 },
-  { name: 'Võrumaa',       lat: 57.83, lng: 27.00 },
-  { name: 'Valgamaa',      lat: 57.78, lng: 26.05 },
-  { name: 'Viljandimaa',   lat: 58.37, lng: 25.60 },
-  { name: 'Pärnumaa',      lat: 58.37, lng: 24.50 },
-  { name: 'Läänemaa',      lat: 58.95, lng: 23.70 },
-  { name: 'Hiiumaa',       lat: 58.93, lng: 22.60 },
-  { name: 'Saaremaa',      lat: 58.25, lng: 22.50 },
-];
-
-function getEstonianCounty(lat: number, lng: number): string {
-  let closest = ESTONIAN_COUNTIES[0];
-  let minDist = Infinity;
-  for (const county of ESTONIAN_COUNTIES) {
-    const d = Math.sqrt((lat - county.lat) ** 2 + (lng - county.lng) ** 2);
-    if (d < minDist) { minDist = d; closest = county; }
-  }
-  return closest.name;
-}
 
 export const Stops = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -143,17 +116,18 @@ export const Stops = () => {
       return;
     }
     const query = searchQuery.toLowerCase();
-    let results = allStops.filter(stop =>
+    let results = allStops.filter(stop => 
       stop.name.toLowerCase().includes(query) || stop.id.includes(query)
     );
-    // Sort by distance from user when location is available
+
     if (userLocation) {
       results = results.map(s => ({
         ...s,
         distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng)
       })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
     }
-    setFilteredStops(results.slice(0, 20));
+
+    setFilteredStops(results.slice(0, 20)); // limit to 20 results for performance
   }, [searchQuery, allStops, userLocation]);
 
   useEffect(() => {
@@ -365,20 +339,30 @@ export const Stops = () => {
                       <NearMe className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="font-headline font-bold text-lg text-primary">{stop.name}</h4>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
-                          {getEstonianCounty(stop.lat, stop.lng)}
-                        </span>
-                        {userLocation && (
-                          <>
-                            <span className="text-secondary opacity-30">•</span>
-                            <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
-                              {(getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000).toFixed(0)}m
-                            </span>
-                          </>
+                      <div className="flex items-baseline gap-2">
+                        <h4 className="font-headline font-bold text-lg text-primary leading-tight">{stop.name}</h4>
+                        {stop.desc && (
+                          <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest bg-surface-container-high px-1.5 py-0.5 rounded-md">
+                            {stop.desc}
+                          </span>
                         )}
                       </div>
+                      {userLocation ? (
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
+                            {(getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000).toFixed(0)}m
+                          </span>
+                          <span className="text-secondary opacity-30">•</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
+                              {Math.round((getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000) / 83.33)} min
+                            </span>
+                            <Footprints className="w-3 h-3 text-secondary/60" />
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="font-label text-xs text-secondary mt-0.5">Stop ID: {stop.id}</p>
+                      )}
                     </div>
                   </div>
                   <ChevronRight className="text-outline-variant w-5 h-5" />
@@ -425,22 +409,30 @@ export const Stops = () => {
             ) : nearbyStops.length > 0 ? (
               <div className="space-y-3 px-6">
                 {nearbyStops.map((stop) => (
-                  <div key={stop.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] overflow-hidden transition-all">
+                  <div key={stop.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all">
                     <div 
-                      className="p-3 flex items-center justify-between hover:bg-surface-container-low transition-colors cursor-pointer group"
+                      className={cn(
+                        "p-3 flex items-center justify-between hover:bg-surface-container-low transition-colors cursor-pointer group",
+                        expandedNearby === stop.id ? "rounded-t-[20px]" : "rounded-[20px]"
+                      )}
                       onClick={() => handleNearbyClick(stop)}
                     >
                       <div className="flex items-center gap-4">
                         <Link 
                           to={`/map?lat=${stop.lat}&lng=${stop.lng}&zoom=20&stopId=${stop.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="h-10 w-10 rounded-full bg-primary/5 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-colors active:scale-90"
+                          className={cn(
+                            "h-10 w-10 rounded-full flex items-center justify-center transition-colors active:scale-90",
+                            getStopColorClass(stop)
+                          )}
                           title="View on Map"
                         >
                           <MapPin className="w-5 h-5" />
                         </Link>
                         <div>
-                          <h4 className="font-headline font-bold text-lg text-primary">{stop.name}</h4>
+                          <div className="flex items-baseline gap-2">
+                            <h4 className="font-headline font-bold text-lg text-primary leading-tight">{stop.name}</h4>
+                          </div>
                           <div className="flex flex-col mt-0.5">
                             <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
                               {formatDistance(stop.distance! * 1000)}
@@ -475,7 +467,7 @@ export const Stops = () => {
 
                     {/* Expanded Nearby Departures */}
                     {expandedNearby === stop.id && (
-                      <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50">
+                      <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
                         {nearbyLoading[stop.id] ? (
                           <div className="flex justify-center py-4">
                             <Loader2 className="w-5 h-5 animate-spin text-secondary" />
@@ -483,38 +475,14 @@ export const Stops = () => {
                         ) : nearbyDepartures[stop.id]?.length > 0 ? (
                           <div className="space-y-2">
                             {nearbyDepartures[stop.id].map((arr, i) => (
-                              <div key={i} className="flex items-center justify-between py-2 relative">
-                                <div className="flex items-center gap-3">
-                                  <div className={cn(
-                                    "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs",
-                                    getVehicleColorClass(arr.type)
-                                  )}>
-                                    {arr.line}
-                                  </div>
-                                  <span className="font-headline font-bold text-primary text-sm">{arr.destination}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  {arr.minutes > 15 && arr.status !== 'departed' && (
-                                    <button 
-                                      onClick={() => setAlertingArrival({ stop, arrival: arr })}
-                                      className={cn(
-                                        "p-1.5 rounded-full transition-all active:scale-90",
-                                        isAlertActive(stop.id, arr.line, arr.minutes) 
-                                          ? "bg-amber-500 text-white" 
-                                          : "bg-surface-container-high text-secondary hover:text-primary"
-                                      )}
-                                    >
-                                      <Bell className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                  <div className="flex items-baseline gap-1">
-                                    <span className="font-headline font-black text-lg text-primary">
-                                      {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
-                                    </span>
-                                    {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[10px] font-bold text-secondary uppercase">min</span>}
-                                  </div>
-                                </div>
-
+                              <div key={i} className="relative">
+                                <ArrivalItem 
+                                  arrival={arr} 
+                                  stop={stop} 
+                                  variant="compact"
+                                  isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
+                                  onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
+                                />
                                 <AnimatePresence>
                                   {alertingArrival?.arrival === arr && alertingArrival?.stop === stop && (
                                     <NotificationSelector 
@@ -574,7 +542,7 @@ export const Stops = () => {
                     key={stop.id}
                     onClick={() => handleFavClick(stop)}
                     className={cn(
-                      "p-5 rounded-[24px] shadow-sm flex flex-col justify-between min-h-[180px] relative overflow-hidden group transition-all",
+                      "p-5 rounded-[24px] shadow-sm flex flex-col justify-between min-h-[180px] relative group transition-all",
                       isEditMode ? "bg-surface-container-high ring-2 ring-primary/20" : "bg-surface-container-lowest hover:bg-surface-container-low cursor-pointer"
                     )}
                   >
@@ -607,10 +575,17 @@ export const Stops = () => {
                       )}
                     </div>
                     <div>
-                      <h3 className="font-headline text-lg font-black text-primary leading-tight pr-16 flex items-center gap-2">
-                        {stop.emoji && <span className="text-xl">{stop.emoji}</span>}
-                        {stop.customName || stop.name}
-                      </h3>
+                      <div className="flex items-baseline gap-2 pr-16">
+                        <h3 className="font-headline text-lg font-black text-primary leading-tight flex items-center gap-2">
+                          {stop.emoji && <span className="text-xl">{stop.emoji}</span>}
+                          {stop.customName || stop.name}
+                        </h3>
+                        {stop.desc && (
+                          <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest bg-surface-container-high px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                            {stop.desc}
+                          </span>
+                        )}
+                      </div>
                       {userLocation ? (
                         <div className="flex items-center gap-2 mt-1">
                           <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
@@ -637,41 +612,14 @@ export const Stops = () => {
                         </div>
                       ) : favDepartures[stop.id]?.length > 0 ? (
                         favDepartures[stop.id].map((arr, i) => (
-                          <div key={i} className="flex items-center justify-between relative">
-                            <div className="flex items-center gap-2">
-                              <div className={cn(
-                                "h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px]",
-                                getVehicleColorClass(arr.type)
-                              )}>
-                                {arr.line}
-                              </div>
-                              <span className="font-headline font-bold text-primary text-xs truncate max-w-[120px]">{arr.destination}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {arr.minutes > 15 && arr.status !== 'departed' && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setAlertingArrival({ stop, arrival: arr });
-                                  }}
-                                  className={cn(
-                                    "p-1 rounded-full transition-all active:scale-90",
-                                    isAlertActive(stop.id, arr.line, arr.minutes) 
-                                      ? "bg-amber-500 text-white" 
-                                      : "bg-surface-container-high text-secondary hover:text-primary"
-                                  )}
-                                >
-                                  <Bell className="w-3 h-3" />
-                                </button>
-                              )}
-                              <div className="flex items-baseline gap-0.5">
-                                <span className="font-headline font-black text-sm text-primary">
-                                  {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : arr.minutes)}
-                                </span>
-                                {arr.minutes > 0 && !(arr.minutes > 60 && arr.time) && <span className="text-[8px] font-bold text-secondary uppercase">min</span>}
-                              </div>
-                            </div>
-
+                          <div key={i} className="relative">
+                            <ArrivalItem 
+                              arrival={arr} 
+                              stop={stop} 
+                              variant="compact"
+                              isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
+                              onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
+                            />
                             <AnimatePresence>
                               {alertingArrival?.arrival === arr && alertingArrival?.stop === stop && (
                                 <NotificationSelector 
@@ -740,7 +688,14 @@ export const Stops = () => {
                   <Star className={cn("w-6 h-6", isFavorite(selectedStop.id) && "fill-current")} />
                 </button>
                 <div>
-                  <h3 className="font-headline text-2xl font-black text-primary tracking-tight">{selectedStop.name}</h3>
+                  <div className="flex items-baseline gap-2">
+                    <h3 className="font-headline text-2xl font-black text-primary tracking-tight leading-tight">{selectedStop.name}</h3>
+                    {selectedStop.desc && (
+                      <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest bg-surface-container-high px-1.5 py-0.5 rounded-md">
+                        {selectedStop.desc}
+                      </span>
+                    )}
+                  </div>
                   {userLocation ? (
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
@@ -797,7 +752,10 @@ export const Stops = () => {
                     <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{departures.length} found</span>
                   </div>
                   {departures.map((arr, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-surface-container-low rounded-[20px] border border-outline-variant/5 relative">
+                    <div key={i} className={cn(
+                      "flex items-center justify-between p-4 bg-surface-container-low rounded-[20px] border border-outline-variant/5 relative",
+                      alertingArrival?.arrival === arr && alertingArrival?.stop === selectedStop ? "z-50" : "z-10"
+                    )}>
                       <div className="flex items-center gap-4">
                         <div className={cn(
                           "h-10 w-10 rounded-full flex items-center justify-center",
@@ -831,9 +789,14 @@ export const Stops = () => {
                           </button>
                         )}
                         <div className="text-right">
-                          <p className="font-headline font-black text-xl text-primary">
-                            {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes <= 0 ? 'Now' : `${arr.minutes}m`)}
-                          </p>
+                          <div className="flex items-baseline gap-1">
+                            {arr.isRealtime && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center" />
+                            )}
+                            <p className="font-headline font-black text-xl text-primary">
+                              {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes === 0 ? 'Now' : `${arr.minutes}m`)}
+                            </p>
+                          </div>
                         </div>
                       </div>
 
