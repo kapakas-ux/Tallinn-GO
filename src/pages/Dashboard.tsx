@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Star, CheckCircle2, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Bell } from 'lucide-react';
+import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { cn, formatDistance, formatWalkingTime, getVehicleColorClass, getStopColorClass } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getStopColorClass } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
 import { getFavorites, isFavorite, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
@@ -414,75 +414,20 @@ export const Dashboard = () => {
         ) : (
           <div className="space-y-2">
             {departures.map((arrival, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  "group flex items-center justify-between p-3 rounded-[20px] transition-all relative",
-                  arrival.status === 'departed' 
-                    ? "bg-surface-container-high/30 opacity-60" 
-                    : "bg-surface-container-lowest editorial-shadow hover:translate-x-2",
-                  alertingArrival?.arrival === arrival && alertingArrival?.stop === closestStop ? "z-50" : "z-10"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "h-10 w-10 rounded-full flex items-center justify-center font-label font-bold text-base",
-                    getVehicleColorClass(arrival.type)
-                  )}>
-                    {arrival.line}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className={cn(
-                      "font-headline font-extrabold text-primary text-sm",
-                      arrival.status === 'departed' && "line-through text-on-surface-variant"
-                    )}>
-                      {arrival.destination}
-                    </span>
-                    <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-widest">
-                      {arrival.type.charAt(0).toUpperCase() + arrival.type.slice(1)} • {arrival.info || 'Local'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {arrival.minutes > 15 && arrival.status !== 'departed' && closestStop && (
-                    <button 
-                      onClick={() => setAlertingArrival({ stop: closestStop, arrival })}
-                      className={cn(
-                        "p-2 rounded-full transition-all active:scale-90",
-                        isAlertActive(closestStop.id, arrival.line, arrival.minutes) 
-                          ? "bg-amber-500 text-white" 
-                          : "bg-surface-container-high text-secondary hover:text-primary"
-                      )}
-                    >
-                      <Bell className="w-4 h-4" />
-                    </button>
-                  )}
-                  <div className="flex flex-col items-end">
-                    {arrival.status === 'departed' ? (
-                      <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
-                    ) : (
-                      <div className="flex items-baseline gap-1">
-                        {arrival.isRealtime && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center" />
-                        )}
-                        <span className="font-headline font-black text-xl text-primary">
-                          {arrival.minutes > 60 && arrival.time ? arrival.time : (arrival.minutes === 0 ? 'Now' : arrival.minutes)}
-                        </span>
-                        {arrival.minutes > 0 && !(arrival.minutes > 60 && arrival.time) && <span className="text-[10px] ml-0.5 font-bold">min</span>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
+              <div key={idx} className={cn("relative", alertingArrival?.arrival === arrival && alertingArrival?.stop === closestStop ? "z-50" : "z-10")}>
+                <ArrivalItem
+                  arrival={arrival}
+                  stop={closestStop ?? undefined}
+                  onAlertClick={closestStop ? () => setAlertingArrival({ stop: closestStop, arrival }) : undefined}
+                  isAlertActive={closestStop ? isAlertActive(closestStop.id, arrival.line, arrival.minutes) : false}
+                />
                 <AnimatePresence>
                   {alertingArrival?.arrival === arrival && alertingArrival?.stop === closestStop && (
-                    <NotificationSelector 
+                    <NotificationSelector
                       stop={closestStop}
                       arrival={arrival}
                       onClose={() => setAlertingArrival(null)}
-                      onScheduled={() => {
-                        setScheduledAlerts(getActiveAlerts());
-                      }}
+                      onScheduled={() => setScheduledAlerts(getActiveAlerts())}
                     />
                   )}
                 </AnimatePresence>
