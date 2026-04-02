@@ -247,7 +247,7 @@ export const Dashboard = () => {
   const visibleFavs = showAllFavs ? favorites : favorites.slice(0, 3);
 
   return (
-    <div className="max-w-screen-md mx-auto px-6 mt-8 pb-10">
+    <div className="max-w-screen-md mx-auto px-6 mt-4 pb-10">
      {/* Edit Favorite Modal */}
       {editingFav && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
