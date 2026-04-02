@@ -2,7 +2,7 @@ import React from 'react';
 import { Bell, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Stop, Arrival } from '../types';
-import { scheduleDepartureNotification, requestBatteryOptimisationExemption } from '../services/notificationService';
+import { scheduleDepartureNotification } from '../services/notificationService';
 import { addActiveAlert } from '../services/alertService';
 
 interface NotificationSelectorProps {
@@ -14,9 +14,6 @@ interface NotificationSelectorProps {
 
 export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: NotificationSelectorProps) => {
   const handleSchedule = async (minutesBefore: number) => {
-    // Request battery optimization exemption before scheduling
-    await requestBatteryOptimisationExemption();
-
     const success = await scheduleDepartureNotification(
       stop.name,
       arrival.line,
