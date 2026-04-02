@@ -4,6 +4,9 @@ const config: CapacitorConfig = {
   appId: 'com.tallinngo.app',
   appName: 'GO NOW',
   webDir: 'dist',
+  android: {
+    versionCode: 10800,
+  },
   server: {
     cleartext: true,
   },
