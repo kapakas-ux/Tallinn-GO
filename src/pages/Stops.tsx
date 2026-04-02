@@ -84,30 +84,30 @@ export const Stops = () => {
       distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng)
     })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
-    const closest = sorted.slice(0, 4); // Show 4 nearby stops like dashboard might
+    const closest = sorted.slice(0, 6);
     setNearbyStops(closest);
   }, [userLocation, allStops]);
 
-  const handleNearbyClick = async (stop: Stop) => {
-    const stopId = stop.id;
-    if (expandedNearby === stopId) {
-      setExpandedNearby(null);
-      return;
-    }
-    
-    setExpandedNearby(stopId);
-    
-    if (!nearbyDepartures[stopId]) {
-      setNearbyLoading(prev => ({ ...prev, [stopId]: true }));
+  // Auto-fetch departures for all nearby stops
+  useEffect(() => {
+    if (nearbyStops.length === 0) return;
+    nearbyStops.forEach(async (stop) => {
+      if (nearbyDepartures[stop.id]) return;
+      setNearbyLoading(prev => ({ ...prev, [stop.id]: true }));
       try {
-        const deps = await fetchDepartures(stopId, stop.siriId);
-        setNearbyDepartures(prev => ({ ...prev, [stopId]: deps.slice(0, 6) }));
+        const deps = await fetchDepartures(stop.id, stop.siriId);
+        setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
       } catch (err) {
         console.error("Failed to load nearby departures", err);
       } finally {
-        setNearbyLoading(prev => ({ ...prev, [stopId]: false }));
+        setNearbyLoading(prev => ({ ...prev, [stop.id]: false }));
       }
-    }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearbyStops]);
+
+  const handleNearbyClick = (stop: Stop) => {
+    setExpandedNearby(expandedNearby === stop.id ? null : stop.id);
   };
 
   useEffect(() => {
@@ -400,62 +400,74 @@ export const Stops = () => {
               <div className="space-y-3 px-6">
                 {nearbyStops.map((stop) => (
                   <div key={stop.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all">
-                    <div 
+                    {/* Stop header */}
+                    <div
                       className={cn(
-                        "p-3 flex items-center justify-between hover:bg-surface-container-low transition-colors cursor-pointer group",
+                        "p-3 flex items-center justify-between cursor-pointer hover:bg-surface-container-low transition-colors",
                         expandedNearby === stop.id ? "rounded-t-[20px]" : "rounded-[20px]"
                       )}
                       onClick={() => handleNearbyClick(stop)}
                     >
-                      <div className="flex items-center gap-4">
-                        <Link 
+                      <div className="flex items-center gap-3">
+                        <Link
                           to={`/map?lat=${stop.lat}&lng=${stop.lng}&zoom=20&stopId=${stop.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className={cn(
-                            "h-10 w-10 rounded-full flex items-center justify-center transition-colors active:scale-90",
-                            getStopColorClass(stop)
-                          )}
-                          title="View on Map"
+                          className={cn("h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-colors active:scale-90", getStopColorClass(stop))}
                         >
-                          <MapPin className="w-5 h-5" />
+                          <MapPin className="w-4 h-4" />
                         </Link>
-                        <div>
-                          <div className="flex items-baseline gap-2">
-                            <h4 className="font-headline font-bold text-lg text-primary leading-tight">{stop.name}</h4>
-                          </div>
-                          <div className="flex flex-col mt-0.5">
-                            <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-                              {formatDistance(stop.distance! * 1000)}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <Footprints className="w-2.5 h-2.5 text-secondary/60" />
-                              <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-                                {formatWalkingTime(stop.distance! * 1000)}
-                              </span>
-                            </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-headline font-bold text-sm text-primary leading-tight">{stop.name}</h4>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-wider">{formatDistance(stop.distance! * 1000)}</span>
+                            <span className="text-secondary/30">·</span>
+                            <Footprints className="w-2.5 h-2.5 text-secondary/50" />
+                            <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-wider">{formatWalkingTime(stop.distance! * 1000)}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(stop);
-                          }}
-                          className={cn(
-                            "h-10 w-10 rounded-full flex items-center justify-center transition-all",
-                            isFavorite(stop.id) ? "text-amber-400" : "text-secondary hover:text-amber-400"
-                          )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleFavorite(stop); }}
+                          className={cn("h-8 w-8 rounded-full flex items-center justify-center transition-all", isFavorite(stop.id) ? "text-amber-400" : "text-secondary/40 hover:text-amber-400")}
                         >
-                          <Star className={cn("w-5 h-5", isFavorite(stop.id) && "fill-current")} />
+                          <Star className={cn("w-4 h-4", isFavorite(stop.id) && "fill-current")} />
                         </button>
-                        <div className="text-secondary ml-1">
-                          {expandedNearby === stop.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        <div className="text-secondary">
+                          {expandedNearby === stop.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </div>
                       </div>
                     </div>
 
-                    {/* Expanded Nearby Departures */}
+                    {/* Inline departure preview (always visible) */}
+                    {!expandedNearby || expandedNearby !== stop.id ? (
+                      nearbyLoading[stop.id] ? (
+                        <div className="flex items-center gap-2 px-3 pb-2.5">
+                          <Loader2 className="w-3 h-3 animate-spin text-secondary/40" />
+                          <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
+                        </div>
+                      ) : nearbyDepartures[stop.id]?.length > 0 ? (
+                        <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 space-y-0.5">
+                          {nearbyDepartures[stop.id].map((arr, i) => (
+                            <div key={i} className="flex items-center justify-between py-0.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getStopColorClass(stop))}>
+                                  {arr.line}
+                                </div>
+                                <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
+                                  {arr.destination}
+                                </span>
+                              </div>
+                              <span className={cn("font-headline font-black text-[11px] shrink-0 ml-2", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
+                                {arr.status === 'departed' ? '–' : arr.minutes > 60 && arr.time ? arr.time : arr.minutes === 0 ? 'Now' : `${arr.minutes}m`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null
+                    ) : null}
+
+                    {/* Expanded ArrivalItem view */}
                     {expandedNearby === stop.id && (
                       <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
                         {nearbyLoading[stop.id] ? (
@@ -466,22 +478,20 @@ export const Stops = () => {
                           <div className="space-y-2">
                             {nearbyDepartures[stop.id].map((arr, i) => (
                               <div key={i} className="relative">
-                                <ArrivalItem 
-                                  arrival={arr} 
-                                  stop={stop} 
+                                <ArrivalItem
+                                  arrival={arr}
+                                  stop={stop}
                                   variant="compact"
                                   isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
                                   onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
                                 />
                                 <AnimatePresence>
                                   {alertingArrival?.arrival === arr && alertingArrival?.stop === stop && (
-                                    <NotificationSelector 
+                                    <NotificationSelector
                                       stop={stop}
                                       arrival={arr}
                                       onClose={() => setAlertingArrival(null)}
-                                      onScheduled={() => {
-                                        setScheduledAlerts(getActiveAlerts());
-                                      }}
+                                      onScheduled={() => setScheduledAlerts(getActiveAlerts())}
                                     />
                                   )}
                                 </AnimatePresence>
@@ -489,9 +499,7 @@ export const Stops = () => {
                             ))}
                           </div>
                         ) : (
-                          <div className="py-4 text-center text-sm text-secondary">
-                            No upcoming departures
-                          </div>
+                          <div className="py-4 text-center text-sm text-secondary">No upcoming departures</div>
                         )}
                       </div>
                     )}
