@@ -40,7 +40,7 @@ export function previewSound(soundId: string): void {
   if (!sound?.file) return;
   try {
     const audio = new Audio(sound.file);
-    audio.play();
+    audio.play().catch(e => console.warn('Could not play preview', e));
   } catch (e) {
     console.warn('Could not play preview', e);
   }

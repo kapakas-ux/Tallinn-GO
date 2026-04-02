@@ -55,13 +55,23 @@ export const scheduleDepartureNotification = async (
 
     if (scheduleDate <= new Date()) return true;
 
-    // ─── NEW: resolve selected alarm sound ────────────────────────────────
+    // ─── Resolve selected alarm sound ─────────────────────────────────────
     const { alarmSound } = getSettings();
     const soundEntry = ALARM_SOUNDS.find(s => s.id === alarmSound);
-    // Android: sound filename (no extension) must exist in res/raw/
-    const sound = soundEntry?.id === 'default' || !soundEntry?.file
-      ? 'default'
-      : soundEntry.id;
+    const isCustom = soundEntry && soundEntry.id !== 'default' && !!soundEntry.file;
+    // Android 8+: sound is set on the notification channel, not per-notification.
+    // We create one channel per sound so changing the setting takes effect immediately.
+    const channelId = isCustom ? `departure_alert_${soundEntry!.id}` : 'departure_alert_default';
+    const soundFile = isCustom ? soundEntry!.id : undefined; // filename without extension in res/raw/
+
+    await LocalNotifications.createChannel({
+      id: channelId,
+      name: 'Departure Alerts',
+      ...(soundFile ? { sound: soundFile } : {}),
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+    });
     // ──────────────────────────────────────────────────────────────────────
 
     await LocalNotifications.schedule({
@@ -71,7 +81,7 @@ export const scheduleDepartureNotification = async (
           body: `Your bus from ${stopName} is arriving in ${minutesBefore} minutes!`,
           id: Math.floor(Math.random() * 1000000),
           schedule: { at: scheduleDate },
-          sound,
+          channelId,
           attachments: [],
           actionTypeId: '',
           extra: null
