@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Star, Navigation as NearMe, ChevronRight, Loader2, X, Bus, Train, Zap, Trash2, Map as MapIcon, MapPin, ChevronDown, ChevronUp, Footprints, Edit, X as CloseIcon, Bell } from 'lucide-react';
+import { Search, Star, Navigation as NearMe, ChevronRight, Loader2, X, Trash2, Map as MapIcon, MapPin, ChevronDown, ChevronUp, Footprints, Edit, X as CloseIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
 import { getFavorites, toggleFavorite as toggleFavService, isFavorite, updateFavorite } from '../services/favoritesService';
@@ -8,7 +8,7 @@ import { getDistance } from '../lib/geo';
 import { MiniMap } from '../components/MiniMap';
 import { ArrivalItem } from '../components/ArrivalItem';
 import { Stop, Arrival } from '../types';
-import { cn, formatDistance, formatWalkingTime, getVehicleColorClass, getStopColorClass } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getStopColorClass } from '../lib/utils';
 import { NotificationSelector } from '../components/NotificationSelector';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { AnimatePresence } from 'motion/react';
@@ -170,16 +170,6 @@ export const Stops = () => {
   const toggleFavorite = (stop: Stop) => {
     const newFavs = toggleFavService(stop);
     setFavorites(newFavs);
-  };
-
-  const getIcon = (type: string) => {
-    switch (type) {
-      case 'tram': return <Train className="w-4 h-4" />;
-      case 'trolley': return <Zap className="w-4 h-4" />;
-      case 'train': return <Train className="w-4 h-4" />;
-      case 'regional': return <Bus className="w-4 h-4" />;
-      default: return <Bus className="w-4 h-4" />;
-    }
   };
 
   const handleFavClick = async (fav: Stop) => {
@@ -613,10 +603,11 @@ export const Stops = () => {
                       ) : favDepartures[stop.id]?.length > 0 ? (
                         favDepartures[stop.id].map((arr, i) => (
                           <div key={i} className="relative">
-                            <ArrivalItem 
-                              arrival={arr} 
-                              stop={stop} 
+                            <ArrivalItem
+                              arrival={arr}
+                              stop={stop}
                               variant="compact"
+                              expandable={false}
                               isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
                               onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
                             />
@@ -752,63 +743,20 @@ export const Stops = () => {
                     <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{departures.length} found</span>
                   </div>
                   {departures.map((arr, i) => (
-                    <div key={i} className={cn(
-                      "flex items-center justify-between p-4 bg-surface-container-low rounded-[20px] border border-outline-variant/5 relative",
-                      alertingArrival?.arrival === arr && alertingArrival?.stop === selectedStop ? "z-50" : "z-10"
-                    )}>
-                      <div className="flex items-center gap-4">
-                        <div className={cn(
-                          "h-10 w-10 rounded-full flex items-center justify-center",
-                          getVehicleColorClass(arr.type)
-                        )}>
-                          <span className="font-label font-black text-sm">{arr.line}</span>
-                        </div>
-                        <div>
-                          <p className="font-headline font-bold text-primary">{arr.destination}</p>
-                          <div className="flex items-center gap-1.5 text-secondary">
-                            {getIcon(arr.type)}
-                            <span className="font-label text-[10px] font-bold uppercase tracking-widest">{arr.type}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {arr.minutes > 15 && (
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAlertingArrival({ stop: selectedStop, arrival: arr });
-                            }}
-                            className={cn(
-                              "h-8 w-8 rounded-full flex items-center justify-center transition-all",
-                              isAlertActive(selectedStop.id, arr.line, arr.minutes) 
-                                ? "bg-amber-500 text-white" 
-                                : "bg-surface-container-high text-secondary hover:text-primary"
-                            )}
-                          >
-                            <Bell className="w-3 h-3" />
-                          </button>
-                        )}
-                        <div className="text-right">
-                          <div className="flex items-baseline gap-1">
-                            {arr.isRealtime && (
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center" />
-                            )}
-                            <p className="font-headline font-black text-xl text-primary">
-                              {arr.minutes > 60 && arr.time ? arr.time : (arr.minutes === 0 ? 'Now' : `${arr.minutes}m`)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
+                    <div key={i} className={cn("relative", alertingArrival?.arrival === arr && alertingArrival?.stop === selectedStop ? "z-50" : "z-10")}>
+                      <ArrivalItem
+                        arrival={arr}
+                        stop={selectedStop}
+                        onAlertClick={() => setAlertingArrival({ stop: selectedStop, arrival: arr })}
+                        isAlertActive={isAlertActive(selectedStop.id, arr.line, arr.minutes)}
+                      />
                       <AnimatePresence>
                         {alertingArrival?.arrival === arr && alertingArrival?.stop === selectedStop && (
-                          <NotificationSelector 
+                          <NotificationSelector
                             stop={selectedStop}
                             arrival={arr}
                             onClose={() => setAlertingArrival(null)}
-                            onScheduled={() => {
-                              setScheduledAlerts(getActiveAlerts());
-                            }}
+                            onScheduled={() => setScheduledAlerts(getActiveAlerts())}
                           />
                         )}
                       </AnimatePresence>
