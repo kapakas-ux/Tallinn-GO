@@ -447,10 +447,10 @@ export const Stops = () => {
                           <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
                         </div>
                       ) : nearbyDepartures[stop.id]?.length > 0 ? (
-                        <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 space-y-0.5">
+                        <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 grid grid-cols-2 gap-x-3 gap-y-0.5">
                           {nearbyDepartures[stop.id].map((arr, i) => (
-                            <div key={i} className="flex items-center justify-between py-0.5">
-                              <div className="flex items-center gap-2 min-w-0">
+                            <div key={i} className="flex items-center justify-between py-0.5 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
                                 <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getStopColorClass(stop))}>
                                   {arr.line}
                                 </div>
@@ -458,7 +458,7 @@ export const Stops = () => {
                                   {arr.destination}
                                 </span>
                               </div>
-                              <span className={cn("font-headline font-black text-[11px] shrink-0 ml-2", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
+                              <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
                                 {arr.status === 'departed' ? '–' : arr.minutes > 60 && arr.time ? arr.time : arr.minutes === 0 ? 'Now' : `${arr.minutes}m`}
                               </span>
                             </div>
