@@ -8,7 +8,7 @@ import { getDistance } from '../lib/geo';
 import { MiniMap } from '../components/MiniMap';
 import { ArrivalItem } from '../components/ArrivalItem';
 import { Stop, Arrival } from '../types';
-import { cn, formatDistance, formatWalkingTime, getStopColorClass } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getVehicleColorClass, getStopColorClass } from '../lib/utils';
 import { NotificationSelector } from '../components/NotificationSelector';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { AnimatePresence } from 'motion/react';
@@ -447,20 +447,24 @@ export const Stops = () => {
                           <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
                         </div>
                       ) : nearbyDepartures[stop.id]?.length > 0 ? (
-                        <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 grid grid-cols-2 gap-x-3 gap-y-0.5">
-                          {nearbyDepartures[stop.id].map((arr, i) => (
-                            <div key={i} className="flex items-center justify-between py-0.5 min-w-0">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getStopColorClass(stop))}>
-                                  {arr.line}
+                        <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 flex gap-3">
+                          {[nearbyDepartures[stop.id].slice(0, 3), nearbyDepartures[stop.id].slice(3)].map((col, ci) => (
+                            <div key={ci} className="flex-1 min-w-0 space-y-0.5">
+                              {col.map((arr, i) => (
+                                <div key={i} className="flex items-center justify-between py-0.5 min-w-0">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
+                                      {arr.line}
+                                    </div>
+                                    <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
+                                      {arr.destination}
+                                    </span>
+                                  </div>
+                                  <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
+                                    {arr.status === 'departed' ? '–' : arr.minutes > 60 && arr.time ? arr.time : arr.minutes === 0 ? 'Now' : `${arr.minutes}m`}
+                                  </span>
                                 </div>
-                                <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
-                                  {arr.destination}
-                                </span>
-                              </div>
-                              <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                                {arr.status === 'departed' ? '–' : arr.minutes > 60 && arr.time ? arr.time : arr.minutes === 0 ? 'Now' : `${arr.minutes}m`}
-                              </span>
+                              ))}
                             </div>
                           ))}
                         </div>
