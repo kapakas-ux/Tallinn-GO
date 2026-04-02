@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { X, Play, Check } from 'lucide-react';
-import { ALARM_SOUNDS, getSettings, saveSettings, previewSound } from '../services/settingsService';
+import { ALARM_SOUNDS, getSettings, saveSettings, previewSound, stopPreview } from '../services/settingsService';
 
 interface Props { onClose: () => void; }
 
 export const SettingsModal = ({ onClose }: Props) => {
+  const handleClose = () => { stopPreview(); onClose(); };
   const [selectedSound, setSelectedSound] = useState(getSettings().alarmSound);
 
   const handleSelect = (id: string) => {
@@ -15,7 +16,7 @@ export const SettingsModal = ({ onClose }: Props) => {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
@@ -24,7 +25,7 @@ export const SettingsModal = ({ onClose }: Props) => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
           <h2 className="font-headline font-black text-2xl text-primary">Settings</h2>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-secondary">
+          <button onClick={handleClose} className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-secondary">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -72,7 +73,7 @@ export const SettingsModal = ({ onClose }: Props) => {
 
         {/* Footer */}
         <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">
-          <button onClick={onClose} className="w-full py-3 bg-primary text-white rounded-xl font-bold font-headline hover:bg-primary/90 transition-colors">
+          <button onClick={handleClose} className="w-full py-3 bg-primary text-white rounded-xl font-bold font-headline hover:bg-primary/90 transition-colors">
             Done
           </button>
         </div>

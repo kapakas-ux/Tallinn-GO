@@ -35,13 +35,30 @@ export function saveSettings(settings: Partial<AppSettings>): void {
   }
 }
 
+let currentPreview: HTMLAudioElement | null = null;
+
 export function previewSound(soundId: string): void {
   const sound = ALARM_SOUNDS.find(s => s.id === soundId);
   if (!sound?.file) return;
   try {
+    if (currentPreview) {
+      currentPreview.pause();
+      currentPreview.currentTime = 0;
+      currentPreview = null;
+    }
     const audio = new Audio(sound.file);
+    currentPreview = audio;
     audio.play().catch(e => console.warn('Could not play preview', e));
+    audio.onended = () => { currentPreview = null; };
   } catch (e) {
     console.warn('Could not play preview', e);
+  }
+}
+
+export function stopPreview(): void {
+  if (currentPreview) {
+    currentPreview.pause();
+    currentPreview.currentTime = 0;
+    currentPreview = null;
   }
 }
