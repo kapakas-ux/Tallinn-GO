@@ -839,7 +839,7 @@ export const Map = () => {
                     {selectedVehicle.vehicle.destination || 'Unknown Destination'}
                   </h3>
                   <p className="font-label text-xs text-secondary font-bold uppercase tracking-widest mt-0.5">
-                    {selectedVehicle.vehicle.type} • {Math.round(selectedVehicle.vehicle.speed || 0)} km/h
+                    {selectedVehicle.vehicle.type}{selectedVehicle.vehicle.speed ? ` • ${Math.round(selectedVehicle.vehicle.speed)} km/h` : ''}
                   </p>
                 </div>
               </div>
