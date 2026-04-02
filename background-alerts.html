@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tallinn GO — Background Alerts: Do They Work?</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 860px; margin: 40px auto; padding: 0 32px; color: #1a1a2e; line-height: 1.6; font-size: 14px; }
+  h1 { font-size: 26px; color: #1565C0; border-bottom: 3px solid #1565C0; padding-bottom: 10px; margin-bottom: 6px; }
+  h2 { font-size: 18px; color: #1565C0; margin-top: 36px; margin-bottom: 4px; border-left: 4px solid #1565C0; padding-left: 10px; }
+  h3 { font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 20px; margin-bottom: 6px; }
+  .subtitle { color: #555; font-size: 13px; margin-bottom: 28px; }
+  .file-label { display: inline-block; background: #E3F2FD; color: #1565C0; font-family: monospace; font-size: 12px; padding: 3px 10px; border-radius: 6px; font-weight: 700; margin-bottom: 8px; }
+  pre { background: #1e1e2e; color: #cdd6f4; border-radius: 10px; padding: 20px; overflow-x: auto; font-size: 12px; line-height: 1.6; margin: 0 0 24px 0; }
+  code { font-family: 'Fira Code', 'Consolas', monospace; }
+  .kw  { color: #cba6f7; }
+  .str { color: #a6e3a1; }
+  .cm  { color: #6c7086; font-style: italic; }
+  .tag { color: #89b4fa; }
+  .attr{ color: #fab387; }
+  .val { color: #a6e3a1; }
+  .ok   { background: #E8F5E9; border-left: 4px solid #43A047; padding: 12px 16px; border-radius: 6px; font-size: 13px; margin: 16px 0; }
+  .warn { background: #FFF8E1; border-left: 4px solid #FFB300; padding: 12px 16px; border-radius: 6px; font-size: 13px; margin: 16px 0; }
+  .bad  { background: #FFEBEE; border-left: 4px solid #E53935; padding: 12px 16px; border-radius: 6px; font-size: 13px; margin: 16px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; }
+  th { background: #E3F2FD; color: #1565C0; font-size: 12px; text-align: left; padding: 8px 12px; border: 1px solid #BBDEFB; }
+  td { padding: 8px 12px; border: 1px solid #E0E0E0; font-size: 13px; }
+  tr:nth-child(even) td { background: #FAFAFA; }
+  .tick  { color: #2E7D32; font-weight: bold; }
+  .cross { color: #C62828; font-weight: bold; }
+  .section { margin-bottom: 40px; }
+  @media print { body { margin: 20px; } pre { break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<h1>Tallinn GO — Background Alerts</h1>
+<p class="subtitle">Do alerts fire when the app is closed? Yes — and here is what to add to make them reliable.</p>
+
+<!-- ─── HOW IT WORKS ──────────────────────────────────────────────────────── -->
+<div class="section">
+<h2>How Local Notifications Work</h2>
+
+<div class="ok">
+  <strong>✅ No background service needed.</strong><br>
+  When the user taps "Set Alert", <code>LocalNotifications.schedule()</code> registers the alarm directly with the Android OS alarm manager. From that moment the app can be completely closed — the OS will wake the device and show the notification at exactly the right time.
+</div>
+
+<table>
+<tr><th>App state when alert fires</th><th>Will it work?</th><th>Notes</th></tr>
+<tr><td>App is open / in foreground</td><td class="tick">✅ Yes</td><td>Always works</td></tr>
+<tr><td>App is minimised (background)</td><td class="tick">✅ Yes</td><td>Always works</td></tr>
+<tr><td>App is fully closed / swiped away</td><td class="tick">✅ Yes</td><td>OS handles it, no JS needed</td></tr>
+<tr><td>Device was rebooted after scheduling</td><td class="cross">❌ Lost</td><td>See "After reboot" section below</td></tr>
+<tr><td>Battery saver / Doze mode active</td><td class="warn">⚠️ May be late</td><td>Needs SCHEDULE_EXACT_ALARM permission</td></tr>
+</table>
+</div>
+
+<!-- ─── MISSING PERMISSIONS ───────────────────────────────────────────────── -->
+<div class="section">
+<h2>Required: Add Missing Android Permissions</h2>
+
+<p>Your current <code>AndroidManifest.xml</code> only has INTERNET and LOCATION. You are missing two permissions that notifications need:</p>
+
+<table>
+<tr><th>Permission</th><th>Android version</th><th>Without it</th></tr>
+<tr><td><code>POST_NOTIFICATIONS</code></td><td>Android 13+ (API 33)</td><td>Notifications silently blocked — user never sees them</td></tr>
+<tr><td><code>SCHEDULE_EXACT_ALARM</code></td><td>Android 12+ (API 31)</td><td>Notification may fire minutes late due to battery optimisation</td></tr>
+</table>
+
+<div class="file-label">android/app/src/main/AndroidManifest.xml — add these lines inside &lt;manifest&gt;</div>
+<pre><code><span class="cm">&lt;!-- Existing permissions (keep these) --&gt;</span>
+<span class="tag">&lt;uses-permission</span> <span class="attr">android:name</span>=<span class="val">"android.permission.INTERNET"</span> <span class="tag">/&gt;</span>
+<span class="tag">&lt;uses-permission</span> <span class="attr">android:name</span>=<span class="val">"android.permission.ACCESS_COARSE_LOCATION"</span> <span class="tag">/&gt;</span>
+<span class="tag">&lt;uses-permission</span> <span class="attr">android:name</span>=<span class="val">"android.permission.ACCESS_FINE_LOCATION"</span> <span class="tag">/&gt;</span>
+
+<span class="cm">&lt;!-- Required for Android 13+: show notifications at all --&gt;</span>
+<span class="tag">&lt;uses-permission</span> <span class="attr">android:name</span>=<span class="val">"android.permission.POST_NOTIFICATIONS"</span> <span class="tag">/&gt;</span>
+
+<span class="cm">&lt;!-- Required for Android 12+: fire at the exact scheduled minute --&gt;</span>
+<span class="tag">&lt;uses-permission</span> <span class="attr">android:name</span>=<span class="val">"android.permission.SCHEDULE_EXACT_ALARM"</span> <span class="tag">/&gt;</span>
+
+<span class="cm">&lt;!-- Fallback for Android 13+ devices where SCHEDULE_EXACT_ALARM needs approval --&gt;</span>
+<span class="tag">&lt;uses-permission</span> <span class="attr">android:name</span>=<span class="val">"android.permission.USE_EXACT_ALARM"</span> <span class="tag">/&gt;</span></code></pre>
+
+<div class="warn">
+  <strong>⚠️ Note on USE_EXACT_ALARM:</strong> On Android 13+ Google Play may ask you to justify its use. It is allowed for alarm/reminder apps. In your Play Store description mention that the app sends departure alerts — that satisfies the review.
+</div>
+</div>
+
+<!-- ─── AFTER REBOOT ───────────────────────────────────────────────────────── -->
+<div class="section">
+<h2>Optional: Reschedule After Device Reboot</h2>
+
+<p>If the user's phone reboots after they set an alert, Android wipes all scheduled local notifications. To fix this, add a <strong>boot receiver</strong> that re-reads the saved alerts from localStorage and reschedules them on startup.</p>
+
+<p>This is done in two parts:</p>
+
+<h3>Part A — AndroidManifest.xml: add RECEIVE_BOOT_COMPLETED permission + receiver</h3>
+<pre><code><span class="cm">&lt;!-- Add with the other permissions --&gt;</span>
+<span class="tag">&lt;uses-permission</span> <span class="attr">android:name</span>=<span class="val">"android.permission.RECEIVE_BOOT_COMPLETED"</span> <span class="tag">/&gt;</span>
+
+<span class="cm">&lt;!-- Add inside &lt;application&gt; tag --&gt;</span>
+<span class="tag">&lt;receiver</span>
+    <span class="attr">android:name</span>=<span class="val">".BootReceiver"</span>
+    <span class="attr">android:exported</span>=<span class="val">"true"</span>
+    <span class="attr">android:enabled</span>=<span class="val">"true"</span><span class="tag">&gt;</span>
+    <span class="tag">&lt;intent-filter&gt;</span>
+        <span class="tag">&lt;action</span> <span class="attr">android:name</span>=<span class="val">"android.intent.action.BOOT_COMPLETED"</span> <span class="tag">/&gt;</span>
+        <span class="tag">&lt;action</span> <span class="attr">android:name</span>=<span class="val">"android.intent.action.QUICKBOOT_POWERON"</span> <span class="tag">/&gt;</span>
+    <span class="tag">&lt;/intent-filter&gt;</span>
+<span class="tag">&lt;/receiver&gt;</span></code></pre>
+
+<h3>Part B — new Java file: android/app/src/main/java/…/BootReceiver.java</h3>
+<p>Place this in the same folder as <code>MainActivity.java</code>. Replace <code>ee.tallinngo.app</code> with your actual package name.</p>
+<pre><code><span class="kw">package</span> ee.tallinngo.app;
+
+<span class="kw">import</span> android.content.BroadcastReceiver;
+<span class="kw">import</span> android.content.Context;
+<span class="kw">import</span> android.content.Intent;
+<span class="kw">import</span> android.content.SharedPreferences;
+<span class="kw">import</span> android.app.AlarmManager;
+<span class="kw">import</span> android.app.PendingIntent;
+<span class="kw">import</span> android.util.Log;
+
+<span class="kw">import</span> org.json.JSONArray;
+<span class="kw">import</span> org.json.JSONObject;
+
+<span class="kw">public class</span> BootReceiver <span class="kw">extends</span> BroadcastReceiver {
+
+    <span class="kw">private static final</span> String TAG = <span class="str">"TallinnGO_Boot"</span>;
+
+    @Override
+    <span class="kw">public void</span> onReceive(Context context, Intent intent) {
+        String action = intent.getAction();
+        <span class="kw">if</span> (action == <span class="kw">null</span>) <span class="kw">return</span>;
+        <span class="kw">if</span> (!action.equals(Intent.ACTION_BOOT_COMPLETED) &amp;&amp;
+            !action.equals(<span class="str">"android.intent.action.QUICKBOOT_POWERON"</span>)) <span class="kw">return</span>;
+
+        Log.i(TAG, <span class="str">"Boot detected — rescheduling departure alerts"</span>);
+
+        <span class="cm">// Read alerts saved by the JS layer in Capacitor's WebView storage.</span>
+        <span class="cm">// Capacitor stores localStorage in a WebView database; the easiest</span>
+        <span class="cm">// cross-platform approach is to re-launch the activity so the JS</span>
+        <span class="cm">// side can reschedule via LocalNotifications.schedule() itself.</span>
+        Intent launchIntent = <span class="kw">new</span> Intent(context, MainActivity.<span class="kw">class</span>);
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        launchIntent.putExtra(<span class="str">"reschedule_alerts"</span>, <span class="kw">true</span>);
+        context.startActivity(launchIntent);
+    }
+}</code></pre>
+
+<h3>Part C — src/services/alertService.ts: reschedule on app start</h3>
+<p>Add this function to <code>alertService.ts</code> and call it once in <code>App.tsx</code> on mount.</p>
+<pre><code><span class="cm">// alertService.ts — add this new export function</span>
+<span class="kw">import</span> { scheduleDepartureNotification } <span class="kw">from</span> <span class="str">'./notificationService'</span>;
+
+<span class="kw">export async function</span> <span class="fn">rescheduleAlertsAfterBoot</span>(): <span class="kw">Promise</span>&lt;<span class="kw">void</span>&gt; {
+  <span class="kw">const</span> alerts = <span class="fn">getActiveAlerts</span>(); <span class="cm">// already filters expired ones</span>
+  <span class="kw">if</span> (alerts.length === 0) <span class="kw">return</span>;
+
+  <span class="kw">const</span> nowMs = Date.<span class="fn">now</span>();
+  <span class="kw">for</span> (<span class="kw">const</span> alert <span class="kw">of</span> alerts) {
+    <span class="kw">const</span> msUntilDeparture = alert.departureTimestamp - nowMs;
+    <span class="kw">const</span> minsUntilDeparture = Math.<span class="fn">floor</span>(msUntilDeparture / 60000);
+    <span class="kw">if</span> (minsUntilDeparture &lt; alert.minutesBefore) <span class="kw">continue</span>; <span class="cm">// too late</span>
+    <span class="kw">await</span> <span class="fn">scheduleDepartureNotification</span>(
+      alert.stopName,
+      alert.line,
+      alert.destination,
+      minsUntilDeparture,
+      alert.minutesBefore
+    );
+    console.<span class="fn">log</span>(`Rescheduled alert: line ${alert.line} @ ${alert.stopName}`);
+  }
+}</code></pre>
+
+<pre><code><span class="cm">// App.tsx — add inside the useEffect that already runs on mount</span>
+<span class="kw">import</span> { rescheduleAlertsAfterBoot } <span class="kw">from</span> <span class="str">'./services/alertService'</span>;
+
+<span class="cm">// Inside AppContent useEffect:</span>
+<span class="fn">rescheduleAlertsAfterBoot</span>();</code></pre>
+</div>
+
+<!-- ─── BATTERY OPTIMISATION ───────────────────────────────────────────────── -->
+<div class="section">
+<h2>Optional: Ask User to Disable Battery Optimisation</h2>
+
+<p>Samsung, Xiaomi, and Huawei have aggressive battery killers that can delay even exact alarms. You can prompt the user to whitelist the app. Add this to <code>notificationService.ts</code> (call it once, e.g. when the first alert is set).</p>
+
+<pre><code><span class="kw">import</span> { Capacitor } <span class="kw">from</span> <span class="str">'@capacitor/core'</span>;
+
+<span class="kw">export async function</span> <span class="fn">requestBatteryOptimisationExemption</span>(): <span class="kw">Promise</span>&lt;<span class="kw">void</span>&gt; {
+  <span class="kw">if</span> (!Capacitor.<span class="fn">isNativePlatform</span>()) <span class="kw">return</span>;
+  <span class="kw">try</span> {
+    <span class="cm">// Opens the system battery optimisation settings page for this app.</span>
+    <span class="cm">// The user can tap "Don't optimise" to ensure exact alarms fire on time.</span>
+    <span class="kw">const</span> { Browser } = <span class="kw">await</span> <span class="fn">import</span>(<span class="str">'@capacitor/browser'</span>);
+    <span class="kw">await</span> Browser.<span class="fn">open</span>({
+      url: <span class="str">'package:ee.tallinngo.app'</span> <span class="cm">// replace with your actual package name</span>
+    });
+  } <span class="kw">catch</span> (e) {
+    console.<span class="fn">warn</span>(<span class="str">'Could not open battery settings'</span>, e);
+  }
+}</code></pre>
+
+<div class="warn">
+  <strong>Simpler approach:</strong> Show a one-time dialog when the user first sets an alert, saying: <em>"For reliable alerts, go to Settings → Battery → Tallinn GO → Don't optimise."</em> Most users will do this if asked nicely.
+</div>
+</div>
+
+<!-- ─── SUMMARY ────────────────────────────────────────────────────────────── -->
+<div class="section">
+<h2>Summary — What to Do</h2>
+<table>
+<tr><th>Task</th><th>Priority</th><th>Effect</th></tr>
+<tr><td>Add POST_NOTIFICATIONS to AndroidManifest.xml</td><td>🔴 Required</td><td>Android 13+ users can receive notifications at all</td></tr>
+<tr><td>Add SCHEDULE_EXACT_ALARM to AndroidManifest.xml</td><td>🔴 Required</td><td>Alerts fire at the exact minute, not delayed</td></tr>
+<tr><td>Add USE_EXACT_ALARM to AndroidManifest.xml</td><td>🟡 Recommended</td><td>Fallback for newer Android versions</td></tr>
+<tr><td>BootReceiver + rescheduleAlertsAfterBoot()</td><td>🟡 Recommended</td><td>Alerts survive device reboot</td></tr>
+<tr><td>Battery optimisation dialog</td><td>🟢 Optional</td><td>Fixes late alerts on Samsung/Xiaomi</td></tr>
+</table>
+</div>
+
+</body>
+</html>
