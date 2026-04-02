@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tallinn GO — Real-Time Stop Delays via TLT SIRI API</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 900px; margin: 40px auto; padding: 0 32px; color: #1a1a2e; line-height: 1.6; font-size: 14px; }
+  h1 { font-size: 26px; color: #1565C0; border-bottom: 3px solid #1565C0; padding-bottom: 10px; margin-bottom: 6px; }
+  h2 { font-size: 18px; color: #1565C0; margin-top: 36px; margin-bottom: 4px; border-left: 4px solid #1565C0; padding-left: 10px; }
+  h3 { font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 20px; margin-bottom: 6px; }
+  .subtitle { color: #555; font-size: 13px; margin-bottom: 28px; }
+  .file-label { display: inline-block; background: #E3F2FD; color: #1565C0; font-family: monospace; font-size: 12px; padding: 3px 10px; border-radius: 6px; font-weight: 700; margin-bottom: 8px; }
+  .step { display: inline-block; background: #1565C0; color: white; border-radius: 50%; width: 22px; height: 22px; text-align: center; line-height: 22px; font-size: 12px; font-weight: bold; margin-right: 6px; }
+  pre { background: #1e1e2e; color: #cdd6f4; border-radius: 10px; padding: 20px; overflow-x: auto; font-size: 12px; line-height: 1.6; margin: 0 0 24px 0; }
+  code { font-family: 'Fira Code', 'Consolas', monospace; }
+  .kw   { color: #cba6f7; }
+  .str  { color: #a6e3a1; }
+  .cm   { color: #6c7086; font-style: italic; }
+  .fn   { color: #89b4fa; }
+  .type { color: #f9e2af; }
+  .num  { color: #fab387; }
+  .ok   { background: #E8F5E9; border-left: 4px solid #43A047; padding: 12px 16px; border-radius: 6px; font-size: 13px; margin: 16px 0; }
+  .warn { background: #FFF8E1; border-left: 4px solid #FFB300; padding: 12px 16px; border-radius: 6px; font-size: 13px; margin: 16px 0; }
+  .info { background: #E3F2FD; border-left: 4px solid #1565C0; padding: 12px 16px; border-radius: 6px; font-size: 13px; margin: 16px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; }
+  th { background: #E3F2FD; color: #1565C0; font-size: 12px; text-align: left; padding: 8px 12px; border: 1px solid #BBDEFB; }
+  td { padding: 8px 12px; border: 1px solid #E0E0E0; font-size: 13px; }
+  tr:nth-child(even) td { background: #FAFAFA; }
+  .section { margin-bottom: 40px; }
+  @media print { body { margin: 20px; } pre { break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<h1>Real-Time Stop Delays — TLT SIRI API</h1>
+<p class="subtitle">
+  Endpoint confirmed: <code>https://transport.tallinn.ee/siri-stop-departures.php?stopid=XXXX</code> &nbsp;·&nbsp;
+  Access-Control-Allow-Origin: * &nbsp;·&nbsp; Works from native app.
+</p>
+
+<!-- ─── HOW IT WORKS ──────────────────────────────────────────────────────── -->
+<div class="section">
+<h2>How It Works</h2>
+<p>gis.ee queries this endpoint for every stop popup. It returns the real scheduled <em>and</em> expected departure times for each upcoming trip. The delay in seconds is <code>expectedDepartureTime − scheduledDepartureTime</code>.</p>
+
+<div class="ok">
+  <strong>What this gives us over peatus.ee:</strong><br>
+  peatus.ee marks most TLT routes as <code>realtime: false</code>, so we only get scheduled times.
+  The SIRI endpoint gives the actual real-time delay in seconds directly from TLT's AVL system —
+  the same data gis.ee shows as "+68s".
+</div>
+
+<table>
+<tr><th>Source</th><th>TLT city buses (1–89)</th><th>Trolleys</th><th>Trams</th><th>Regional buses</th></tr>
+<tr><td>SIRI endpoint</td><td>✅ Real-time delays</td><td>✅ Real-time delays</td><td>✅ Real-time delays</td><td>❌ Not covered</td></tr>
+<tr><td>peatus.ee (current)</td><td>⚠️ Scheduled only</td><td>⚠️ Scheduled only</td><td>⚠️ Scheduled only</td><td>⚠️ Scheduled only</td></tr>
+</table>
+</div>
+
+<!-- ─── STEP 1: FIND EXACT FORMAT ─────────────────────────────────────────── -->
+<div class="section">
+<h2><span class="step">1</span> Find the Exact Response Format</h2>
+<p>First, check what fields the API actually returns. Open browser DevTools, go to the Network tab, click a bus stop on gis.ee/tallinn, and click the <code>siri-stop-departures.php</code> request → <strong>Response</strong> tab. Note the field names for:</p>
+<ul>
+  <li>Line number (e.g. <code>lineRef</code>, <code>line</code>, <code>LineRef</code>)</li>
+  <li>Scheduled departure (e.g. <code>aimedDepartureTime</code>, <code>scheduledTime</code>)</li>
+  <li>Expected departure (e.g. <code>expectedDepartureTime</code>, <code>realTime</code>)</li>
+  <li>Delay in seconds (e.g. <code>delay</code>, <code>delaySeconds</code>)</li>
+</ul>
+<div class="warn">
+  <strong>The code below uses the most likely field names. After seeing the real response, update the field names in <code>parseSiriDeparture()</code>.</strong>
+</div>
+</div>
+
+<!-- ─── STEP 2: NEW FUNCTION ──────────────────────────────────────────────── -->
+<div class="section">
+<h2><span class="step">2</span> Add to <code>src/services/transportService.ts</code></h2>
+<p>Add this new function anywhere before <code>fetchDepartures</code>. It fetches the SIRI data and returns a map of <code>lineNumber → delaySeconds</code> for a given stop.</p>
+
+<div class="file-label">src/services/transportService.ts — add this new function</div>
+<pre><code><span class="cm">/**
+ * Fetches real-time departure delays from TLT SIRI endpoint.
+ * Returns a map: lineRef → { delaySeconds, expectedMinutes }
+ * Only covers TLT city buses / trolleys / trams (stopid must be numeric TLT code).
+ */</span>
+<span class="kw">interface</span> <span class="type">SiriDeparture</span> {
+  line: <span class="type">string</span>;
+  destination: <span class="type">string</span>;
+  scheduledTime: <span class="type">number</span>; <span class="cm">// unix seconds</span>
+  expectedTime: <span class="type">number</span>;  <span class="cm">// unix seconds</span>
+  delaySeconds: <span class="type">number</span>;
+}
+
+<span class="kw">async function</span> <span class="fn">fetchSiriStopDepartures</span>(stopId: <span class="type">string</span>): <span class="type">Promise</span>&lt;<span class="type">SiriDeparture</span>[]&gt; {
+  <span class="kw">const</span> url = `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${stopId}`;
+  <span class="kw">try</span> {
+    <span class="kw">let</span> rawData: <span class="type">any</span>;
+
+    <span class="kw">if</span> (Capacitor.<span class="fn">isNativePlatform</span>()) {
+      <span class="kw">const</span> resp = <span class="kw">await</span> CapacitorHttp.<span class="fn">get</span>({
+        url,
+        headers: { <span class="str">'Accept'</span>: <span class="str">'application/json, text/plain, */*'</span> },
+        connectTimeout: <span class="num">8000</span>,
+        readTimeout: <span class="num">8000</span>,
+      });
+      <span class="kw">if</span> (resp.status !== <span class="num">200</span>) <span class="kw">return</span> [];
+      <span class="cm">// Log the raw response once so we can verify field names</span>
+      console.<span class="fn">log</span>(<span class="str">'SIRI raw sample:'</span>, <span class="type">JSON</span>.<span class="fn">stringify</span>(resp.data).<span class="fn">substring</span>(<span class="num">0</span>, <span class="num">500</span>));
+      rawData = <span class="kw">typeof</span> resp.data === <span class="str">'string'</span> ? <span class="type">JSON</span>.<span class="fn">parse</span>(resp.data) : resp.data;
+    } <span class="kw">else</span> {
+      <span class="kw">const</span> resp = <span class="kw">await</span> <span class="fn">fetch</span>(url);
+      <span class="kw">if</span> (!resp.ok) <span class="kw">return</span> [];
+      <span class="kw">const</span> text = <span class="kw">await</span> resp.<span class="fn">text</span>();
+      console.<span class="fn">log</span>(<span class="str">'SIRI raw sample:'</span>, text.<span class="fn">substring</span>(<span class="num">0</span>, <span class="num">500</span>));
+      rawData = <span class="type">JSON</span>.<span class="fn">parse</span>(text);
+    }
+
+    <span class="cm">// Normalise: handle both array and wrapped { departures: [...] } shapes</span>
+    <span class="kw">const</span> items: <span class="type">any</span>[] = <span class="type">Array</span>.<span class="fn">isArray</span>(rawData)
+      ? rawData
+      : (rawData.departures || rawData.data || rawData.stopTimes || rawData.MonitoredStopVisit || []);
+
+    <span class="kw">return</span> items.<span class="fn">map</span>((item: <span class="type">any</span>) =&gt; <span class="fn">parseSiriDeparture</span>(item)).<span class="fn">filter</span>(Boolean) <span class="kw">as</span> <span class="type">SiriDeparture</span>[];
+  } <span class="kw">catch</span> (err) {
+    console.<span class="fn">warn</span>(<span class="str">'fetchSiriStopDepartures failed:'</span>, err);
+    <span class="kw">return</span> [];
+  }
+}
+
+<span class="cm">/**
+ * Parses one item from the SIRI response.
+ * UPDATE THE FIELD NAMES here once you see the actual response in DevTools.
+ */</span>
+<span class="kw">function</span> <span class="fn">parseSiriDeparture</span>(item: <span class="type">any</span>): <span class="type">SiriDeparture</span> | <span class="kw">null</span> {
+  <span class="kw">try</span> {
+    <span class="cm">// Line number — try all known field name variants</span>
+    <span class="kw">const</span> line = <span class="type">String</span>(
+      item.lineRef || item.LineRef || item.line || item.lineNumber ||
+      item.MonitoredVehicleJourney?.LineRef || <span class="str">''</span>
+    ).<span class="fn">replace</span>(/^0+/, <span class="str">''</span>); <span class="cm">// strip leading zeros</span>
+
+    <span class="cm">// Destination</span>
+    <span class="kw">const</span> destination = <span class="type">String</span>(
+      item.destinationName || item.destination || item.headsign ||
+      item.MonitoredVehicleJourney?.DestinationName || <span class="str">''</span>
+    );
+
+    <span class="cm">// Scheduled departure — ISO string or unix seconds</span>
+    <span class="kw">const</span> scheduledRaw =
+      item.aimedDepartureTime || item.scheduledDepartureTime || item.scheduledTime ||
+      item.AimedDepartureTime || item.MonitoredVehicleJourney?.MonitoredCall?.AimedDepartureTime;
+
+    <span class="cm">// Expected (real-time) departure</span>
+    <span class="kw">const</span> expectedRaw =
+      item.expectedDepartureTime || item.realDepartureTime || item.realTime ||
+      item.ExpectedDepartureTime || item.MonitoredVehicleJourney?.MonitoredCall?.ExpectedDepartureTime;
+
+    <span class="kw">if</span> (!scheduledRaw || !line) <span class="kw">return null</span>;
+
+    <span class="kw">const</span> <span class="fn">toSeconds</span> = (v: <span class="type">any</span>): <span class="type">number</span> =&gt; {
+      <span class="kw">if</span> (<span class="kw">typeof</span> v === <span class="str">'number'</span>) <span class="kw">return</span> v &gt; <span class="num">1e9</span> ? v / <span class="num">1000</span> : v; <span class="cm">// ms or s</span>
+      <span class="kw">return</span> <span class="type">Math</span>.<span class="fn">floor</span>(<span class="kw">new</span> <span class="fn">Date</span>(v).<span class="fn">getTime</span>() / <span class="num">1000</span>);
+    };
+
+    <span class="kw">const</span> scheduledTime = <span class="fn">toSeconds</span>(scheduledRaw);
+    <span class="kw">const</span> expectedTime = expectedRaw ? <span class="fn">toSeconds</span>(expectedRaw) : scheduledTime;
+
+    <span class="cm">// Delay may be provided directly in the response as well</span>
+    <span class="kw">const</span> directDelay =
+      item.delay ?? item.delaySeconds ?? item.delayInSeconds ?? item.Delay;
+    <span class="kw">const</span> delaySeconds = directDelay !== <span class="kw">undefined</span>
+      ? <span class="type">Number</span>(directDelay)
+      : (expectedTime - scheduledTime);
+
+    <span class="kw">return</span> { line, destination, scheduledTime, expectedTime, delaySeconds };
+  } <span class="kw">catch</span> {
+    <span class="kw">return null</span>;
+  }
+}</code></pre>
+</div>
+
+<!-- ─── STEP 3: INTEGRATE INTO fetchDepartures ────────────────────────────── -->
+<div class="section">
+<h2><span class="step">3</span> Update <code>fetchDepartures()</code> to merge SIRI data</h2>
+<p>Find the existing <code>fetchDepartures</code> function. After the peatus.ee call returns the arrivals array, add the SIRI merge block shown below.</p>
+
+<div class="file-label">src/services/transportService.ts — inside fetchDepartures(), after arrivals are built</div>
+<pre><code><span class="cm">// ─── EXISTING code (find this block) ─────────────────────────────────────────</span>
+<span class="kw">export async function</span> <span class="fn">fetchDepartures</span>(stopId: <span class="type">string</span>, siriId?: <span class="type">string</span>, time?: <span class="type">string</span>): <span class="type">Promise</span>&lt;<span class="type">Arrival</span>[]&gt; {
+  <span class="kw">try</span> {
+    <span class="cm">// ... existing peatus.ee GraphQL query ...</span>
+    <span class="cm">// ... existing arrivals array is built ...</span>
+
+    arrivals.<span class="fn">sort</span>((a, b) =&gt; a.minutes - b.minutes);
+    <span class="cm">// ... existing vehicleIndex assignment ...</span>
+
+    <span class="cm">// ─── ADD THIS BLOCK right before the final return ─────────────────────</span>
+
+    <span class="cm">// Overlay real-time delays from TLT SIRI endpoint.
+    // Only applies to stops that have a numeric TLT stop code (siriId).
+    // Non-TLT stops (regional buses) are unaffected.</span>
+    <span class="kw">const</span> tltStopCode = siriId || stopId;
+    <span class="kw">if</span> (/^\d+$/<span class="fn">.test</span>(tltStopCode)) {
+      <span class="kw">const</span> siriDeps = <span class="kw">await</span> <span class="fn">fetchSiriStopDepartures</span>(tltStopCode);
+      <span class="kw">if</span> (siriDeps.length &gt; <span class="num">0</span>) {
+        <span class="kw">const</span> nowSeconds = <span class="type">Math</span>.<span class="fn">floor</span>(Date.<span class="fn">now</span>() / <span class="num">1000</span>);
+        arrivals = arrivals.<span class="fn">map</span>(arrival =&gt; {
+          <span class="cm">// Match by line number; if multiple trips, match closest scheduled time</span>
+          <span class="kw">const</span> candidates = siriDeps.<span class="fn">filter</span>(s =&gt;
+            s.line === arrival.line ||
+            s.line === arrival.line.<span class="fn">replace</span>(/^0+/, <span class="str">''</span>)
+          );
+          <span class="kw">if</span> (candidates.length === <span class="num">0</span>) <span class="kw">return</span> arrival;
+
+          <span class="cm">// Pick SIRI entry whose scheduled time is closest to this arrival's minutes</span>
+          <span class="kw">const</span> arrivalScheduledSeconds = nowSeconds + arrival.minutes * <span class="num">60</span>;
+          <span class="kw">const</span> best = candidates.<span class="fn">reduce</span>((a, b) =>
+            <span class="type">Math</span>.<span class="fn">abs</span>(a.scheduledTime - arrivalScheduledSeconds) &lt;
+            <span class="type">Math</span>.<span class="fn">abs</span>(b.scheduledTime - arrivalScheduledSeconds) ? a : b
+          );
+
+          <span class="cm">// Only use SIRI if the match is within ±3 minutes</span>
+          <span class="kw">if</span> (<span class="type">Math</span>.<span class="fn">abs</span>(best.scheduledTime - arrivalScheduledSeconds) &gt; <span class="num">180</span>) <span class="kw">return</span> arrival;
+
+          <span class="kw">const</span> realMinutes = <span class="type">Math</span>.<span class="fn">max</span>(<span class="num">0</span>, <span class="type">Math</span>.<span class="fn">floor</span>((best.expectedTime - nowSeconds) / <span class="num">60</span>));
+          <span class="kw">const</span> delayMin  = <span class="type">Math</span>.<span class="fn">round</span>(best.delaySeconds / <span class="num">60</span>);
+          <span class="kw">const</span> status: <span class="type">Arrival</span>[<span class="str">'status'</span>] = best.delaySeconds &gt; <span class="num">60</span> ? <span class="str">'delayed'</span>
+                                                : best.delaySeconds &lt; -<span class="num">30</span> ? <span class="str">'on-time'</span>
+                                                : <span class="str">'on-time'</span>;
+
+          <span class="kw">return</span> {
+            ...arrival,
+            minutes: realMinutes,
+            status,
+            <span class="cm">// Show delay badge in UI: "+1 min" or "-30s"</span>
+            info: best.delaySeconds &gt; <span class="num">30</span>
+              ? `+${best.delaySeconds}s`
+              : best.delaySeconds &lt; -<span class="num">30</span> ? `${best.delaySeconds}s` : <span class="kw">undefined</span>,
+          };
+        });
+        console.<span class="fn">log</span>(`SIRI overlay applied: ${siriDeps.length} real-time entries for stop ${tltStopCode}`);
+      }
+    }
+
+    <span class="cm">// ─── END of new block ─────────────────────────────────────────────────</span>
+
+    <span class="kw">return</span> arrivals.<span class="fn">slice</span>(<span class="num">0</span>, time === <span class="str">'0'</span> ? <span class="num">50</span> : <span class="num">10</span>);
+  } <span class="kw">catch</span> (error) { ... }
+}</code></pre>
+
+<div class="warn">
+  <strong>Note:</strong> The <code>arrivals</code> variable must be declared with <code>let</code> not <code>const</code> for the <code>arrivals = arrivals.map(…)</code> line to work. Check the existing declaration and change it if needed.
+</div>
+</div>
+
+<!-- ─── STEP 4: SHOW DELAY IN UI ──────────────────────────────────────────── -->
+<div class="section">
+<h2><span class="step">4</span> Show Delay Badge in the Stop Popup</h2>
+<p>The <code>info</code> field on an arrival already renders in the popup in <code>Map.tsx</code>. The SIRI merge sets it to <code>"+68s"</code> when the bus is late. No UI change is strictly needed — but you can make it more visible by adding a coloured badge. Find the departure row HTML inside <code>handleStopClick</code> → <code>updateContent</code> in <code>Map.tsx</code> and add the delay badge:</p>
+
+<div class="file-label">Map.tsx — inside the departures.map() HTML string, next to the time display</div>
+<pre><code><span class="cm">&lt;!-- Find this line (the time display div) and add the delay badge before it --&gt;</span>
+${d.info ? `
+  &lt;span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full
+    ${d.info.startsWith('+') ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}"&gt;
+    ${d.info}
+  &lt;/span&gt;
+` : ''}
+&lt;div class="text-right"&gt;
+  &lt;span class="font-headline font-black text-lg text-primary"&gt;
+    ${d.minutes &gt; 60 &amp;&amp; d.time ? d.time : (d.minutes &lt;= 0 ? 'Now' : d.minutes + '&lt;span class="text-[10px] ml-0.5 font-bold"&gt;min&lt;/span&gt;')}
+  &lt;/span&gt;
+&lt;/div&gt;</code></pre>
+</div>
+
+<!-- ─── SUMMARY ────────────────────────────────────────────────────────────── -->
+<div class="section">
+<h2>Summary</h2>
+<table>
+<tr><th>File</th><th>Change</th></tr>
+<tr><td>src/services/transportService.ts</td><td>Add <code>fetchSiriStopDepartures()</code> + <code>parseSiriDeparture()</code> functions. Merge SIRI data inside <code>fetchDepartures()</code>.</td></tr>
+<tr><td>src/pages/Map.tsx</td><td>Add delay badge (<code>+68s</code> / <code>-30s</code>) next to arrival time in stop popup.</td></tr>
+</table>
+
+<div class="info">
+  <strong>After first run:</strong> check the console for <code>SIRI raw sample: …</code>. Copy that output and update the field names in <code>parseSiriDeparture()</code> to match the actual response. Then remove the logging line.
+</div>
+</div>
+
+</body>
+</html>
