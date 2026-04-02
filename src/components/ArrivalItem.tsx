@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Arrival, Stop } from '../types';
 import { getRouteStopsForArrival } from '../services/transportService';
 import { cn, getVehicleColorClass } from '../lib/utils';
-import { CheckCircle2, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, MapPin, Bell } from 'lucide-react';
 import { VehicleMap } from './VehicleMap';
 
 interface ArrivalItemProps {
@@ -10,9 +10,11 @@ interface ArrivalItemProps {
   arrival: Arrival;
   stop?: Stop;
   variant?: 'main' | 'compact';
+  onAlertClick?: (e: React.MouseEvent) => void;
+  isAlertActive?: boolean;
 }
 
-export function ArrivalItem({ arrival, stop, variant = 'main' }: ArrivalItemProps) {
+export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive }: ArrivalItemProps) {
   const [expanded, setExpanded] = useState(false);
   const [routeStops, setRouteStops] = useState<Stop[]>([]);
   const [loading, setLoading] = useState(false);
@@ -95,9 +97,28 @@ export function ArrivalItem({ arrival, stop, variant = 'main' }: ArrivalItemProp
             <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
           ) : (
             <div className="flex items-center gap-2">
+              {onAlertClick && arrival.minutes > 15 && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAlertClick(e);
+                  }}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all active:scale-90",
+                    isAlertActive 
+                      ? "bg-amber-500 text-white" 
+                      : "bg-surface-container-high text-secondary hover:text-primary"
+                  )}
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                </button>
+              )}
               <div className="flex items-baseline gap-1">
+                {arrival.isRealtime && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center" />
+                )}
                 <span className={cn("font-headline font-black text-primary", isCompact ? "text-lg" : "text-xl")}>
-                  {arrival.minutes > 60 && arrival.time ? arrival.time : (arrival.minutes <= 0 ? 'Now' : arrival.minutes)}
+                  {arrival.minutes > 60 && arrival.time ? arrival.time : (arrival.minutes === 0 ? 'Now' : arrival.minutes)}
                 </span>
                 {arrival.minutes > 0 && !(arrival.minutes > 60 && arrival.time) && (
                   <span className={cn("font-bold text-secondary uppercase", isCompact ? "text-[10px]" : "text-[10px] ml-0.5")}>min</span>

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
+import { SettingsModal } from './SettingsModal';
 
 export const TopBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
     <>
@@ -37,10 +39,19 @@ export const TopBar = () => {
               <div className="absolute top-full left-6 mt-2 w-48 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 overflow-hidden z-50">
                 <button
                   onClick={() => {
-                    setIsTermsOpen(true);
+                    setIsSettingsOpen(true);
                     setIsMenuOpen(false);
                   }}
                   className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
+                >
+                  ⚙️ Settings
+                </button>
+                <button
+                  onClick={() => {
+                    setIsTermsOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
                 >
                   Terms & Conditions
                 </button>
@@ -67,6 +78,9 @@ export const TopBar = () => {
           )}
         </div>
       </header>
+
+      {/* Settings Modal */}
+      {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
 
       {/* Terms & Conditions Modal */}
       {isTermsOpen && (

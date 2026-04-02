@@ -34,4 +34,13 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:name="android.hardware.location.gps" />
+
+    <!-- Required for Android 13+: show notifications at all -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Required for Android 12+: fire at the exact scheduled minute -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Fallback for Android 13+ devices where SCHEDULE_EXACT_ALARM needs approval -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 </manifest>

@@ -3,15 +3,18 @@ import { Capacitor } from '@capacitor/core';
 import { useLocation } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes, adjustArrivalsWithVehicles } from '../services/transportService';
+import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes } from '../services/transportService';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
 import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
 import { Stop, Arrival, Vehicle } from '../types';
-import { Bus, Loader2, Navigation, Footprints, Bell } from 'lucide-react';
+import { Bus, Loader2, Navigation, Footprints, Bell, X } from 'lucide-react';
 import { getDistance } from '../lib/geo';
-import { formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
 import { scheduleDepartureNotification } from '../services/notificationService';
 import { addActiveAlert, getActiveAlerts, isAlertActive } from '../services/alertService';
+import { getRouteStopsForVehicle } from '../services/transportService';
+import { VehicleMap } from '../components/VehicleMap';
+import { AnimatePresence, motion } from 'motion/react';
 
 const TALLINN_CENTER: [number, number] = [TALLINN_CENTER_COORD.lng, TALLINN_CENTER_COORD.lat]; // [lng, lat]
 
@@ -36,10 +39,10 @@ export const Map = () => {
   const [locationError, setLocationError] = useState(null as string | null);
   const [pulsatingStopId, setPulsatingStopId] = useState(null as string | null);
   const [scheduledAlerts, setScheduledAlerts] = useState<any[]>([]);
+  const [selectedVehicle, setSelectedVehicle] = useState<{ vehicle: Vehicle, routeStops: Stop[] } | null>(null);
 
   const [stops, setStops] = useState([] as Stop[]);
   const [vehicles, setVehicles] = useState([] as Vehicle[]);
-  const vehiclesRef = useRef([] as Vehicle[]);
   const [styleLoadCount, setStyleLoadCount] = useState(0);
 
   useEffect(() => {
@@ -63,7 +66,7 @@ export const Map = () => {
     };
 
     loadVehicles();
-    const interval = setInterval(loadVehicles, 2000);
+    const interval = setInterval(loadVehicles, 2000); // Update every 2 seconds
 
     // Animation loop for smooth vehicle movement
     let animationFrameId: number;
@@ -231,11 +234,6 @@ export const Map = () => {
     };
   }, []);
 
-  // Keep vehiclesRef in sync so stop popups always use latest vehicle data
-  useEffect(() => {
-    vehiclesRef.current = vehicles;
-  }, [vehicles]);
-
   // Update vehicle markers
   useEffect(() => {
     if (!map.current || styleLoadCount === 0) return;
@@ -285,13 +283,13 @@ export const Map = () => {
       } else {
         // Create new
         const el = document.createElement('div');
-        el.className = 'pointer-events-none';
+        el.className = 'cursor-pointer group';
         
         const bgColor = getVehicleColorClass(vehicle.type).split(' ')[0];
         const labelText = vehicle.destination ? `${vehicle.line} ${vehicle.destination}` : vehicle.line;
 
         el.innerHTML = `
-          <div class="relative w-5 h-5 flex items-center justify-center">
+          <div class="relative w-5 h-5 flex items-center justify-center transition-transform group-hover:scale-110">
             <div class="vehicle-label absolute bottom-full mb-1 text-[8px] font-bold text-white ${bgColor} opacity-80 px-1 py-0.5 rounded-sm shadow-sm whitespace-nowrap">
               ${labelText}
             </div>
@@ -302,6 +300,12 @@ export const Map = () => {
             </div>
           </div>
         `;
+
+        el.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const routeStops = await getRouteStopsForVehicle(vehicle);
+          setSelectedVehicle({ vehicle, routeStops });
+        });
 
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([vehicle.lng, vehicle.lat])
@@ -402,9 +406,9 @@ export const Map = () => {
           id: stop.id,
           siriId: stop.siriId,
           name: stop.name,
+          modes: stop.modes || [],
           originalLat: (stop as any).originalLat || stop.lat,
-          originalLng: (stop as any).originalLng || stop.lng,
-          stopType: stop.vehicleTypes?.every(t => t === 'TRAM') ? 'tram' : 'bus'
+          originalLng: (stop as any).originalLng || stop.lng
         }
       }))
     };
@@ -435,9 +439,22 @@ export const Map = () => {
               16, 10
             ],
             'circle-color': [
-              'match', ['get', 'stopType'],
-              'tram', '#B71C1C',
-              '#1976D2'
+              'case',
+              // Only trams
+              ['all', 
+                ['in', 'tram', ['get', 'modes']], 
+                ['==', ['length', ['get', 'modes']], 1]
+              ], '#DC143C',
+              // Any bus, trolley, regional, commercial, or suburban
+              ['any',
+                ['in', 'bus', ['get', 'modes']],
+                ['in', 'trolley', ['get', 'modes']],
+                ['in', 'regional', ['get', 'modes']],
+                ['in', 'commercial', ['get', 'modes']],
+                ['in', 'suburban', ['get', 'modes']]
+              ], '#4DA3FF',
+              // Default
+              '#ff4444'
             ],
             'circle-stroke-width': 2,
             'circle-stroke-color': '#ffffff',
@@ -533,8 +550,6 @@ export const Map = () => {
         if (!isLoading) {
           try {
             departures = await fetchDepartures(id, siriId);
-            const stopObj = { id, siriId, name, lat: coordinates[1], lng: coordinates[0] };
-            departures = adjustArrivalsWithVehicles(departures, vehiclesRef.current, stopObj);
           } catch (err: any) {
             console.error('Error in handleStopClick:', err);
             errorMsg = err.message || 'No live data';
@@ -569,9 +584,10 @@ export const Map = () => {
                       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
                     </button>
                   ` : ''}
-                  <div class="text-right">
+                  <div class="text-right flex items-baseline gap-1">
+                    ${d.isRealtime ? '<div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center"></div>' : ''}
                     <span class="font-headline font-black text-lg text-primary">
-                      ${d.minutes > 60 && d.time ? d.time : (d.minutes <= 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
+                      ${d.minutes > 60 && d.time ? d.time : (d.minutes === 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
                     </span>
                   </div>
                 </div>
@@ -796,6 +812,82 @@ export const Map = () => {
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {selectedVehicle && (
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="absolute bottom-0 left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col max-h-[80vh]"
+          >
+            <div className="w-full flex justify-center pt-3 pb-2" onClick={() => setSelectedVehicle(null)}>
+              <div className="w-12 h-1.5 bg-outline-variant/30 rounded-full" />
+            </div>
+            
+            <div className="px-6 pb-4 flex items-center justify-between border-b border-outline-variant/10">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "h-10 w-10 rounded-full flex items-center justify-center font-label font-bold text-base",
+                  getVehicleColorClass(selectedVehicle.vehicle.type)
+                )}>
+                  {selectedVehicle.vehicle.line}
+                </div>
+                <div>
+                  <h3 className="font-headline font-bold text-xl text-primary leading-tight">
+                    {selectedVehicle.vehicle.destination || 'Unknown Destination'}
+                  </h3>
+                  <p className="font-label text-xs text-secondary font-bold uppercase tracking-widest mt-0.5">
+                    {selectedVehicle.vehicle.type} • {Math.round(selectedVehicle.vehicle.speed || 0)} km/h
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedVehicle(null)}
+                className="p-2 rounded-full bg-surface-container-high text-secondary hover:text-primary transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+              <div className="h-48 rounded-xl overflow-hidden bg-surface-container relative shrink-0">
+                <VehicleMap routeStops={selectedVehicle.routeStops} targetStop={selectedVehicle.routeStops[0]} />
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <h4 className="font-label text-xs font-bold text-secondary uppercase tracking-widest px-2">Route Stops</h4>
+                {selectedVehicle.routeStops.length === 0 ? (
+                  <p className="text-sm text-secondary px-2">Route data not available</p>
+                ) : (
+                  selectedVehicle.routeStops.map((stop, idx) => (
+                    <div key={idx} className="flex items-center gap-3 px-2 py-1">
+                      <div className="flex flex-col items-center self-stretch">
+                        <div className={cn(
+                          "w-3 h-3 rounded-full border-2 z-10",
+                          idx === 0 ? "bg-primary border-primary" : "bg-surface-container-lowest border-outline-variant"
+                        )} />
+                        {idx < selectedVehicle.routeStops.length - 1 && (
+                          <div className="w-0.5 h-full bg-outline-variant/30 my-1" />
+                        )}
+                      </div>
+                      <div className="pb-2">
+                        <span className={cn(
+                          "font-headline font-bold text-sm",
+                          idx === 0 ? "text-primary" : "text-secondary"
+                        )}>
+                          {stop.name}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

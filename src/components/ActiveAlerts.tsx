@@ -79,8 +79,8 @@ export const ActiveAlerts: React.FC<ActiveAlertsProps> = ({ onAlertsChange }) =>
                     <div className="flex items-center gap-1 justify-end">
                       <Clock className="w-3 h-3 text-amber-600" />
                       <span className="font-headline font-black text-xl text-amber-600">
-                        {minutesLeft}
-                        <span className="text-[10px] ml-0.5 font-bold">min</span>
+                        {minutesLeft > 60 ? new Date(alert.departureTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : minutesLeft}
+                        {minutesLeft <= 60 && <span className="text-[10px] ml-0.5 font-bold">min</span>}
                       </span>
                     </div>
                     <p className="text-[8px] font-label font-bold text-amber-700/50 uppercase tracking-widest">

@@ -343,6 +343,23 @@ async function startServer() {
     }
   });
 
+  app.get("/api/transport/vehicles", async (req, res) => {
+    try {
+      const response = await axios.get("https://gis.ee/tallinn/gps.php", {
+        responseType: 'json',
+        timeout: 5000
+      });
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.json(response.data);
+    } catch (error: any) {
+      console.error("Error fetching vehicles from gis.ee:", error.message);
+      res.status(500).json({ error: "Failed to fetch vehicles data" });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

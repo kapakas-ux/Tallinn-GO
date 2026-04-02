@@ -22,6 +22,17 @@ export function getVehicleColorClass(type: string): string {
   }
 }
 
+export function getStopColorClass(stop: { modes?: string[] }): string {
+  const modes = stop.modes || [];
+  if (modes.includes('tram') && modes.length === 1) {
+    return 'bg-tram text-white';
+  }
+  if (modes.includes('bus') || modes.includes('trolley') || modes.includes('regional')) {
+    return 'bg-bus-light text-white';
+  }
+  return 'bg-primary/5 text-primary';
+}
+
 export function formatWalkingTime(meters: number): string {
   const minutes = Math.round(meters / 83.33);
   if (minutes >= 60) {

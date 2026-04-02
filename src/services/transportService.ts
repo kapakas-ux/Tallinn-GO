@@ -106,6 +106,8 @@ let routesMap: { [key: string]: string } = {};
 export const routeStopsMap: { [key: string]: { name: string, stops: string[] }[] } = {};
 let stopsPromise: Promise<Stop[]> | null = null;
 let routesPromise: Promise<void> | null = null;
+let stopsByIdMap: Map<string, Stop> | null = null;
+let stopsByBaseIdMap: Map<string, Stop> | null = null;
 
 /**
  * Robust coordinate parser that handles both integers (multiplied) and floats
@@ -134,6 +136,7 @@ function parseCoordinate(valStr: string, type: 'lat' | 'lng'): number {
 }
 
 export const usedStopsSet = new Set<string>();
+export const stopModesMap: Record<string, Set<string>> = {};
 
 export async function fetchRoutes(): Promise<void> {
   if (routesPromise) return routesPromise;
@@ -162,6 +165,8 @@ export async function fetchRoutes(): Promise<void> {
       }
       
       let currentRouteNum = '';
+      let currentTransport = '';
+      let currentRouteName = '';
       
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
@@ -170,35 +175,54 @@ export async function fetchRoutes(): Promise<void> {
         const parts = line.split(delim).map(p => p.trim().replace(/"/g, ''));
         
         const routeNum = parts[fld['ROUTENUM']];
+        const transport = parts[fld['TRANSPORT']];
+        const routeName = parts[fld['ROUTENAME']];
+        
         if (routeNum && routeNum !== '-') {
           currentRouteNum = routeNum;
         }
+        if (transport && transport !== '-') {
+          currentTransport = transport;
+        }
+        if (routeName && routeName !== '-') {
+          currentRouteName = routeName;
+        }
         
-        const routeName = parts[fld['ROUTENAME']];
-        if (currentRouteNum && routeName) {
-          routesMap[currentRouteNum] = routeName;
+        if (currentRouteNum && currentRouteName) {
+          routesMap[currentRouteNum] = currentRouteName;
           const normNum = currentRouteNum.replace(/^0+/, '');
-          if (normNum && normNum !== currentRouteNum) routesMap[normNum] = routeName;
+          if (normNum && normNum !== currentRouteNum) routesMap[normNum] = currentRouteName;
         }
         
         const routeStops = parts[fld['ROUTESTOPS']];
         if (routeStops) {
           const stops = routeStops.split(',').filter(Boolean);
           for (const stop of stops) {
+            const normStop = stop.replace(/^0+/, '');
             usedStopsSet.add(stop);
+            usedStopsSet.add(normStop);
+            
+            if (currentTransport) {
+              const mode = currentTransport.toLowerCase();
+              if (!stopModesMap[stop]) stopModesMap[stop] = new Set();
+              if (!stopModesMap[normStop]) stopModesMap[normStop] = new Set();
+              
+              stopModesMap[stop].add(mode);
+              stopModesMap[normStop].add(mode);
+            }
           }
-          if (currentRouteNum && routeName) {
+          if (currentRouteNum && currentRouteName) {
             if (!routeStopsMap[currentRouteNum]) {
               routeStopsMap[currentRouteNum] = [];
             }
-            routeStopsMap[currentRouteNum].push({ name: routeName, stops });
+            routeStopsMap[currentRouteNum].push({ name: currentRouteName, stops });
             
             const normNum = currentRouteNum.replace(/^0+/, '');
             if (normNum && normNum !== currentRouteNum) {
               if (!routeStopsMap[normNum]) {
                 routeStopsMap[normNum] = [];
               }
-              routeStopsMap[normNum].push({ name: routeName, stops });
+              routeStopsMap[normNum].push({ name: currentRouteName, stops });
             }
           }
         }
@@ -226,7 +250,7 @@ export async function fetchStops(): Promise<Stop[]> {
       const response = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: '{ stops { gtfsId name lat lon code routes { mode } } }' })
+        body: JSON.stringify({ query: '{ stops { gtfsId name lat lon code desc zoneId parentStation { name } routes { mode } } }' })
       });
       
       const data = await response.json();
@@ -244,11 +268,46 @@ export async function fetchStops(): Promise<Stop[]> {
         const lat = raw.lat;
         const lng = raw.lon;
         
+        const zoneId = raw.zoneId || '';
+        const parentName = raw.parentStation?.name || '';
+        
+        // Format zoneId to county name
+        let county = '';
+        if (zoneId) {
+          const lower = zoneId.toLowerCase();
+          if (lower.includes('harju')) county = 'Harjumaa';
+          else if (lower.includes('tartu')) county = 'Tartumaa';
+          else if (lower.includes('parnu') || lower.includes('pärnu')) county = 'Pärnumaa';
+          else if (lower.includes('viru')) county = 'Virumaa';
+          else if (lower.includes('viljandi')) county = 'Viljandimaa';
+          else if (lower.includes('rapla')) county = 'Raplamaa';
+          else if (lower.includes('saare')) county = 'Saaremaa';
+          else if (lower.includes('jogeva') || lower.includes('jõgeva')) county = 'Jõgevamaa';
+          else if (lower.includes('jarva') || lower.includes('järva')) county = 'Järvamaa';
+          else if (lower.includes('valga')) county = 'Valgamaa';
+          else if (lower.includes('polva') || lower.includes('põlva')) county = 'Põlvamaa';
+          else if (lower.includes('laane') || lower.includes('lääne')) county = 'Läänemaa';
+          else if (lower.includes('hiiu')) county = 'Hiiumaa';
+          else if (lower.includes('voru') || lower.includes('võru')) county = 'Võrumaa';
+          else if (isNaN(Number(zoneId))) county = zoneId.replace(/[0-9]/g, '').trim();
+        }
+        
+        let finalDesc = county;
+        if (parentName && parentName !== name && parentName !== county) {
+          finalDesc = finalDesc ? `${finalDesc}, ${parentName}` : parentName;
+        }
+        
+        // If it's still empty and we are in Tallinn (based on coordinates), use Tallinn
+        if (!finalDesc && lat > 59.35 && lat < 59.50 && lng > 24.55 && lng < 24.95) {
+          finalDesc = 'Tallinn';
+        }
+        
         // Populate stopsMap for vehicle destination resolution
         const normId = internalId.replace(/^0+/, '');
         const baseId = internalId.split('-')[0];
+        const normBaseId = baseId.replace(/^0+/, '');
         
-        [internalId, normId, baseId].forEach(key => {
+        [internalId, normId, baseId, normBaseId].forEach(key => {
           if (key && !stopsMap[key]) {
             stopsMap[key] = name;
           }
@@ -263,23 +322,60 @@ export async function fetchStops(): Promise<Stop[]> {
           });
         }
         
-        const vehicleTypes: string[] = [...new Set(
-          (raw.routes || []).map((r: any) => r.mode as string).filter(Boolean)
-        )];
+        // Hide ghost stops (those not used by any route)
+        const hasPeatusRoutes = raw.routes && raw.routes.length > 0;
+        const isUsedInTallinn = usedStopsSet.has(internalId) || usedStopsSet.has(normId) || usedStopsSet.has(baseId) || usedStopsSet.has(normBaseId);
+        
+        if (!hasPeatusRoutes && !isUsedInTallinn) {
+          continue;
+        }
+        
+        const modesSet = new Set<string>();
+        
+        // Add modes from peatus.ee
+        if (raw.routes) {
+          raw.routes.forEach((r: any) => {
+            if (r.mode) {
+              let m = r.mode.toLowerCase();
+              if (m === 'trolleybus') m = 'trolley';
+              if (m === 'rail') m = 'train';
+              modesSet.add(m);
+            }
+          });
+        }
 
-        if (vehicleTypes.length === 0) continue; // ghost stop — no active routes
-
+        // Add modes from Tallinn routes (backup/override)
+        [internalId, normId, baseId, normBaseId].forEach(key => {
+          if (stopModesMap[key]) {
+            stopModesMap[key].forEach(m => modesSet.add(m));
+          }
+        });
+        
+        const modes = Array.from(modesSet) as any[];
+        
         stops.push({
           id: internalId,
           siriId: siriId,
           name: name,
           lat: lat,
           lng: lng,
-          vehicleTypes
+          desc: finalDesc,
+          modes: modes
         });
       }
       
       console.log(`Successfully parsed ${stops.length} stops from peatus.ee.`);
+      
+      stopsByIdMap = new Map();
+      stopsByBaseIdMap = new Map();
+      for (const stop of stops) {
+        stopsByIdMap.set(stop.id, stop);
+        const baseId = stop.id.split('-')[0];
+        if (!stopsByBaseIdMap.has(baseId)) {
+          stopsByBaseIdMap.set(baseId, stop);
+        }
+      }
+      
       return stops;
     } catch (error) {
       console.error('Error fetching/parsing stops from peatus.ee:', error);
@@ -293,48 +389,102 @@ export async function fetchStops(): Promise<Stop[]> {
 
 let cachedVehicles: Vehicle[] = [];
 let lastVehiclesFetch = 0;
+let vehiclesPromise: Promise<Vehicle[]> | null = null;
 
-const TALLINN_BOUNDS = { latMin: 59.3, latMax: 59.6, lonMin: 24.4, lonMax: 24.95 };
+export async function fetchVehicles(): Promise<Vehicle[]> {
+  const now = Date.now();
+  
+  // If we have cached vehicles, return them immediately to avoid blocking.
+  // If they are older than 2000ms, trigger a background refresh.
+  if (cachedVehicles.length > 0) {
+    if (now - lastVehiclesFetch >= 10000) {
+      // If cache is very stale (>10s), wait for the new fetch
+      if (!vehiclesPromise) {
+        vehiclesPromise = fetchVehiclesFromApi().then(vehicles => {
+          cachedVehicles = vehicles;
+          lastVehiclesFetch = Date.now();
+          vehiclesPromise = null;
+          return vehicles;
+        }).catch(err => {
+          console.error('Vehicle fetch failed:', err);
+          vehiclesPromise = null;
+          return cachedVehicles;
+        });
+      }
+      return vehiclesPromise;
+    } else if (now - lastVehiclesFetch >= 2000 && !vehiclesPromise) {
+      // Trigger background refresh but return cached immediately
+      vehiclesPromise = fetchVehiclesFromApi().then(vehicles => {
+        cachedVehicles = vehicles;
+        lastVehiclesFetch = Date.now();
+        vehiclesPromise = null;
+        return vehicles;
+      }).catch(err => {
+        console.error('Background vehicle fetch failed:', err);
+        vehiclesPromise = null;
+        return cachedVehicles;
+      });
+    }
+    return cachedVehicles;
+  }
 
-// Only 'tallinn' exists on gis.ee — other city endpoints return 404
-const GIS_EE_CITIES = ['tallinn'];
+  if (vehiclesPromise) {
+    return vehiclesPromise;
+  }
 
+  vehiclesPromise = fetchVehiclesFromApi().then(vehicles => {
+    cachedVehicles = vehicles;
+    lastVehiclesFetch = Date.now();
+    vehiclesPromise = null;
+    return vehicles;
+  }).catch(err => {
+    console.error('Initial vehicle fetch failed:', err);
+    vehiclesPromise = null;
+    return cachedVehicles;
+  });
 
-async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
-  const url = `https://gis.ee/${city}/gps.php?ver=${Date.now()}`;
-  let data: any;
+  return vehiclesPromise;
+}
+
+async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
+  let data;
+  
   if (Capacitor.isNativePlatform()) {
-    // CapacitorHttp with browser-like headers so gis.ee returns full dataset including county buses
-    const resp = await CapacitorHttp.get({
-      url,
-      headers: {
-        'Referer': `https://gis.ee/${city}/`,
-        'Accept': 'application/json, */*',
-        'Cache-Control': 'no-cache'
-      },
-      connectTimeout: 20000,
-      readTimeout: 20000
-    });
-    if (resp.status >= 400) throw new Error(`gis.ee/${city} error: ${resp.status}`);
-    data = typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data;
+    const url = 'https://gis.ee/tallinn/gps.php';
+    const responseText = await universalFetch(url);
+    data = JSON.parse(responseText);
   } else {
+    // Use our backend proxy for web
+    const url = `${API_BASE}/api/transport/vehicles`;
     const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`gis.ee/${city} error: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`gis.ee API error via proxy: ${response.status}`);
+    }
     data = await response.json();
   }
+  const features = data?.features || [];
+
   const vehicles: Vehicle[] = [];
-  for (const feature of (data?.features || [])) {
+  
+  for (const feature of features) {
     const props = feature.properties;
     const coords = feature.geometry?.coordinates;
+    
     if (!coords || coords.length < 2) continue;
+
     let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
+    
     if (props.type === 1) type = 'trolley';
+    else if (props.type === 2) type = 'bus';
     else if (props.type === 3) type = 'tram';
-    else if (props.type === 7) type = 'bus';
+    else if (props.type === 7) type = 'bus'; // nightbus
     else if (props.type === 10) type = 'train';
+    else if (props.type === 20) type = 'regional';
+
     const jitter = (Math.random() - 0.5) * 0.000001;
+    
     vehicles.push({
-      id: `gis_${city}_${props.id}`,
+      id: props.id?.toString() || Math.random().toString(),
       type,
       line: props.line?.toString() || '',
       lng: coords[0] + jitter,
@@ -344,141 +494,16 @@ async function fetchGisEeCity(city: string): Promise<Vehicle[]> {
       destination: props.destination || ''
     });
   }
-  const byType: Record<number, number> = {};
-  for (const f of (data?.features || [])) {
-    const t = f.properties?.type ?? -1;
-    byType[t] = (byType[t] || 0) + 1;
-  }
-  console.log(`gis.ee/${city}: ${vehicles.length} vehicles`);
+  
+  console.log(`fetchVehicles: parsed ${vehicles.length} vehicles successfully from gis.ee`);
   return vehicles;
-}
-
-async function fetchPeatusVehicles(): Promise<Vehicle[]> {
-  const query = `{
-    vehicles {
-      id lat lon heading speed
-      route { shortName mode }
-      trip { tripHeadsign }
-    }
-  }`;
-  const response = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query })
-  });
-  if (!response.ok) throw new Error(`peatus.ee vehicles error: ${response.status}`);
-  const data = await response.json();
-  const rawVehicles: any[] = data?.data?.vehicles || [];
-  const vehicles: Vehicle[] = [];
-  for (const raw of rawVehicles) {
-    if (!raw.lat || !raw.lon) continue;
-    const mode = (raw.route?.mode || '').toUpperCase();
-    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
-    if (mode === 'TRAM') type = 'tram';
-    else if (mode === 'RAIL' || mode === 'SUBWAY') type = 'train';
-    else if (mode === 'TROLLEYBUS') type = 'trolley';
-    else if (mode === 'BUS') {
-      // City buses stay in known urban areas; everything else is a county bus
-      const inTallinn = raw.lat >= TALLINN_BOUNDS.latMin && raw.lat <= TALLINN_BOUNDS.latMax &&
-                        raw.lon >= TALLINN_BOUNDS.lonMin && raw.lon <= TALLINN_BOUNDS.lonMax;
-      const inTartu = raw.lat >= 58.32 && raw.lat <= 58.45 && raw.lon >= 26.65 && raw.lon <= 26.82;
-      if (!inTallinn && !inTartu) type = 'regional';
-    }
-    vehicles.push({
-      id: `otp_${raw.id}`,
-      type,
-      line: raw.route?.shortName || '',
-      lat: raw.lat,
-      lng: raw.lon,
-      bearing: raw.heading || 0,
-      speed: raw.speed || 0,
-      destination: raw.trip?.tripHeadsign || ''
-    });
-  }
-  return vehicles;
-}
-
-export async function fetchVehicles(): Promise<Vehicle[]> {
-  try {
-    const now = Date.now();
-    if (cachedVehicles.length > 0 && now - lastVehiclesFetch < 1000) {
-      return cachedVehicles;
-    }
-
-    const TARTU_BOUNDS = { latMin: 58.32, latMax: 58.45, lonMin: 26.65, lonMax: 26.82 };
-    const inTartu = (lat: number, lng: number) =>
-      lat >= TARTU_BOUNDS.latMin && lat <= TARTU_BOUNDS.latMax &&
-      lng >= TARTU_BOUNDS.lonMin && lng <= TARTU_BOUNDS.lonMax;
-
-    // Fetch all gis.ee cities + peatus.ee all-Estonia in parallel
-    // Tartu city buses are covered by peatus.ee (Ridango API has no public vehicle positions endpoint)
-    const cityPromises = GIS_EE_CITIES.map(city => fetchGisEeCity(city));
-    const tartuResult: PromiseSettledResult<Vehicle[]> = { status: 'fulfilled', value: [] };
-    const [estoniaResult, ...cityResults] = await Promise.allSettled([
-      fetchPeatusVehicles(),
-      ...cityPromises
-    ]);
-
-    const vehicles: Vehicle[] = [];
-    const gisIds = new Set<string>();
-
-    // Add Tartu Ridango vehicles first (most accurate for Tartu city buses)
-    const tartuIds = new Set<string>();
-    const hasTartuData = tartuResult.status === 'fulfilled' && tartuResult.value.length > 0;
-    if (hasTartuData) {
-      vehicles.push(...tartuResult.value);
-      tartuResult.value.forEach(v => tartuIds.add(v.id));
-      console.log(`fetchVehicles: ${tartuResult.value.length} from Tartu Ridango`);
-    } else if (tartuResult.status === 'rejected') {
-      console.warn('fetchVehicles: Tartu Ridango failed:', tartuResult.reason);
-    }
-
-    // Add gis.ee vehicles from all cities
-    for (let i = 0; i < cityResults.length; i++) {
-      const result = cityResults[i];
-      const city = GIS_EE_CITIES[i];
-      if (result.status === 'fulfilled') {
-        vehicles.push(...result.value);
-        result.value.forEach(v => gisIds.add(v.id));
-        console.log(`fetchVehicles: ${result.value.length} from gis.ee/${city}`);
-      } else {
-        console.warn(`fetchVehicles: gis.ee/${city} failed:`, result.reason);
-      }
-    }
-
-    // Add peatus.ee vehicles not already covered by gis.ee or Tartu Ridango
-    if (estoniaResult.status === 'fulfilled') {
-      const extra = estoniaResult.value.filter(v => {
-        const inTallinn = v.lat >= TALLINN_BOUNDS.latMin && v.lat <= TALLINN_BOUNDS.latMax &&
-                          v.lng >= TALLINN_BOUNDS.lonMin && v.lng <= TALLINN_BOUNDS.lonMax;
-        // Skip Tallinn (covered by gis.ee) and Tartu if Ridango data is available
-        if (inTallinn) return false;
-        if (hasTartuData && inTartu(v.lat, v.lng)) return false;
-        return true;
-      });
-      vehicles.push(...extra);
-      console.log(`fetchVehicles: ${extra.length} extra from peatus.ee`);
-    } else {
-      console.warn('fetchVehicles: peatus.ee failed:', estoniaResult.reason);
-    }
-
-
-    if (vehicles.length > 0) {
-      cachedVehicles = vehicles;
-      lastVehiclesFetch = now;
-    }
-    return vehicles.length > 0 ? vehicles : cachedVehicles;
-  } catch (error) {
-    console.error('Error fetching vehicles:', error);
-    return cachedVehicles;
-  }
 }
 
 export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]> {
   if (Object.keys(routeStopsMap).length === 0) {
     await fetchRoutes();
   }
-  const allStops = await fetchStops();
+  await fetchStops(); // Ensure stops are fetched and maps are populated
   const normArrivalLine = arrival.line.replace(/^0+/, '');
   const routes = routeStopsMap[normArrivalLine];
   if (!routes || routes.length === 0) return [];
@@ -492,7 +517,7 @@ export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]>
   const lastStopMatch = routes.find(r => {
     if (r.stops.length === 0) return false;
     const lastStopId = r.stops[r.stops.length - 1];
-    const lastStop = allStops.find(s => s.id === lastStopId);
+    const lastStop = stopsByIdMap?.get(lastStopId);
     if (!lastStop) return false;
     const sName = lastStop.name.toLowerCase();
     return sName.includes(vDest) || vDest.includes(sName);
@@ -527,11 +552,11 @@ export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]>
   
   // Map stop IDs to Stop objects
   return bestRoute.stops.map(id => {
-    const exactStop = allStops.find(s => s.id === id);
+    const exactStop = stopsByIdMap?.get(id);
     if (exactStop) return exactStop;
     
     const baseId = id.split('-')[0];
-    const baseStop = allStops.find(s => s.id.startsWith(baseId + '-'));
+    const baseStop = stopsByBaseIdMap?.get(baseId);
     if (baseStop) return baseStop;
     
     return { id, name: id, lat: 0, lng: 0 }; // Fallback
@@ -542,7 +567,7 @@ export async function getRouteStopsForVehicle(vehicle: Vehicle, expectedDestinat
   if (Object.keys(routeStopsMap).length === 0) {
     await fetchRoutes();
   }
-  const allStops = await fetchStops();
+  await fetchStops(); // Ensure stops are fetched and maps are populated
   const routes = routeStopsMap[vehicle.line];
   if (!routes || routes.length === 0) return [];
   
@@ -555,7 +580,7 @@ export async function getRouteStopsForVehicle(vehicle: Vehicle, expectedDestinat
   const lastStopMatch = routes.find(r => {
     if (r.stops.length === 0) return false;
     const lastStopId = r.stops[r.stops.length - 1];
-    const lastStop = allStops.find(s => s.id === lastStopId);
+    const lastStop = stopsByIdMap?.get(lastStopId);
     if (!lastStop) return false;
     const sName = lastStop.name.toLowerCase();
     return sName.includes(vDest) || vDest.includes(sName);
@@ -590,11 +615,11 @@ export async function getRouteStopsForVehicle(vehicle: Vehicle, expectedDestinat
   
   // Map stop IDs to Stop objects
   return bestRoute.stops.map(id => {
-    const exactStop = allStops.find(s => s.id === id);
+    const exactStop = stopsByIdMap?.get(id);
     if (exactStop) return exactStop;
     
     const baseId = id.split('-')[0];
-    const baseStop = allStops.find(s => s.id.startsWith(baseId + '-'));
+    const baseStop = stopsByBaseIdMap?.get(baseId);
     if (baseStop) return baseStop;
     
     return { id, name: id, lat: 0, lng: 0 }; // Fallback
@@ -819,8 +844,106 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
   return destinationMatches[0];
 }
 
+/**
+ * Computes an ETA (in minutes) from the vehicle's GPS position to a target stop.
+ *
+ * Strategy:
+ * - GPS-path ETA: sum distances along route stops -> vehicle -> target, divide by speed
+ * - API schedule ETA: the `arrival.minutes` already adjusted by realtime data
+ * - Blend: weight towards GPS when vehicle is confirmed approaching, API when no GPS
+ */
+export async function computeEtaToStop(
+  arrival: Arrival,
+  stop: Stop
+): Promise<{ etaMinutes: number; source: 'gps' | 'schedule' | 'blended' }> {
+  const scheduleEta = arrival.minutes; // Fallback: peatus.ee realtime/scheduled minutes
+  
+  // 1. Try to find the matching vehicle on the map
+  const vehicle = await getVehicleForArrival(arrival, stop);
+  if (!vehicle) {
+    return { etaMinutes: scheduleEta, source: 'schedule' };
+  }
+  
+  // 2. Get the ordered route stops for this vehicle
+  const routeStops = await getRouteStopsForVehicle(vehicle, arrival.destination);
+  if (routeStops.length === 0) {
+    return { etaMinutes: scheduleEta, source: 'schedule' };
+  }
+  
+  // 3. Find the vehicle's closest stop index on the route
+  let vehicleClosestIdx = -1;
+  let minVehicleDist = Infinity;
+  for (let i = 0; i < routeStops.length; i++) {
+    const d = getDistance(vehicle.lat, vehicle.lng, routeStops[i].lat, routeStops[i].lng);
+    if (d < minVehicleDist) {
+      minVehicleDist = d;
+      vehicleClosestIdx = i;
+    }
+  }
+  
+  // 4. Find the target stop index on the route
+  let targetIdx = routeStops.findIndex(s => s.id === stop.id);
+  if (targetIdx === -1) {
+    const baseId = stop.id.split('-')[0];
+    targetIdx = routeStops.findIndex(s => s.id.split('-')[0] === baseId);
+  }
+  
+  if (vehicleClosestIdx === -1 || targetIdx === -1 || vehicleClosestIdx >= targetIdx) {
+    // Vehicle has already passed the stop, or can't resolve position — fall back to sched
+    return { etaMinutes: scheduleEta, source: 'schedule' };
+  }
+  
+  // 5. Compute path distance: vehicle -> closest stop -> ... -> target stop
+  // First leg: vehicle to its closest stop (partial segment)
+  let totalDistKm = getDistance(vehicle.lat, vehicle.lng, routeStops[vehicleClosestIdx].lat, routeStops[vehicleClosestIdx].lng);
+  
+  // Middle legs: stop-to-stop along the route
+  for (let i = vehicleClosestIdx; i < targetIdx; i++) {
+    totalDistKm += getDistance(
+      routeStops[i].lat, routeStops[i].lng,
+      routeStops[i + 1].lat, routeStops[i + 1].lng
+    );
+  }
+  
+  // 6. Estimate speed
+  // Use the vehicle's GPS speed if meaningful, else use type-based defaults
+  const AVG_SPEED_KMH: Record<string, number> = {
+    tram: 15,
+    trolley: 20,
+    bus: 22,
+    regional: 45,
+    train: 60,
+  };
+  
+  const speedKmh = AVG_SPEED_KMH[vehicle.type] ?? 22;
+  
+  // 7. GPS-derived ETA
+  const gpsEtaMinutes = (totalDistKm / speedKmh) * 60;
+  
+  // 8. Blend: how many stops away is the vehicle?
+  const stopsAway = targetIdx - vehicleClosestIdx;
+  
+  // Trust GPS more when vehicle is close (1-3 stops away),
+  // blend equally when 4-6 stops, lean on schedule beyond that.
+  let gpsWeight: number;
+  if (stopsAway <= 2) {
+    gpsWeight = 0.85;
+  } else if (stopsAway <= 5) {
+    gpsWeight = 0.60;
+  } else {
+    gpsWeight = 0.35;
+  }
+  
+  const blendedEta = gpsWeight * gpsEtaMinutes + (1 - gpsWeight) * scheduleEta;
+  const finalEta = Math.max(0, Math.round(blendedEta));
+  
+  const source = gpsWeight >= 0.75 ? 'gps' : 'blended';
+  return { etaMinutes: finalEta, source };
+}
+
 export async function fetchDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
   try {
+    const nowSeconds = Math.floor(Date.now() / 1000);
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
     const gtfsId = `estonia:${targetId}`;
 
@@ -830,7 +953,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       {
         stop(id: "${gtfsId}") {
           name
-          stoptimesWithoutPatterns(numberOfDepartures: ${numberOfDepartures}) {
+          stoptimesWithoutPatterns(numberOfDepartures: ${numberOfDepartures}, startTime: ${nowSeconds - 180}) {
             scheduledDeparture
             realtimeDeparture
             realtime
@@ -861,7 +984,6 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || [];
 
     const arrivals: Arrival[] = [];
-    const nowSeconds = Math.floor(Date.now() / 1000);
 
     for (const st of stoptimes) {
       const modeStr = st.trip?.route?.mode?.toLowerCase() || 'bus';
@@ -881,23 +1003,30 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       const line = st.trip?.route?.shortName || '';
       const destination = st.headsign || '';
 
-      // Calculate time — use ?? so realtimeDeparture=0 (midnight) isn't dropped
+      // Calculate time
+      const departureTimeSeconds = st.serviceDay + (st.realtimeDeparture || st.scheduledDeparture);
+      const diffSeconds = departureTimeSeconds - nowSeconds;
       const isRealTime = st.realtime === true;
-      const departureTimeSeconds = st.serviceDay + (st.realtimeDeparture ?? st.scheduledDeparture);
-      let minutes = Math.floor((departureTimeSeconds - nowSeconds) / 60);
-
-      // Scheduled-only trips may be running late — give a 10-min grace period.
-      // Real-time trips have accurate data so a 2-min grace is enough.
-      const gracePeriod = isRealTime ? 2 : 10;
-      if (minutes < -gracePeriod) continue;
-      if (minutes < 0) minutes = 0;
-
+      
+      // If it's marked as departed or canceled, skip
+      if (st.realtimeState === 'DEPARTED' || st.realtimeState === 'CANCELED') continue;
+      
+      // If it's real-time, trust the DEPARTED state mostly, but drop if it's extremely stale (e.g., > 3 mins past)
+      if (isRealTime && diffSeconds < -180) continue;
+      
+      // If it's scheduled (not real-time), drop if it's > 1 min past scheduled time
+      if (!isRealTime && diffSeconds < -60) continue;
+      
+      // Clamp negative minutes to 0 so buses just departing show as "Now"
+      let minutes = Math.max(0, Math.floor(diffSeconds / 60));
+      
       const depDate = new Date(departureTimeSeconds * 1000);
       const hours = String(depDate.getHours()).padStart(2, '0');
       const mins = String(depDate.getMinutes()).padStart(2, '0');
       const timeStr = `${hours}:${mins}`;
 
       let status: 'on-time' | 'delayed' | 'expected' | 'departed' = 'expected';
+      
       if (isRealTime) {
         if (st.realtimeState === 'UPDATED' && st.realtimeDeparture > st.scheduledDeparture + 60) {
           status = 'delayed';
@@ -913,7 +1042,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
         minutes,
         time: timeStr,
         status,
-        info: isRealTime ? undefined : 'Scheduled'
+        isRealtime: isRealTime
       });
     }
 
@@ -932,139 +1061,33 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       a.vehicleIndex = counts[key];
     });
 
+    // Compute ETA for all arrivals
+    await fetchStops(); // Ensure stops and maps are loaded
+    let targetStop = stopsByIdMap?.get(stopId);
+    if (!targetStop && siriId) {
+      // Fallback to searching by siriId if not found by id
+      const allStops = await fetchStops();
+      targetStop = allStops.find(s => s.siriId === siriId);
+    }
+    
+    if (targetStop) {
+      await Promise.all(arrivals.map(async (arrival) => {
+        const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
+        arrival.minutes = etaMinutes;
+        if (source === 'gps') {
+          arrival.info = 'Live GPS';
+        } else if (source === 'blended') {
+          arrival.info = 'GPS + Schedule';
+        }
+      }));
+    }
+
+    // Re-sort by updated minutes
+    arrivals.sort((a, b) => a.minutes - b.minutes);
+
     return arrivals.slice(0, time === '0' ? 50 : 10);
   } catch (error) {
     console.error('Error fetching departures from peatus.ee:', error);
     return [];
   }
-}
-
-/**
- * Fetches live vehicle positions from Tartu city bus API (Ridango).
- * Endpoint: https://wmb-public-api-tartu.eu-prod.ridango.cloud/tenant/7/v1/vehicle-positions
- */
-async function fetchTartuVehicles(): Promise<Vehicle[]> {
-  const BASE = 'https://wmb-public-api-tartu.eu-prod.ridango.cloud/tenant/7';
-  const CANDIDATE_PATHS = [
-    '/v1/vehicles',
-    '/v2/vehicle-positions',
-    '/v1/vehicles/positions',
-    '/v1/vehicle-monitoring',
-    '/v2/vehicles',
-  ];
-  const headers = {
-    'Origin': 'https://www.tartulinnaliin.ee',
-    'Referer': 'https://www.tartulinnaliin.ee/',
-    'Accept': 'application/json',
-  };
-
-  if (!Capacitor.isNativePlatform()) return [];
-
-  try {
-    let data: any;
-    let foundUrl = '';
-
-    for (const path of CANDIDATE_PATHS) {
-      const url = BASE + path;
-      const response = await CapacitorHttp.get({ url, headers, connectTimeout: 6000, readTimeout: 6000 });
-      console.log(`Tartu probe ${path}: ${response.status}`);
-      if (response.status === 200) {
-        const rawStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-        console.log(`Tartu API FOUND at ${path}: ${rawStr.substring(0, 300)}`);
-        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-        foundUrl = url;
-        break;
-      }
-    }
-
-    if (!data) return [];
-
-    // Ridango returns array of vehicle position objects
-    const items: any[] = Array.isArray(data) ? data : (data.vehicles || data.data || data.features || []);
-    console.log(`Tartu API items count: ${items.length}, sample: ${JSON.stringify(items[0]).substring(0, 300)}`);
-    const vehicles: Vehicle[] = [];
-
-    for (const item of items) {
-      // Support both flat and nested GeoJSON-style responses
-      const props = item.properties || item;
-      const coords = item.geometry?.coordinates;
-      const lat = coords ? coords[1] : (props.latitude ?? props.lat);
-      const lng = coords ? coords[0] : (props.longitude ?? props.lng);
-
-      if (!lat || !lng) continue;
-
-      const line = String(props.line_name || props.lineName || props.route_short_name || props.line || '');
-      const bearing = Number(props.bearing || props.heading || props.direction || 0);
-      const speed = Number(props.speed || 0);
-      const destination = String(props.destination || props.trip_headsign || props.headsign || '');
-      const vehicleId = String(props.vehicle_id || props.vehicleId || props.id || item.id || '');
-
-      if (!line || !vehicleId) continue;
-
-      vehicles.push({
-        id: `tartu_${vehicleId}`,
-        type: 'bus',
-        line,
-        lat: Number(lat),
-        lng: Number(lng),
-        bearing,
-        speed,
-        destination,
-      });
-    }
-
-    console.log(`Tartu vehicles fetched: ${vehicles.length}`);
-    return vehicles;
-  } catch (err) {
-    console.error('Error fetching Tartu vehicles:', err);
-    return [];
-  }
-}
-
-/**
- * Improves scheduled (non-realtime) arrival times using live vehicle positions.
- * For each unconfirmed arrival, finds a matching vehicle heading toward the stop
- * and replaces the scheduled ETA with a distance-based estimate.
- */
-export function adjustArrivalsWithVehicles(
-  arrivals: Arrival[],
-  vehicles: Vehicle[],
-  stop: Stop
-): Arrival[] {
-  return arrivals.map(arrival => {
-    if (arrival.status !== 'expected') return arrival; // already has real-time data
-
-    const matching = vehicles.filter(v => v.line === arrival.line);
-    if (matching.length === 0) return arrival;
-
-    let bestEta: number | null = null;
-
-    for (const v of matching) {
-      // Skip vehicles with unknown bearing (bearing=0 and not moving means no direction data)
-      if (v.bearing === 0 && (!v.speed || v.speed < 1)) continue;
-
-      const distKm = getDistance(v.lat, v.lng, stop.lat, stop.lng);
-      const distM = distKm * 1000;
-      if (distM > 5000) continue; // ignore vehicles more than 5km away
-
-      // Check vehicle is heading roughly toward the stop (within ±90°)
-      const bearingToStop = getBearing(v.lat, v.lng, stop.lat, stop.lng);
-      const diff = Math.abs(((v.bearing - bearingToStop) + 180) % 360 - 180);
-      if (diff > 90) continue;
-
-      // ETA: use reported speed or default 20 km/h city speed
-      const speedMps = (v.speed && v.speed > 1) ? v.speed : (20000 / 3600);
-      const etaMinutes = Math.max(1, Math.round(distM / speedMps / 60));
-
-      if (bestEta === null || etaMinutes < bestEta) bestEta = etaMinutes;
-    }
-
-    // Update ETA when GPS gives a better estimate — including when bus is running late
-    // (schedule says "Now" but GPS shows bus is still several minutes away)
-    if (bestEta !== null && (bestEta !== arrival.minutes)) {
-      return { ...arrival, minutes: bestEta, status: 'on-time' as const };
-    }
-
-    return arrival;
-  });
 }
