@@ -2,10 +2,12 @@ const SETTINGS_KEY = 'tallinn_go_settings';
 
 export interface AppSettings {
   alarmSound: string;
+  showDailyFact: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   alarmSound: 'default',
+  showDailyFact: true,
 };
 
 export const ALARM_SOUNDS = [

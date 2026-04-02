@@ -13,7 +13,8 @@ import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { NotificationSelector } from '../components/NotificationSelector';
 import { ActiveAlerts } from '../components/ActiveAlerts';
 import { AnimatePresence } from 'motion/react';
-import { getDailyFact } from '../services/dailyFactService';
+import { getDailyFact, dismissDailyFact } from '../services/dailyFactService';
+import { getSettings } from '../services/settingsService';
 
 export const Dashboard = () => {
   const [closestStop, setClosestStop] = useState(null as Stop | null);
@@ -24,6 +25,8 @@ export const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null as string | null);
   const [showAllFavs, setShowAllFavs] = useState(false);
+  const dailyFact = getDailyFact();
+  const [factDismissed, setFactDismissed] = useState(dailyFact.dismissed);
   
   const [expandedNearby, setExpandedNearby] = useState(null as string | null);
   const [nearbyDepartures, setNearbyDepartures] = useState({} as { [key: string]: Arrival[] });
@@ -314,12 +317,23 @@ export const Dashboard = () => {
 
       {/* Hero Section: Stop Identity */}
       {/* Daily Fact */}
-      <section className="mb-8">
-        <div className="px-4 py-3 bg-surface-container-lowest editorial-shadow rounded-[20px] border-l-2 border-primary/30">
-          <p className="font-label text-[9px] font-bold uppercase tracking-widest text-primary/50 mb-1">Did you know?</p>
-          <p className="font-body text-[11px] text-secondary leading-relaxed">{getDailyFact()}</p>
-        </div>
-      </section>
+      {getSettings().showDailyFact && !factDismissed && (
+        <section className="mb-8">
+          <div className="px-4 py-3 bg-surface-container-lowest editorial-shadow rounded-[20px] border-l-2 border-primary/30 flex items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="font-label text-[9px] font-bold uppercase tracking-widest text-primary/50 mb-1">Did you know?</p>
+              <p className="font-body text-[11px] text-secondary leading-relaxed">{dailyFact.text}</p>
+            </div>
+            <button
+              onClick={() => { dismissDailyFact(); setFactDismissed(true); }}
+              className="shrink-0 mt-0.5 p-1 rounded-full text-secondary/40 hover:text-secondary transition-colors active:scale-90"
+              aria-label="Dismiss"
+            >
+              <CloseIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="mb-10">
         <div className="flex justify-between items-start">

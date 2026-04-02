@@ -106,25 +106,41 @@ const FACTS = [
 interface StoredFact {
   date: string; // YYYY-MM-DD
   index: number;
+  dismissed?: boolean;
 }
 
-export function getDailyFact(): string {
-  const today = new Date().toISOString().slice(0, 10);
+function getToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function getDailyFact(): { text: string; dismissed: boolean } {
+  const today = getToday();
   try {
     const stored = localStorage.getItem(FACTS_KEY);
     if (stored) {
       const parsed: StoredFact = JSON.parse(stored);
       if (parsed.date === today) {
-        return FACTS[parsed.index];
+        return { text: FACTS[parsed.index], dismissed: !!parsed.dismissed };
       }
     }
-    // Pick a new random fact for today
+    // New day — pick a fresh random fact, not dismissed
     const index = Math.floor(Math.random() * FACTS.length);
-    localStorage.setItem(FACTS_KEY, JSON.stringify({ date: today, index }));
-    return FACTS[index];
+    localStorage.setItem(FACTS_KEY, JSON.stringify({ date: today, index, dismissed: false }));
+    return { text: FACTS[index], dismissed: false };
   } catch {
-    return FACTS[0];
+    return { text: FACTS[0], dismissed: false };
   }
+}
+
+export function dismissDailyFact(): void {
+  const today = getToday();
+  try {
+    const stored = localStorage.getItem(FACTS_KEY);
+    if (stored) {
+      const parsed: StoredFact = JSON.parse(stored);
+      localStorage.setItem(FACTS_KEY, JSON.stringify({ ...parsed, date: today, dismissed: true }));
+    }
+  } catch { /* ignore */ }
 }
 
 export const FACTS_COUNT = FACTS.length;
