@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { cn, formatDistance, formatWalkingTime, getStopColorClass } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleColorClass } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
 import { getFavorites, isFavorite, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
-import { ArrivalItem } from '../components/ArrivalItem';
+import { ArrivalItem, getLiveMinutes } from '../components/ArrivalItem';
 import { Stop, Arrival } from '../types';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { NotificationSelector } from '../components/NotificationSelector';
@@ -136,11 +136,12 @@ export const Dashboard = () => {
     })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
     const nearest = sorted[0];
+    const nearby = sorted.slice(1, 4);
     
     // Only update departures if the closest stop actually changed
     if (!closestStop || nearest.id !== closestStop.id) {
       setClosestStop(nearest);
-      setNearbyStops(sorted.slice(1, 4));
+      setNearbyStops(nearby);
       setLoading(true);
       
       fetchDepartures(nearest.id, nearest.siriId).then(deps => {
@@ -149,10 +150,35 @@ export const Dashboard = () => {
       }).catch(() => {
         setLoading(false);
       });
+
+      nearby.forEach(stop => {
+        setNearbyLoading(prev => ({ ...prev, [stop.id]: true }));
+        fetchDepartures(stop.id, stop.siriId).then(deps => {
+          setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
+        }).catch(err => console.error(err))
+        .finally(() => setNearbyLoading(prev => ({ ...prev, [stop.id]: false })));
+      });
     } else {
       // Just update distance
       setClosestStop(nearest);
-      setNearbyStops(sorted.slice(1, 4));
+      
+      // If nearby stops changed, fetch for the new ones
+      const oldNearbyIds = nearbyStops.map(s => s.id).join(',');
+      const newNearbyIds = nearby.map(s => s.id).join(',');
+      
+      if (oldNearbyIds !== newNearbyIds) {
+        nearby.forEach(stop => {
+          if (!nearbyStops.some(s => s.id === stop.id)) {
+            setNearbyLoading(prev => ({ ...prev, [stop.id]: true }));
+            fetchDepartures(stop.id, stop.siriId).then(deps => {
+              setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
+            }).catch(err => console.error(err))
+            .finally(() => setNearbyLoading(prev => ({ ...prev, [stop.id]: false })));
+          }
+        });
+      }
+      
+      setNearbyStops(nearby);
     }
   }, [userLocation, allStops]);
 
@@ -220,21 +246,26 @@ export const Dashboard = () => {
         }).catch(err => console.error("Failed to refresh closest stop departures", err));
       }
 
-      // Refresh expanded nearby stop or favorite
-      if (expandedNearby) {
-        const stop = allStops.find(s => s.id === expandedNearby) || favorites.find(f => f.id === expandedNearby);
+      // Refresh nearby stops
+      nearbyStops.forEach(stop => {
+        fetchDepartures(stop.id, stop.siriId).then(deps => {
+          setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
+        }).catch(err => console.error("Failed to refresh nearby departures", err));
+      });
+
+      // Refresh expanded favorite
+      if (expandedNearby && !nearbyStops.some(s => s.id === expandedNearby)) {
+        const stop = favorites.find(f => f.id === expandedNearby);
         if (stop) {
           fetchDepartures(stop.id, stop.siriId).then(deps => {
-            // Favorites show 3, nearby show 6
-            const isFav = favorites.some(f => f.id === stop.id);
-            setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, isFav ? 3 : 6) }));
-          }).catch(err => console.error("Failed to refresh nearby departures", err));
+            setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 3) }));
+          }).catch(err => console.error("Failed to refresh favorite departures", err));
         }
       }
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [closestStop, expandedNearby, allStops, favorites]);
+  }, [closestStop, expandedNearby, allStops, favorites, nearbyStops]);
 
   const handleSaveEdit = () => {
     if (editingFav) {
@@ -526,6 +557,34 @@ export const Dashboard = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Inline departure preview (always visible) */}
+                {!expandedNearby || expandedNearby !== stop.id ? (
+                  nearbyLoading[stop.id] ? (
+                    <div className="flex items-center gap-2 px-4 pb-3">
+                      <Loader2 className="w-3 h-3 animate-spin text-secondary/40" />
+                      <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
+                    </div>
+                  ) : nearbyDepartures[stop.id]?.length > 0 ? (
+                    <div className="px-4 pb-3 pt-1 grid grid-cols-2 gap-2">
+                      {nearbyDepartures[stop.id].slice(0, 2).map((arr, i) => (
+                        <div key={i} className="min-w-0 flex items-center justify-between py-1.5 bg-surface-container-high/50 px-2.5 rounded-lg">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={cn("h-5 w-5 rounded-full flex items-center justify-center font-label font-bold text-[9px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
+                              {arr.line}
+                            </div>
+                            <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
+                              {arr.destination}
+                            </span>
+                          </div>
+                          <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1.5", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
+                            {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? 'Now' : (arr.time ?? `${getLiveMinutes(arr)}m`)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null
+                ) : null}
 
                 {/* Expanded Nearby Departures */}
                 {expandedNearby === stop.id && (

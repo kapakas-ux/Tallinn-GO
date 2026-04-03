@@ -1,17 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Stop } from '../types';
+import { Stop, Vehicle } from '../types';
+import { cn } from '../lib/utils';
 
 interface VehicleMapProps {
   routeStops: Stop[];
   targetStop?: Stop;
+  vehicle?: Vehicle;
 }
 
-export const VehicleMap = ({ routeStops, targetStop }: VehicleMapProps) => {
+export const VehicleMap = ({ routeStops, targetStop, vehicle }: VehicleMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const stopMarkers = useRef<maplibregl.Marker[]>([]);
+  const vehicleMarker = useRef<maplibregl.Marker | null>(null);
   const isFirstFit = useRef(true);
   const [isMapReady, setIsMapReady] = React.useState(false);
 
@@ -185,6 +188,22 @@ export const VehicleMap = ({ routeStops, targetStop }: VehicleMapProps) => {
       }
     }
   }, [routeStops, targetStop, isMapReady]);
+
+  // Handle vehicle marker
+  useEffect(() => {
+    if (!isMapReady || !map.current || !vehicle) return;
+
+    if (!vehicleMarker.current) {
+      const el = document.createElement('div');
+      el.className = 'w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-md z-30';
+      
+      vehicleMarker.current = new maplibregl.Marker({ element: el })
+        .setLngLat([vehicle.lng, vehicle.lat])
+        .addTo(map.current);
+    } else {
+      vehicleMarker.current.setLngLat([vehicle.lng, vehicle.lat]);
+    }
+  }, [vehicle, isMapReady]);
 
   return <div ref={mapContainer} className="w-full h-full rounded-xl overflow-hidden" />;
 };

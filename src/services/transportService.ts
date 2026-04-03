@@ -258,12 +258,49 @@ export async function fetchStops(): Promise<Stop[]> {
       
       console.log(`fetchStops: received ${rawStops.length} stops from peatus.ee`);
       
+      // Fetch Tallinn stops.txt to get correct SiriIDs
+      const siriIdMap = new Map<string, string>();
+      try {
+        const url = Capacitor.isNativePlatform() 
+          ? `https://transport.tallinn.ee/data/stops.txt?t=${Date.now()}`
+          : `${API_BASE}/api/transport/stops`;
+        const text = await universalFetch(url);
+        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+        if (lines.length > 0) {
+          let delim = ';';
+          if (lines[0].includes(';')) delim = ';';
+          else if (lines[0].includes(',')) delim = ',';
+          
+          const header = lines[0].split(delim).map(h => h.trim().toUpperCase());
+          const idIdx = header.indexOf('ID');
+          const siriIdx = header.indexOf('SIRIID');
+          
+          if (idIdx >= 0 && siriIdx >= 0) {
+            for (let i = 1; i < lines.length; i++) {
+              const parts = lines[i].split(delim).map(p => p.trim());
+              const id = parts[idIdx];
+              const siriId = parts[siriIdx];
+              if (id && siriId) {
+                siriIdMap.set(id, siriId);
+                const normId = id.replace(/^0+/, '');
+                if (normId && normId !== id) siriIdMap.set(normId, siriId);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching stops.txt for SiriIDs:', e);
+      }
+      
       const stops: Stop[] = [];
       
       for (const raw of rawStops) {
         const gtfsId = raw.gtfsId.replace('estonia:', '');
         const internalId = raw.code || gtfsId;
-        const siriId = gtfsId !== '0' ? gtfsId : undefined;
+        
+        // Use SiriID from stops.txt if available, otherwise fallback to gtfsId
+        const siriId = siriIdMap.get(internalId) || siriIdMap.get(internalId.replace(/^0+/, '')) || (gtfsId !== '0' ? gtfsId : undefined);
+        
         const name = raw.name;
         const lat = raw.lat;
         const lng = raw.lon;
@@ -356,6 +393,7 @@ export async function fetchStops(): Promise<Stop[]> {
         stops.push({
           id: internalId,
           siriId: siriId,
+          gtfsId: gtfsId,
           name: name,
           lat: lat,
           lng: lng,
@@ -958,11 +996,19 @@ export async function computeEtaToStop(
   return { etaMinutes: finalEta, source };
 }
 
-export async function fetchDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
+async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
   try {
     const nowSeconds = Math.floor(Date.now() / 1000);
-    const targetId = siriId && siriId !== '0' ? siriId : stopId;
-    const gtfsId = `estonia:${targetId}`;
+    
+    // Find the stop to get its real gtfsId
+    await fetchStops();
+    let gtfsId = `estonia:${stopId}`;
+    if (stopsByIdMap) {
+      const stop = stopsByIdMap.get(stopId);
+      if (stop && stop.gtfsId) {
+        gtfsId = `estonia:${stop.gtfsId}`;
+      }
+    }
 
     const numberOfDepartures = time === '0' ? 50 : 15;
 
@@ -1017,6 +1063,11 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
         }
       }
 
+      // ONLY return regional and train from peatus.ee to avoid duplicates with SIRI
+      if (type !== 'regional' && type !== 'train') {
+        continue;
+      }
+
       const line = st.trip?.route?.shortName || '';
       const destination = st.headsign || '';
 
@@ -1064,6 +1115,99 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       });
     }
 
+    return arrivals;
+  } catch (error) {
+    console.error('Error fetching peatus departures:', error);
+    return [];
+  }
+}
+
+export async function fetchDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
+  try {
+    const targetId = siriId && siriId !== '0' ? siriId : stopId;
+    const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
+    
+    let arrivals: Arrival[] = [];
+    
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const text = await response.text();
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        
+        if (lines.length > 2) {
+          // Header is usually: Transport,RouteNum,ExpectedTimeInSeconds,ScheduleTimeInSeconds,ServerTime,version...
+          const headerParts = lines[0].split(',');
+          const serverTimeSeconds = parseInt(headerParts[4], 10);
+          
+          for (let i = 2; i < lines.length; i++) {
+            const parts = lines[i].split(',');
+            if (parts.length < 5) continue;
+            
+            const typeStr = parts[0].toLowerCase();
+            let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
+            if (typeStr === 'tram') type = 'tram';
+            else if (typeStr === 'trolley') type = 'trolley';
+            else if (typeStr === 'train' || typeStr === 'rail') type = 'train';
+            else if (typeStr === 'regional') type = 'regional';
+            
+            const line = parts[1];
+            const expectedTime = parseInt(parts[2], 10);
+            const scheduledTime = parseInt(parts[3], 10);
+            const destination = parts[4];
+            
+            // Calculate minutes
+            let diffSeconds = expectedTime - serverTimeSeconds;
+            
+            // Handle midnight wrap-around
+            if (diffSeconds < -43200) diffSeconds += 86400;
+            if (diffSeconds > 43200) diffSeconds -= 86400;
+            
+            // Skip departed
+            if (diffSeconds < -60) continue;
+            
+            const minutes = Math.max(0, Math.floor(diffSeconds / 60));
+            
+            // Calculate time string
+            const hours = Math.floor(expectedTime / 3600) % 24;
+            const mins = Math.floor((expectedTime % 3600) / 60);
+            const timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+            
+            const isRealTime = expectedTime !== scheduledTime;
+            let status: 'on-time' | 'delayed' | 'expected' | 'departed' = 'expected';
+            
+            if (isRealTime) {
+              if (expectedTime > scheduledTime + 60) {
+                status = 'delayed';
+              } else {
+                status = 'on-time';
+              }
+            }
+            
+            const nowUnixSeconds = Math.floor(Date.now() / 1000);
+            const departureTimeSeconds = nowUnixSeconds + diffSeconds;
+            
+            arrivals.push({
+              line,
+              destination,
+              type,
+              minutes,
+              departureTimeSeconds,
+              time: timeStr,
+              status,
+              isRealtime: isRealTime
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching SIRI departures:', e);
+    }
+    
+    // Fetch regional/train departures from peatus.ee
+    const peatusArrivals = await fetchPeatusDepartures(stopId, siriId, time);
+    arrivals = [...arrivals, ...peatusArrivals];
+    
     // Sort by minutes ascending
     arrivals.sort((a, b) => a.minutes - b.minutes);
 
@@ -1079,12 +1223,33 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       a.vehicleIndex = counts[key];
     });
 
+    // Compute ETA for all arrivals
+    await fetchStops(); // Ensure stops and maps are loaded
+    let targetStop = stopsByIdMap?.get(stopId);
+    if (!targetStop && siriId) {
+      // Fallback to searching by siriId if not found by id
+      const allStops = await fetchStops();
+      targetStop = allStops.find(s => s.siriId === siriId);
+    }
+    
+    if (targetStop) {
+      await Promise.all(arrivals.map(async (arrival) => {
+        const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
+        arrival.minutes = etaMinutes;
+        if (source === 'gps') {
+          arrival.info = 'Live GPS';
+        } else if (source === 'blended') {
+          arrival.info = 'GPS + Schedule';
+        }
+      }));
+    }
+
     // Re-sort by updated minutes
     arrivals.sort((a, b) => a.minutes - b.minutes);
 
     return arrivals.slice(0, time === '0' ? 50 : 10);
   } catch (error) {
-    console.error('Error fetching departures from peatus.ee:', error);
+    console.error('Error fetching departures:', error);
     return [];
   }
 }

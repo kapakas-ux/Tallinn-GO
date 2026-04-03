@@ -565,7 +565,7 @@ export const Map = () => {
           departuresHtml = departures.map(d => {
             const liveMins = (d as any).departureTimeSeconds ? Math.max(0, Math.floor(((d as any).departureTimeSeconds - Date.now() / 1000) / 60)) : d.minutes;
             const isScheduled = isAlertActive(id, d.line, d.minutes);
-            const showAlarm = liveMins > 5 && d.status !== 'departed';
+            const showAlarm = liveMins >= 15 && d.status !== 'departed';
             
             return `
               <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0 relative">
@@ -586,9 +586,8 @@ export const Map = () => {
                     </button>
                   ` : ''}
                   <div class="text-right flex items-baseline gap-1">
-                    ${d.isRealtime ? '<div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center"></div>' : ''}
-                    <span class="font-headline font-black text-lg text-primary">
-                      ${(() => { const depSec = (d as any).departureTimeSeconds; const m = depSec ? Math.max(0, Math.floor((depSec - Date.now() / 1000) / 60)) : d.minutes; return m <= 1 ? 'Now' : (d.time ?? m + ' min'); })()}
+                    <span class="font-headline font-black text-lg text-primary flex items-baseline gap-1">
+                      ${(() => { const depSec = (d as any).departureTimeSeconds; const m = depSec ? Math.max(0, Math.floor((depSec - Date.now() / 1000) / 60)) : d.minutes; return m <= 1 ? 'Now' : (m <= 59 ? m + '<span class="text-xs font-medium ' + (d.isRealtime ? 'text-emerald-500 animate-pulse' : 'text-secondary') + '">min</span>' : (d.time ?? m + '<span class="text-xs font-medium ' + (d.isRealtime ? 'text-emerald-500 animate-pulse' : 'text-secondary') + '">min</span>')); })()}
                     </span>
                   </div>
                 </div>
@@ -840,7 +839,7 @@ export const Map = () => {
                     {selectedVehicle.vehicle.destination || 'Unknown Destination'}
                   </h3>
                   <p className="font-label text-xs text-secondary font-bold uppercase tracking-widest mt-0.5">
-                    {selectedVehicle.vehicle.type}{selectedVehicle.vehicle.speed ? ` • ${Math.round(selectedVehicle.vehicle.speed)} km/h` : ''}
+                    {selectedVehicle.vehicle.type}{selectedVehicle.vehicle.speed && selectedVehicle.vehicle.speed > 0 ? ` • ${Math.round(selectedVehicle.vehicle.speed)} km/h` : ''}
                   </p>
                 </div>
               </div>
@@ -854,7 +853,7 @@ export const Map = () => {
 
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
               <div className="h-48 rounded-xl overflow-hidden bg-surface-container relative shrink-0">
-                <VehicleMap routeStops={selectedVehicle.routeStops} targetStop={selectedVehicle.routeStops[0]} />
+                <VehicleMap routeStops={selectedVehicle.routeStops} targetStop={selectedVehicle.routeStops[0]} vehicle={selectedVehicle.vehicle} />
               </div>
               
               <div className="flex flex-col gap-2">

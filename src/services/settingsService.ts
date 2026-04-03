@@ -3,11 +3,13 @@ const SETTINGS_KEY = 'tallinn_go_settings';
 export interface AppSettings {
   alarmSound: string;
   showDailyFact: boolean;
+  favoritesFirst: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   alarmSound: 'default',
   showDailyFact: true,
+  favoritesFirst: false,
 };
 
 export const ALARM_SOUNDS = [
@@ -32,6 +34,7 @@ export function saveSettings(settings: Partial<AppSettings>): void {
   try {
     const current = getSettings();
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...current, ...settings }));
+    window.dispatchEvent(new Event('settings_changed'));
   } catch (e) {
     console.warn('Failed to save settings', e);
   }
