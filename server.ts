@@ -279,8 +279,14 @@ async function startServer() {
               const schedTime = new Date(d.scheduled_time || d.expected_time);
               const scheduledTimeUnix = Math.floor(schedTime.getTime() / 1000);
               
+              // Clean up route code (sometimes it's like "6.486")
+              let line = d.route_code || '';
+              if (line.includes('.')) {
+                line = line.split('.')[0];
+              }
+              
               // Format: type, line, expectedTime, scheduledTime, destination
-              siriText += `${type},${d.route_code || ''},${expectedTimeUnix},${scheduledTimeUnix},${d.destination || ''}\n`;
+              siriText += `${type},${line},${expectedTimeUnix},${scheduledTimeUnix},${d.destination || ''}\n`;
             });
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(siriText);
@@ -308,8 +314,14 @@ async function startServer() {
               const schedTime = new Date(d.scheduled_time || d.expected_time);
               const scheduledTimeUnix = Math.floor(schedTime.getTime() / 1000);
               
+              // Clean up route code
+              let line = d.route_code || '';
+              if (line.includes('.')) {
+                line = line.split('.')[0];
+              }
+              
               // Format: type, line, expectedTime, scheduledTime, destination
-              siriText += `${type},${d.route_code || ''},${expectedTimeUnix},${scheduledTimeUnix},${d.destination || ''}\n`;
+              siriText += `${type},${line},${expectedTimeUnix},${scheduledTimeUnix},${d.destination || ''}\n`;
             });
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(siriText);

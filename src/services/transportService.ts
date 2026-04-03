@@ -247,13 +247,27 @@ export async function fetchStops(): Promise<Stop[]> {
     
     try {
       console.log('Fetching stops from peatus.ee GraphQL API...');
-      const response = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: '{ stops { gtfsId name lat lon code desc zoneId parentStation { name } routes { mode } } }' })
-      });
+      const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+      const query = '{ stops { gtfsId name lat lon code desc zoneId parentStation { name } routes { mode } } }';
       
-      const data = await response.json();
+      let text = '';
+      if (Capacitor.isNativePlatform()) {
+        const response = await CapacitorHttp.post({
+          url,
+          headers: { 'Content-Type': 'application/json' },
+          data: { query }
+        });
+        text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+      } else {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        text = await response.text();
+      }
+      
+      const data = JSON.parse(text);
       const rawStops = data.data.stops;
       
       console.log(`fetchStops: received ${rawStops.length} stops from peatus.ee`);
@@ -485,21 +499,12 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
-  let data;
-  
-  if (Capacitor.isNativePlatform()) {
-    const url = 'https://gis.ee/tallinn/gps.php';
-    const responseText = await universalFetch(url);
-    data = JSON.parse(responseText);
-  } else {
-    // Use our backend proxy for web
-    const url = `${API_BASE}/api/transport/vehicles`;
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error(`gis.ee API error via proxy: ${response.status}`);
-    }
-    data = await response.json();
-  }
+  const url = Capacitor.isNativePlatform()
+    ? 'https://gis.ee/tallinn/gps.php'
+    : `${API_BASE}/api/transport/vehicles`;
+    
+  const responseText = await universalFetch(url);
+  const data = JSON.parse(responseText);
   const features = data?.features || [];
 
   const vehicles: Vehicle[] = [];
@@ -1037,13 +1042,34 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       }
     `;
 
-    const response = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    });
+    console.log(`fetchPeatusDepartures: Fetching for ${gtfsId}`);
+    
+    // Use universalFetch for Peatus API too, but we need to handle GraphQL POST
+    // Actually, universalFetch currently only supports GET. 
+    // Let's modify universalFetch to support options or just use a proxy for Peatus too.
+    // For now, let's use a proxy endpoint if possible, or just keep fetch but wrap it.
+    // Actually, CapacitorHttp supports POST.
+    
+    const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+    let text = '';
+    
+    if (Capacitor.isNativePlatform()) {
+      const response = await CapacitorHttp.post({
+        url,
+        headers: { 'Content-Type': 'application/json' },
+        data: { query }
+      });
+      text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    } else {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      text = await response.text();
+    }
 
-    const data = await response.json();
+    const data = JSON.parse(text);
     const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || [];
 
     const arrivals: Arrival[] = [];
@@ -1130,15 +1156,20 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     let arrivals: Arrival[] = [];
     
     try {
-      const response = await fetch(url);
-      if (response.ok) {
-        const text = await response.text();
+      console.log(`fetchDepartures: Fetching from ${url}`);
+      const text = await universalFetch(url);
+      
+      if (text) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
         if (lines.length > 2) {
           // Header is usually: Transport,RouteNum,ExpectedTimeInSeconds,ScheduleTimeInSeconds,ServerTime,version...
           const headerParts = lines[0].split(',');
           const serverTimeSeconds = parseInt(headerParts[4], 10);
+          
+          if (isNaN(serverTimeSeconds)) {
+            console.error(`fetchDepartures: Invalid serverTimeSeconds in header: ${lines[0]}`);
+          }
           
           for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(',');
@@ -1156,8 +1187,13 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
             const scheduledTime = parseInt(parts[3], 10);
             const destination = parts[4];
             
+            if (isNaN(expectedTime) || isNaN(scheduledTime)) {
+              console.warn(`fetchDepartures: Skipping line with invalid times: ${lines[i]}`);
+              continue;
+            }
+            
             // Calculate minutes
-            let diffSeconds = expectedTime - serverTimeSeconds;
+            let diffSeconds = expectedTime - (isNaN(serverTimeSeconds) ? Math.floor(Date.now() / 1000) % 86400 : serverTimeSeconds);
             
             // Handle midnight wrap-around
             if (diffSeconds < -43200) diffSeconds += 86400;
@@ -1198,6 +1234,8 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
               isRealtime: isRealTime
             });
           }
+        } else {
+          console.log(`fetchDepartures: No departures found in response for ${targetId}`);
         }
       }
     } catch (e) {
