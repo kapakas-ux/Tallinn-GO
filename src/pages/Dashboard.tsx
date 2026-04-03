@@ -150,37 +150,30 @@ export const Dashboard = () => {
       }).catch(() => {
         setLoading(false);
       });
-
-      nearby.forEach(stop => {
-        setNearbyLoading(prev => ({ ...prev, [stop.id]: true }));
-        fetchDepartures(stop.id, stop.siriId).then(deps => {
-          setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
-        }).catch(err => console.error(err))
-        .finally(() => setNearbyLoading(prev => ({ ...prev, [stop.id]: false })));
-      });
     } else {
       // Just update distance
       setClosestStop(nearest);
-      
-      // If nearby stops changed, fetch for the new ones
-      const oldNearbyIds = nearbyStops.map(s => s.id).join(',');
-      const newNearbyIds = nearby.map(s => s.id).join(',');
-      
-      if (oldNearbyIds !== newNearbyIds) {
-        nearby.forEach(stop => {
-          if (!nearbyStops.some(s => s.id === stop.id)) {
-            setNearbyLoading(prev => ({ ...prev, [stop.id]: true }));
-            fetchDepartures(stop.id, stop.siriId).then(deps => {
-              setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
-            }).catch(err => console.error(err))
-            .finally(() => setNearbyLoading(prev => ({ ...prev, [stop.id]: false })));
-          }
-        });
-      }
-      
       setNearbyStops(nearby);
     }
   }, [userLocation, allStops]);
+
+  // Auto-fetch departures for all nearby stops
+  useEffect(() => {
+    if (nearbyStops.length === 0) return;
+    nearbyStops.forEach(async (stop) => {
+      if (nearbyDepartures[stop.id]) return;
+      setNearbyLoading(prev => ({ ...prev, [stop.id]: true }));
+      try {
+        const deps = await fetchDepartures(stop.id, stop.siriId);
+        setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
+      } catch (err) {
+        console.error("Failed to load nearby departures", err);
+      } finally {
+        setNearbyLoading(prev => ({ ...prev, [stop.id]: false }));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearbyStops]);
 
   const handleNearbyClick = async (stop: Stop) => {
     const stopId = stop.id;
@@ -561,25 +554,29 @@ export const Dashboard = () => {
                 {/* Inline departure preview (always visible) */}
                 {!expandedNearby || expandedNearby !== stop.id ? (
                   nearbyLoading[stop.id] ? (
-                    <div className="flex items-center gap-2 px-4 pb-3">
+                    <div className="flex items-center gap-2 px-3 pb-2.5">
                       <Loader2 className="w-3 h-3 animate-spin text-secondary/40" />
                       <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
                     </div>
                   ) : nearbyDepartures[stop.id]?.length > 0 ? (
-                    <div className="px-4 pb-3 pt-1 grid grid-cols-2 gap-2">
-                      {nearbyDepartures[stop.id].slice(0, 2).map((arr, i) => (
-                        <div key={i} className="min-w-0 flex items-center justify-between py-1.5 bg-surface-container-high/50 px-2.5 rounded-lg">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={cn("h-5 w-5 rounded-full flex items-center justify-center font-label font-bold text-[9px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
-                              {arr.line}
+                    <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 flex gap-3">
+                      {[nearbyDepartures[stop.id].slice(0, 1), nearbyDepartures[stop.id].slice(1, 2)].map((col, ci) => (
+                        <div key={ci} className="flex-1 min-w-0 space-y-0.5">
+                          {col.map((arr, i) => (
+                            <div key={i} className="flex items-center justify-between py-0.5 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
+                                  {arr.line}
+                                </div>
+                                <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
+                                  {arr.destination}
+                                </span>
+                              </div>
+                              <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
+                                {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? 'Now' : (arr.time ?? `${getLiveMinutes(arr)}m`)}
+                              </span>
                             </div>
-                            <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
-                              {arr.destination}
-                            </span>
-                          </div>
-                          <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1.5", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                            {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? 'Now' : (arr.time ?? `${getLiveMinutes(arr)}m`)}
-                          </span>
+                          ))}
                         </div>
                       ))}
                     </div>
