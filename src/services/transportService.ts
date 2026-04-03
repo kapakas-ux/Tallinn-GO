@@ -1078,32 +1078,6 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       a.vehicleIndex = counts[key];
     });
 
-    // Compute ETA for all arrivals
-    await fetchStops(); // Ensure stops and maps are loaded
-    let targetStop = stopsByIdMap?.get(stopId);
-    if (!targetStop && siriId) {
-      // Fallback to searching by siriId if not found by id
-      const allStops = await fetchStops();
-      targetStop = allStops.find(s => s.siriId === siriId);
-    }
-    
-    if (targetStop) {
-      await Promise.all(arrivals.map(async (arrival) => {
-        // peatus.ee already provides real-time departure data via realtimeDeparture.
-        // Only attempt GPS-based ETA when peatus.ee has no live tracking for this
-        // arrival — otherwise the GPS overlay frequently makes correct times worse.
-        if (arrival.isRealtime) return;
-
-        const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
-        arrival.minutes = etaMinutes;
-        if (source === 'gps') {
-          arrival.info = 'Live GPS';
-        } else if (source === 'blended') {
-          arrival.info = 'GPS + Schedule';
-        }
-      }));
-    }
-
     // Re-sort by updated minutes
     arrivals.sort((a, b) => a.minutes - b.minutes);
 
