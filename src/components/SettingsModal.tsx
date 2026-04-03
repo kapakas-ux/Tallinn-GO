@@ -8,7 +8,7 @@ export const SettingsModal = ({ onClose }: Props) => {
   const handleClose = () => { stopPreview(); onClose(); };
   const [selectedSound, setSelectedSound] = useState(getSettings().alarmSound);
   const [showFact, setShowFact] = useState(getSettings().showDailyFact);
-  const [favoritesFirst, setFavoritesFirst] = useState(getSettings().favoritesFirst);
+  const [showFavoritesFirst, setShowFavoritesFirst] = useState(getSettings().showFavoritesFirst);
 
   const handleSelect = (id: string) => {
     setSelectedSound(id);
@@ -90,7 +90,7 @@ export const SettingsModal = ({ onClose }: Props) => {
             </button>
           </div>
 
-          {/* Favorites First toggle */}
+          {/* Show Favorites First toggle */}
           <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-variant/20 bg-surface-container-low">
             <div>
               <p className="font-headline font-bold text-sm text-primary">Show Favorites First</p>
@@ -98,13 +98,13 @@ export const SettingsModal = ({ onClose }: Props) => {
             </div>
             <button
               onClick={() => {
-                const next = !favoritesFirst;
-                setFavoritesFirst(next);
-                saveSettings({ favoritesFirst: next });
+                const next = !showFavoritesFirst;
+                setShowFavoritesFirst(next);
+                saveSettings({ showFavoritesFirst: next });
               }}
-              className={`relative w-11 h-6 rounded-full transition-colors ${favoritesFirst ? 'bg-primary' : 'bg-outline-variant/40'}`}
+              className={`relative w-11 h-6 rounded-full transition-colors ${showFavoritesFirst ? 'bg-primary' : 'bg-outline-variant/40'}`}
             >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${favoritesFirst ? 'translate-x-5' : 'translate-x-0'}`} />
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showFavoritesFirst ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>

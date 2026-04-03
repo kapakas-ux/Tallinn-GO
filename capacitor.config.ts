@@ -5,7 +5,6 @@ const config: CapacitorConfig = {
   appName: 'GO NOW',
   webDir: 'dist',
   android: {
-    versionCode: 10800,
   },
   server: {
     cleartext: true,
