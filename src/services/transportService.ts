@@ -926,8 +926,18 @@ export async function computeEtaToStop(
   
   // 7. GPS-derived ETA
   const gpsEtaMinutes = (totalDistKm / speedKmh) * 60;
-  
-  // 8. Blend: how many stops away is the vehicle?
+
+  // 8. Sanity check: if the GPS ETA differs wildly from the schedule ETA the
+  // matched vehicle almost certainly belongs to a different trip (e.g. it just
+  // finished its previous run and is near the route start, or is a wrong match).
+  // Only trust GPS when it is within a reasonable band around the schedule.
+  const lowerBound = Math.max(0, scheduleEta - Math.max(5, scheduleEta * 0.5));
+  const upperBound = scheduleEta + Math.max(5, scheduleEta * 0.5);
+  if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
+    return { etaMinutes: scheduleEta, source: 'schedule' };
+  }
+
+  // 9. Blend: how many stops away is the vehicle?
   const stopsAway = targetIdx - vehicleClosestIdx;
   
   // Trust GPS more when vehicle is close (1-3 stops away),
