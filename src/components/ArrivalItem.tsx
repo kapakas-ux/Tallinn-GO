@@ -100,7 +100,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
               isCompact ? "text-sm" : "text-sm",
               arrival.status === 'departed' && "line-through text-on-surface-variant"
             )}>
-              {arrival.destination}
+              {arrival.destination || 'Unknown Destination'}
             </span>
             {!isCompact && (
               <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-widest">

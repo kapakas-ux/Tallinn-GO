@@ -203,7 +203,9 @@ export async function fetchRoutes(): Promise<void> {
             usedStopsSet.add(normStop);
             
             if (currentTransport) {
-              const mode = currentTransport.toLowerCase();
+              let mode = currentTransport.toLowerCase();
+              if (mode === 'nightbus') mode = 'bus';
+              
               if (!stopModesMap[stop]) stopModesMap[stop] = new Set();
               if (!stopModesMap[normStop]) stopModesMap[normStop] = new Set();
               
@@ -499,6 +501,10 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
+  if (Object.keys(routesMap).length === 0) {
+    await fetchRoutes();
+  }
+  
   const url = Capacitor.isNativePlatform()
     ? 'https://gis.ee/tallinn/gps.php'
     : `${API_BASE}/api/transport/vehicles`;
@@ -526,15 +532,28 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
 
     const jitter = (Math.random() - 0.5) * 0.000001;
     
+    const line = props.line?.toString() || '';
+    let destination = props.destination || '';
+    
+    // Fallback for missing destination (common for night buses)
+    if (!destination && line && routesMap[line]) {
+      const routeName = routesMap[line];
+      if (routeName.includes(' - ')) {
+        destination = routeName.split(' - ')[1];
+      } else {
+        destination = routeName;
+      }
+    }
+    
     vehicles.push({
       id: props.id?.toString() || Math.random().toString(),
       type,
-      line: props.line?.toString() || '',
+      line,
       lng: coords[0] + jitter,
       lat: coords[1] + jitter,
       bearing: props.direction || 0,
       speed: 0,
-      destination: props.destination || ''
+      destination
     });
   }
   
@@ -1185,7 +1204,17 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
             const line = parts[1];
             const expectedTime = parseInt(parts[2], 10);
             const scheduledTime = parseInt(parts[3], 10);
-            const destination = parts[4];
+            let destination = parts[4];
+            
+            // Fallback for missing destination
+            if (!destination && line && routesMap[line]) {
+              const routeName = routesMap[line];
+              if (routeName.includes(' - ')) {
+                destination = routeName.split(' - ')[1];
+              } else {
+                destination = routeName;
+              }
+            }
             
             if (isNaN(expectedTime) || isNaN(scheduledTime)) {
               console.warn(`fetchDepartures: Skipping line with invalid times: ${lines[i]}`);
@@ -1246,11 +1275,27 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     const peatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, false);
     arrivals = [...arrivals, ...peatusArrivals];
     
-    // If still no arrivals, try Peatus for ALL modes (useful for night/early morning when SIRI is empty)
-    if (arrivals.length === 0) {
-      console.log(`fetchDepartures: No SIRI data, falling back to all modes from Peatus for ${stopId}`);
+    // If next departure is far away (> 15 mins) or we have very few departures,
+    // try Peatus for ALL modes to catch night buses or early morning gaps.
+    const nextDepartureMins = arrivals.length > 0 ? Math.min(...arrivals.map(a => a.minutes)) : Infinity;
+    
+    if (arrivals.length < 5 || nextDepartureMins > 15) {
+      console.log(`fetchDepartures: SIRI data sparse (next: ${nextDepartureMins}m, count: ${arrivals.length}), fetching all modes from Peatus for ${stopId}`);
       const allPeatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, true);
-      arrivals = allPeatusArrivals;
+      
+      // Merge allPeatusArrivals into arrivals, avoiding duplicates
+      allPeatusArrivals.forEach(pa => {
+        const isDuplicate = arrivals.some(a => 
+          a.line === pa.line && 
+          Math.abs(a.minutes - pa.minutes) < 3 &&
+          (a.destination.toLowerCase().includes(pa.destination.toLowerCase()) || 
+           pa.destination.toLowerCase().includes(a.destination.toLowerCase()))
+        );
+        
+        if (!isDuplicate) {
+          arrivals.push(pa);
+        }
+      });
     }
     
     // Sort by minutes ascending
