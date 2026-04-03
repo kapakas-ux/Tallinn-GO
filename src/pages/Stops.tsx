@@ -467,7 +467,7 @@ export const Stops = () => {
                                     </span>
                                   </div>
                                   <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                                    {arr.status === 'departed' ? '–' : (() => { const m = getLiveMinutes(arr); return m > 60 && arr.time ? arr.time : m === 0 ? 'Now' : `${m}m`; })()}
+                                    {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? 'Now' : (arr.time ?? `${getLiveMinutes(arr)}m`)}
                                   </span>
                                 </div>
                               ))}

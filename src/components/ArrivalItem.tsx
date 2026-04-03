@@ -114,7 +114,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
             <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
           ) : (
             <div className="flex items-center gap-2">
-              {onAlertClick && liveMinutes > 15 && (
+              {onAlertClick && liveMinutes > 5 && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -135,11 +135,8 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center" />
                 )}
                 <span className={cn("font-headline font-black text-primary", isCompact ? "text-lg" : "text-xl")}>
-                  {liveMinutes > 60 && arrival.time ? arrival.time : (liveMinutes === 0 ? 'Now' : liveMinutes)}
+                  {liveMinutes <= 1 ? 'Now' : (arrival.time ?? `${liveMinutes}m`)}
                 </span>
-                {liveMinutes > 0 && !(liveMinutes > 60 && arrival.time) && (
-                  <span className={cn("font-bold text-secondary uppercase", isCompact ? "text-[10px]" : "text-[10px] ml-0.5")}>min</span>
-                )}
               </div>
               {expandable && (expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />)}
             </div>

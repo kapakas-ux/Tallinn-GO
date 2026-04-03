@@ -563,8 +563,9 @@ export const Map = () => {
           departuresHtml = `<div class="py-4 text-center text-red-500 font-label text-xs uppercase tracking-wider">${errorMsg}</div>`;
         } else if (departures.length > 0) {
           departuresHtml = departures.map(d => {
+            const liveMins = (d as any).departureTimeSeconds ? Math.max(0, Math.floor(((d as any).departureTimeSeconds - Date.now() / 1000) / 60)) : d.minutes;
             const isScheduled = isAlertActive(id, d.line, d.minutes);
-            const showAlarm = d.minutes > 15 && d.status !== 'departed';
+            const showAlarm = liveMins > 5 && d.status !== 'departed';
             
             return `
               <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0 relative">
@@ -587,7 +588,7 @@ export const Map = () => {
                   <div class="text-right flex items-baseline gap-1">
                     ${d.isRealtime ? '<div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center"></div>' : ''}
                     <span class="font-headline font-black text-lg text-primary">
-                      ${d.minutes > 60 && d.time ? d.time : (d.minutes === 0 ? 'Now' : d.minutes + '<span class="text-[10px] ml-0.5 font-bold">min</span>')}
+                      ${(() => { const depSec = (d as any).departureTimeSeconds; const m = depSec ? Math.max(0, Math.floor((depSec - Date.now() / 1000) / 60)) : d.minutes; return m <= 1 ? 'Now' : (d.time ?? m + ' min'); })()}
                     </span>
                   </div>
                 </div>
