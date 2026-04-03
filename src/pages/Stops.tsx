@@ -6,7 +6,7 @@ import { getFavorites, toggleFavorite as toggleFavService, isFavorite, updateFav
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { MiniMap } from '../components/MiniMap';
-import { ArrivalItem } from '../components/ArrivalItem';
+import { ArrivalItem, getLiveMinutes } from '../components/ArrivalItem';
 import { Stop, Arrival } from '../types';
 import { cn, formatDistance, formatWalkingTime, getVehicleColorClass, getStopColorClass } from '../lib/utils';
 import { NotificationSelector } from '../components/NotificationSelector';
@@ -29,6 +29,12 @@ export const Stops = () => {
   const [editEmoji, setEditEmoji] = useState('');
   const [alertingArrival, setAlertingArrival] = useState<{ stop: Stop; arrival: Arrival } | null>(null);
   const [scheduledAlerts, setScheduledAlerts] = useState<any[]>([]);
+  // Tick every 15 s so inline minute badges stay live
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 15_000);
+    return () => clearInterval(id);
+  }, []);
 
   const emojiOptions = [
     { label: 'Home', emoji: '🏠' },
@@ -461,7 +467,7 @@ export const Stops = () => {
                                     </span>
                                   </div>
                                   <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                                    {arr.status === 'departed' ? '–' : arr.minutes > 60 && arr.time ? arr.time : arr.minutes === 0 ? 'Now' : `${arr.minutes}m`}
+                                    {arr.status === 'departed' ? '–' : (() => { const m = getLiveMinutes(arr); return m > 60 && arr.time ? arr.time : m === 0 ? 'Now' : `${m}m`; })()}
                                   </span>
                                 </div>
                               ))}

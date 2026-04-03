@@ -1057,6 +1057,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
         destination,
         type,
         minutes,
+        departureTimeSeconds,
         time: timeStr,
         status,
         isRealtime: isRealTime

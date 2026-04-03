@@ -16,6 +16,7 @@ export interface Arrival {
   destination: string;
   type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional';
   minutes: number;
+  departureTimeSeconds?: number; // Unix seconds — used to compute live countdown
   time?: string;
   status: 'on-time' | 'delayed' | 'expected' | 'departed';
   isRealtime?: boolean;

@@ -15,11 +15,27 @@ interface ArrivalItemProps {
   expandable?: boolean;
 }
 
+export function getLiveMinutes(arrival: Arrival): number {
+  if (arrival.departureTimeSeconds) {
+    const diffSec = arrival.departureTimeSeconds - Date.now() / 1000;
+    return Math.max(0, Math.floor(diffSec / 60));
+  }
+  return arrival.minutes;
+}
+
 export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive, expandable = true }: ArrivalItemProps) {
   const [expanded, setExpanded] = useState(false);
   const [routeStops, setRouteStops] = useState<Stop[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
+  const [liveMinutes, setLiveMinutes] = useState(() => getLiveMinutes(arrival));
+
+  // Tick every 15 seconds to keep the countdown accurate
+  useEffect(() => {
+    setLiveMinutes(getLiveMinutes(arrival));
+    const id = setInterval(() => setLiveMinutes(getLiveMinutes(arrival)), 15_000);
+    return () => clearInterval(id);
+  }, [arrival]);
 
   // Reset state if the arrival represents a different vehicle trip
   useEffect(() => {
@@ -98,7 +114,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
             <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
           ) : (
             <div className="flex items-center gap-2">
-              {onAlertClick && arrival.minutes > 15 && (
+              {onAlertClick && liveMinutes > 15 && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -119,9 +135,9 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center" />
                 )}
                 <span className={cn("font-headline font-black text-primary", isCompact ? "text-lg" : "text-xl")}>
-                  {arrival.minutes > 60 && arrival.time ? arrival.time : (arrival.minutes === 0 ? 'Now' : arrival.minutes)}
+                  {liveMinutes > 60 && arrival.time ? arrival.time : (liveMinutes === 0 ? 'Now' : liveMinutes)}
                 </span>
-                {arrival.minutes > 0 && !(arrival.minutes > 60 && arrival.time) && (
+                {liveMinutes > 0 && !(liveMinutes > 60 && arrival.time) && (
                   <span className={cn("font-bold text-secondary uppercase", isCompact ? "text-[10px]" : "text-[10px] ml-0.5")}>min</span>
                 )}
               </div>
