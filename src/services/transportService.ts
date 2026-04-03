@@ -1001,7 +1001,7 @@ export async function computeEtaToStop(
   return { etaMinutes: finalEta, source };
 }
 
-async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
+async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: string, allModes: boolean = false): Promise<Arrival[]> {
   try {
     const nowSeconds = Math.floor(Date.now() / 1000);
     
@@ -1042,7 +1042,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       }
     `;
 
-    console.log(`fetchPeatusDepartures: Fetching for ${gtfsId}`);
+    console.log(`fetchPeatusDepartures: Fetching for ${gtfsId} (allModes: ${allModes})`);
     
     // Use universalFetch for Peatus API too, but we need to handle GraphQL POST
     // Actually, universalFetch currently only supports GET. 
@@ -1089,8 +1089,8 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
         }
       }
 
-      // ONLY return regional and train from peatus.ee to avoid duplicates with SIRI
-      if (type !== 'regional' && type !== 'train') {
+      // If not allModes, ONLY return regional and train from peatus.ee to avoid duplicates with SIRI
+      if (!allModes && type !== 'regional' && type !== 'train') {
         continue;
       }
 
@@ -1243,8 +1243,15 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     }
     
     // Fetch regional/train departures from peatus.ee
-    const peatusArrivals = await fetchPeatusDepartures(stopId, siriId, time);
+    const peatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, false);
     arrivals = [...arrivals, ...peatusArrivals];
+    
+    // If still no arrivals, try Peatus for ALL modes (useful for night/early morning when SIRI is empty)
+    if (arrivals.length === 0) {
+      console.log(`fetchDepartures: No SIRI data, falling back to all modes from Peatus for ${stopId}`);
+      const allPeatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, true);
+      arrivals = allPeatusArrivals;
+    }
     
     // Sort by minutes ascending
     arrivals.sort((a, b) => a.minutes - b.minutes);
