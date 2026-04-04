@@ -650,11 +650,67 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
   return vehicles;
 }
 
-export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]> {
+export async function fetchTripStopTimes(tripId: string): Promise<{ stopId: string, scheduledTime: string }[]> {
+  try {
+    const query = `
+      {
+        trip(id: "${tripId}") {
+          stoptimes {
+            scheduledDeparture
+            stop {
+              gtfsId
+            }
+          }
+        }
+      }
+    `;
+
+    let data: any;
+    try {
+      const url = `${API_BASE}/api/transport/peatus/graphql?t=${Date.now()}`;
+      const text = await universalFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      data = JSON.parse(text);
+    } catch (e) {
+      const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
+      const text = await universalFetch(fallbackUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      data = JSON.parse(text);
+    }
+
+    const stoptimes = data?.data?.trip?.stoptimes || data?.trip?.stoptimes || [];
+    return stoptimes.map((st: any) => {
+      const dep = st.scheduledDeparture;
+      const h = Math.floor(dep / 3600) % 24;
+      const m = Math.floor((dep % 3600) / 60);
+      return {
+        stopId: st.stop?.gtfsId?.replace('estonia:', '') || '',
+        scheduledTime: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching trip stop times:', error);
+    return [];
+  }
+}
+
+export async function getRouteStopsForArrival(arrival: Arrival): Promise<(Stop & { scheduledTime?: string })[]> {
   if (Object.keys(routeStopsMap).length === 0) {
     await fetchRoutes();
   }
   await fetchStops(); // Ensure stops are fetched and maps are populated
+
+  let tripStopTimes: { stopId: string, scheduledTime: string }[] = [];
+  if (arrival.tripId) {
+    tripStopTimes = await fetchTripStopTimes(arrival.tripId);
+  }
+
   const normArrivalLine = arrival.line.replace(/^0+/, '');
   const routes = routeStopsMap[normArrivalLine];
   if (!routes || routes.length === 0) return [];
@@ -701,16 +757,19 @@ export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]>
     }
   }
   
-  // Map stop IDs to Stop objects
+  // Map stop IDs to Stop objects and attach scheduled times
   return bestRoute.stops.map(id => {
-    const exactStop = stopsByIdMap?.get(id);
-    if (exactStop) return exactStop;
+    let stopObj: Stop | undefined = stopsByIdMap?.get(id);
+    if (!stopObj) {
+      const baseId = id.split('-')[0];
+      stopObj = stopsByBaseIdMap?.get(baseId);
+    }
     
-    const baseId = id.split('-')[0];
-    const baseStop = stopsByBaseIdMap?.get(baseId);
-    if (baseStop) return baseStop;
+    if (!stopObj) return { id, name: id, lat: 0, lng: 0 } as Stop;
+
+    const scheduledTime = tripStopTimes.find(t => t.stopId === stopObj?.id || t.stopId === stopObj?.gtfsId)?.scheduledTime;
     
-    return { id, name: id, lat: 0, lng: 0 }; // Fallback
+    return { ...stopObj, scheduledTime };
   }).filter(s => s.lat !== 0 && s.lng !== 0);
 }
 
@@ -1202,6 +1261,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
             headsign
             serviceDay
             trip {
+              id
               route {
                 shortName
                 mode
@@ -1275,6 +1335,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       }
 
       const destination = st.headsign || '';
+      const tripId = st.trip?.id || '';
 
       // Calculate time
       const departureTimeSeconds = st.serviceDay + (st.realtimeDeparture || st.scheduledDeparture);

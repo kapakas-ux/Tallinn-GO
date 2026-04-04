@@ -28,7 +28,7 @@ export function getLiveMinutes(arrival: Arrival): number {
 
 export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive, expandable = true }: ArrivalItemProps) {
   const [expanded, setExpanded] = useState(false);
-  const [routeStops, setRouteStops] = useState<Stop[]>([]);
+  const [routeStops, setRouteStops] = useState<(Stop & { scheduledTime?: string })[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [liveMinutes, setLiveMinutes] = useState(() => getLiveMinutes(arrival));
@@ -45,7 +45,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
     setExpanded(false);
     setRouteStops([]);
     setHasFetched(false);
-  }, [arrival.type, arrival.line, arrival.destination, arrival.vehicleIndex]);
+  }, [arrival.type, arrival.line, arrival.destination, arrival.vehicleIndex, arrival.tripId]);
 
   useEffect(() => {
     if (!expanded || hasFetched) return;
@@ -206,14 +206,19 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                     <div 
                       key={i} 
                       data-target={isTarget ? "true" : "false"}
-                      className={cn("flex items-center gap-3 text-sm", isTarget ? "font-bold text-primary" : "text-secondary")}
+                      className={cn("flex items-center justify-between gap-3 text-sm", isTarget ? "font-bold text-primary" : "text-secondary")}
                     >
-                      <div className={cn("w-2 h-2 rounded-full relative", isTarget ? "bg-primary animate-pulse" : "bg-primary/20")}>
-                        {i !== routeStops.length - 1 && (
-                          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-primary/10" />
-                        )}
+                      <div className="flex items-center gap-3 truncate">
+                        <div className={cn("w-2 h-2 rounded-full relative shrink-0", isTarget ? "bg-primary animate-pulse" : "bg-primary/20")}>
+                          {i !== routeStops.length - 1 && (
+                            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-primary/10" />
+                          )}
+                        </div>
+                        <span className="truncate">{routeStop.name}</span>
                       </div>
-                      <span className="truncate">{routeStop.name}</span>
+                      {routeStop.scheduledTime && (
+                        <span className="text-[10px] font-mono opacity-70 shrink-0">{routeStop.scheduledTime}</span>
+                      )}
                     </div>
                   );
                 })}
