@@ -690,7 +690,7 @@ export async function fetchTripStopTimes(tripId: string): Promise<{ stopId: stri
       const h = Math.floor(dep / 3600) % 24;
       const m = Math.floor((dep % 3600) / 60);
       return {
-        stopId: st.stop?.gtfsId?.replace('estonia:', '') || '',
+        stopId: st.stop?.gtfsId || '',
         scheduledTime: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
       };
     });
@@ -1239,11 +1239,11 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     
     // Find the stop to get its real gtfsId
     await fetchStops();
-    let gtfsId = `estonia:${stopId}`;
+    let gtfsId = stopId.includes(':') ? stopId : `estonia:${stopId}`;
     if (stopsByIdMap) {
       const stop = stopsByIdMap.get(stopId);
       if (stop && stop.gtfsId) {
-        gtfsId = `estonia:${stop.gtfsId}`;
+        gtfsId = stop.gtfsId;
       }
     }
 
@@ -1518,32 +1518,25 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       console.error('Error fetching SIRI departures:', e);
     }
     
-    // Fetch regional/train departures from peatus.ee
-    const peatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, false);
-    arrivals = [...arrivals, ...peatusArrivals];
+    // Fetch all departures from peatus.ee to get tripIds for all modes (including city buses)
+    const peatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, true);
     
-    // If next departure is far away (> 15 mins) or we have very few departures,
-    // try Peatus for ALL modes to catch night buses or early morning gaps.
-    const nextDepartureMins = arrivals.length > 0 ? Math.min(...arrivals.map(a => a.minutes)) : Infinity;
-    
-    if (arrivals.length < 5 || nextDepartureMins > 15) {
-      console.log(`fetchDepartures: SIRI data sparse (next: ${nextDepartureMins}m, count: ${arrivals.length}), fetching all modes from Peatus for ${stopId}`);
-      const allPeatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, true);
+    // Merge Peatus data into SIRI arrivals to attach tripIds
+    peatusArrivals.forEach(pa => {
+      const existing = arrivals.find(a => 
+        a.line === pa.line && 
+        Math.abs(a.minutes - pa.minutes) < 3 &&
+        (a.destination.toLowerCase().includes(pa.destination.toLowerCase()) || 
+         pa.destination.toLowerCase().includes(a.destination.toLowerCase()))
+      );
       
-      // Merge allPeatusArrivals into arrivals, avoiding duplicates
-      allPeatusArrivals.forEach(pa => {
-        const isDuplicate = arrivals.some(a => 
-          a.line === pa.line && 
-          Math.abs(a.minutes - pa.minutes) < 3 &&
-          (a.destination.toLowerCase().includes(pa.destination.toLowerCase()) || 
-           pa.destination.toLowerCase().includes(a.destination.toLowerCase()))
-        );
-        
-        if (!isDuplicate) {
-          arrivals.push(pa);
-        }
-      });
-    }
+      if (existing) {
+        if (!existing.tripId) existing.tripId = pa.tripId;
+      } else {
+        // Only add if it's not a duplicate (handles regional/trains mostly)
+        arrivals.push(pa);
+      }
+    });
     
     // Sort by minutes ascending
     arrivals.sort((a, b) => a.minutes - b.minutes);
