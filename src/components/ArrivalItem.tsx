@@ -131,8 +131,28 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                 </button>
               )}
               <div className="flex items-baseline gap-1">
-                <span className={cn("font-headline font-black text-primary flex items-baseline gap-1", isCompact ? "text-lg" : "text-xl")}>
-                  {liveMinutes <= 1 ? 'Now' : (liveMinutes <= 59 ? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>min</span></> : (arrival.time ?? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>min</span></>))}
+                <span className={cn(
+                  "font-headline font-black flex items-baseline gap-1", 
+                  isCompact ? "text-lg" : "text-xl",
+                  arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-primary"
+                )}>
+                  {liveMinutes === 0 ? (
+                    'Now'
+                  ) : (
+                    liveMinutes <= 59 ? (
+                      <>
+                        {liveMinutes}
+                        <span className="text-sm font-medium">min</span>
+                      </>
+                    ) : (
+                      arrival.time ?? (
+                        <>
+                          {liveMinutes}
+                          <span className="text-sm font-medium">min</span>
+                        </>
+                      )
+                    )
+                  )}
                 </span>
               </div>
               {expandable && (expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />)}

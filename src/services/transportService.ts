@@ -986,8 +986,13 @@ export async function computeEtaToStop(
   
   const speedKmh = AVG_SPEED_KMH[vehicle.type] ?? 22;
   
+  // 9. Blend: how many stops away is the vehicle?
+  const stopsAway = targetIdx - vehicleClosestIdx;
+
   // 7. GPS-derived ETA
-  const gpsEtaMinutes = (totalDistKm / speedKmh) * 60;
+  // Add 30 seconds of dwell time for each stop in between
+  const dwellTimeMinutes = stopsAway * 0.5; // ~30 seconds per stop
+  const gpsEtaMinutes = ((totalDistKm / speedKmh) * 60) + dwellTimeMinutes;
 
   // 8. Sanity check: if the GPS ETA differs wildly from the schedule ETA the
   // matched vehicle almost certainly belongs to a different trip (e.g. it just
@@ -995,12 +1000,11 @@ export async function computeEtaToStop(
   // Only trust GPS when it is within a reasonable band around the schedule.
   const lowerBound = Math.max(0, scheduleEta - Math.max(5, scheduleEta * 0.5));
   const upperBound = scheduleEta + Math.max(5, scheduleEta * 0.5);
+  
   if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
+    console.log(`computeEtaToStop: GPS ETA ${gpsEtaMinutes.toFixed(1)}m out of bounds [${lowerBound.toFixed(1)}, ${upperBound.toFixed(1)}] for ${arrival.line} to ${arrival.destination}. Falling back to schedule ${scheduleEta}m.`);
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
-
-  // 9. Blend: how many stops away is the vehicle?
-  const stopsAway = targetIdx - vehicleClosestIdx;
   
   // Trust GPS more when vehicle is close (1-3 stops away),
   // blend equally when 4-6 stops, lean on schedule beyond that.
@@ -1014,7 +1018,15 @@ export async function computeEtaToStop(
   }
   
   const blendedEta = gpsWeight * gpsEtaMinutes + (1 - gpsWeight) * scheduleEta;
-  const finalEta = Math.max(0, Math.round(blendedEta));
+  
+  // If the vehicle is still at least 1 stop away, ensure we don't show 0 minutes
+  // unless it's extremely close (< 150m) to the target stop.
+  let finalEta = Math.max(0, Math.round(blendedEta));
+  if (stopsAway >= 1 && finalEta === 0 && totalDistKm > 0.15) {
+    finalEta = 1;
+  }
+  
+  console.log(`computeEtaToStop: ${arrival.line} to ${arrival.destination}: stopsAway=${stopsAway}, dist=${totalDistKm.toFixed(2)}km, gpsEta=${gpsEtaMinutes.toFixed(1)}m, schedEta=${scheduleEta}m, blended=${blendedEta.toFixed(1)}m -> final=${finalEta}m`);
   
   const source = gpsWeight >= 0.75 ? 'gps' : 'blended';
   return { etaMinutes: finalEta, source };
