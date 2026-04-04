@@ -1,5 +1,5 @@
 import { Arrival, Stop, Vehicle } from '../types';
-import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { CapacitorHttp, Capacitor } from '@capacitor/core';
 import { getDistance, getBearing } from '../lib/geo';
 
 const getApiBaseUrl = () => {
@@ -31,48 +31,73 @@ const getApiBaseUrl = () => {
 const API_BASE = getApiBaseUrl();
 
 /**
- * Universal fetch that uses standard fetch.
- * The proxy server handles CORS, so we don't need CapacitorHttp anymore.
- * This vastly improves performance on Android for large files like routes.txt.
+ * Universal fetch that uses CapacitorHttp on native to bypass CORS
  */
-async function universalFetch(url: string, options?: RequestInit): Promise<string> {
-  console.log(`universalFetch START: ${url}`);
-  try {
-    const response = await fetch(url, options);
-    if (!response.ok) {
-      throw new Error(`Fetch error: ${response.status}`);
-    }
-    const text = await response.text();
-    return text;
-  } catch (err) {
-    console.warn(`universalFetch standard fetch FAILED: ${url}, trying CapacitorHttp fallback...`, err);
-    
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const optionsForCapacitor = {
-          url,
-          method: options?.method || 'GET',
-          headers: options?.headers as Record<string, string> || {},
-          data: options?.body ? JSON.parse(options.body as string) : undefined
-        };
-        
-        const response = await CapacitorHttp.request(optionsForCapacitor);
-        if (response.status >= 400) {
-          throw new Error(`CapacitorHttp error: ${response.status}`);
-        }
-        
-        // CapacitorHttp returns JSON objects if the content-type is json, otherwise string
-        if (typeof response.data === 'object') {
-          return JSON.stringify(response.data);
-        }
-        return String(response.data);
-      } catch (capErr) {
-        console.error(`universalFetch CapacitorHttp fallback FAILED: ${url}`, capErr);
-        throw capErr;
+async function universalFetch(url: string): Promise<string> {
+  if (Capacitor.isNativePlatform()) {
+    console.log(`universalFetch (native) START: ${url}`);
+    const options = {
+      url,
+      headers: { 
+        'Accept': 'text/plain, */*',
+        'Cache-Control': 'no-cache'
+      },
+      connectTimeout: 20000,
+      readTimeout: 20000
+    };
+    try {
+      const response = await CapacitorHttp.get(options);
+      console.log(`universalFetch (native) RESPONSE: ${url} - Status: ${response.status}`);
+      
+      let dataStr = '';
+      if (typeof response.data === 'string') {
+        dataStr = response.data;
+      } else if (response.data !== null && response.data !== undefined) {
+        // If CapacitorHttp parsed it as JSON, convert it back to string if it's not what we wanted
+        // or if it's an error object
+        dataStr = JSON.stringify(response.data);
+        console.log(`universalFetch (native) WARNING: Data was parsed as object, stringified length: ${dataStr.length}`);
       }
+      
+      console.log(`universalFetch (native) END: ${url} - Data length: ${dataStr.length}`);
+      
+      // Detect if we got an HTML response (likely a cookie wall or proxy page)
+      if (dataStr.trim().toLowerCase().startsWith('<!doctype html') || dataStr.trim().toLowerCase().startsWith('<html')) {
+        console.error(`universalFetch (native) ERROR: Received HTML instead of data for ${url}. This usually means a cookie wall or login page is blocking the API.`);
+        throw new Error(`API blocked by HTML response (cookie wall). Please check your VITE_API_URL.`);
+      }
+
+      // Log a sample of the raw data to help debug parsing
+      if (dataStr.length > 0) {
+        console.log(`RAW DATA SAMPLE (${url.split('/').pop()}): ${dataStr.substring(0, 300).replace(/\n/g, '\\n')}`);
+      } else {
+        console.warn(`universalFetch (native) EMPTY DATA for ${url}`);
+      }
+      
+      if (response.status >= 400) {
+        throw new Error(`CapacitorHttp error: ${response.status} - ${dataStr.substring(0, 100)}`);
+      }
+      
+      return dataStr;
+    } catch (err) {
+      console.error(`universalFetch (native) FAILED: ${url}`, err);
+      throw err;
     }
-    
-    throw err;
+  } else {
+    console.log(`universalFetch (web) START: ${url}`);
+    try {
+      const response = await fetch(url);
+      console.log(`universalFetch (web) END: ${url} - Status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Fetch error: ${response.status}`);
+      }
+      const text = await response.text();
+      console.log(`RAW DATA SAMPLE (web): ${text.substring(0, 200)}`);
+      return text;
+    } catch (err) {
+      console.error(`universalFetch (web) FAILED: ${url}`, err);
+      throw err;
+    }
   }
 }
 
@@ -118,40 +143,13 @@ export async function fetchRoutes(): Promise<void> {
   
   routesPromise = (async () => {
     try {
-      let text: string;
-      try {
-        const url = `${API_BASE}/api/transport/parsed-routes`;
-        text = await universalFetch(url);
-        if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
-        const data = JSON.parse(text);
-        
-        routesMap = data.routesMap || {};
-        
-        // Update routeStopsMap
-        for (const [key, value] of Object.entries(data.routeStopsMap || {})) {
-          routeStopsMap[key] = value as any;
-        }
-        
-        // Update usedStopsSet
-        (data.usedStopsArray || []).forEach((stop: string) => usedStopsSet.add(stop));
-        
-        // Update stopModesMap
-        for (const [key, value] of Object.entries(data.stopModesMap || {})) {
-          stopModesMap[key] = new Set(value as string[]);
-        }
-        
-        console.log(`Successfully loaded ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops from parsed-routes`);
-        return; // Success, exit early
-      } catch (e) {
-        console.warn('Failed to fetch from parsed-routes, falling back to raw routes.txt', e);
-        // Fallback to direct API
-        const fallbackUrl = `https://transport.tallinn.ee/data/routes.txt`;
-        text = await universalFetch(fallbackUrl);
-      }
+      const url = Capacitor.isNativePlatform() 
+        ? `https://transport.tallinn.ee/data/routes.txt?t=${Date.now()}`
+        : `${API_BASE}/api/transport/routes`;
+      const text = await universalFetch(url);
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
       
-      // Fallback parsing logic
-      const lines = text.split(/\r?\n/);
-      console.log(`fetchRoutes fallback: found ${lines.length} lines`);
+      console.log(`fetchRoutes: found ${lines.length} lines`);
       
       if (lines.length === 0) return;
       
@@ -172,19 +170,13 @@ export async function fetchRoutes(): Promise<void> {
       
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        if (!line || line.trim().length === 0 || line.startsWith('#')) continue;
+        if (line.startsWith('#')) continue;
         
-        const parts = line.split(delim);
+        const parts = line.split(delim).map(p => p.trim().replace(/"/g, ''));
         
-        const rawRouteNum = parts[fld['ROUTENUM']];
-        const rawTransport = parts[fld['TRANSPORT']];
-        const rawRouteName = parts[fld['ROUTENAME']];
-        const rawRouteStops = parts[fld['ROUTESTOPS']];
-        
-        const routeNum = rawRouteNum ? rawRouteNum.trim().replace(/"/g, '') : undefined;
-        const transport = rawTransport ? rawTransport.trim().replace(/"/g, '') : undefined;
-        const routeName = rawRouteName ? rawRouteName.trim().replace(/"/g, '') : undefined;
-        const routeStops = rawRouteStops ? rawRouteStops.trim().replace(/"/g, '') : undefined;
+        const routeNum = parts[fld['ROUTENUM']];
+        const transport = parts[fld['TRANSPORT']];
+        const routeName = parts[fld['ROUTENAME']];
         
         if (routeNum && routeNum !== '-') {
           currentRouteNum = routeNum;
@@ -202,6 +194,7 @@ export async function fetchRoutes(): Promise<void> {
           if (normNum && normNum !== currentRouteNum) routesMap[normNum] = currentRouteName;
         }
         
+        const routeStops = parts[fld['ROUTESTOPS']];
         if (routeStops) {
           const stops = routeStops.split(',').filter(Boolean);
           for (const stop of stops) {
@@ -236,7 +229,7 @@ export async function fetchRoutes(): Promise<void> {
           }
         }
       }
-      console.log(`Successfully loaded ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops from fallback`);
+      console.log(`Successfully parsed ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops`);
     } catch (error) {
       console.error('Error fetching/parsing routes:', error);
       routesPromise = null;
@@ -256,63 +249,39 @@ export async function fetchStops(): Promise<Stop[]> {
     
     try {
       console.log('Fetching stops from peatus.ee GraphQL API...');
-      let rawStops: any[] = [];
+      const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+      const query = '{ stops { gtfsId name lat lon code desc zoneId parentStation { name } routes { mode } } }';
       
-      try {
-        const url = `${API_BASE}/api/transport/peatus/stops`;
-        const text = await universalFetch(url);
-        if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
-        const data = JSON.parse(text);
-        rawStops = data.data?.stops || data.stops;
-      } catch (e) {
-        console.warn('Failed to fetch from peatus/stops proxy, falling back to direct GraphQL', e);
-        const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
-        const query = `
-          query {
-            stops {
-              gtfsId
-              name
-              lat
-              lon
-              code
-              zoneId
-              parentStation {
-                name
-              }
-              routes {
-                mode
-              }
-            }
-          }
-        `;
-        const response = await fetch(fallbackUrl, {
+      let text = '';
+      if (Capacitor.isNativePlatform()) {
+        const response = await CapacitorHttp.post({
+          url,
+          headers: { 'Content-Type': 'application/json' },
+          data: { query }
+        });
+        text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+      } else {
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query })
         });
-        const data = await response.json();
-        rawStops = data.data?.stops || data.stops;
+        text = await response.text();
       }
       
-      if (!rawStops) rawStops = [];
+      const data = JSON.parse(text);
+      const rawStops = data.data.stops;
+      
       console.log(`fetchStops: received ${rawStops.length} stops from peatus.ee`);
       
       // Fetch Tallinn stops.txt to get correct SiriIDs
       const siriIdMap = new Map<string, string>();
       try {
-        let text = '';
-        try {
-          const url = `${API_BASE}/api/transport/stops`;
-          text = await universalFetch(url);
-          // If it returned HTML (cookie check), throw error
-          if (text.trim().startsWith('<')) throw new Error('Received HTML instead of stops.txt');
-        } catch (e) {
-          console.warn('Failed to fetch from stops proxy, falling back to direct API', e);
-          const fallbackUrl = `https://transport.tallinn.ee/data/stops.txt`;
-          text = await universalFetch(fallbackUrl);
-        }
-        
-        const lines = text.split(/\r?\n/);
+        const url = Capacitor.isNativePlatform() 
+          ? `https://transport.tallinn.ee/data/stops.txt?t=${Date.now()}`
+          : `${API_BASE}/api/transport/stops`;
+        const text = await universalFetch(url);
+        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
         if (lines.length > 0) {
           let delim = ';';
           if (lines[0].includes(';')) delim = ';';
@@ -324,11 +293,9 @@ export async function fetchStops(): Promise<Stop[]> {
           
           if (idIdx >= 0 && siriIdx >= 0) {
             for (let i = 1; i < lines.length; i++) {
-              const line = lines[i];
-              if (!line || line.trim().length === 0) continue;
-              const parts = line.split(delim);
-              const id = parts[idIdx]?.trim();
-              const siriId = parts[siriIdx]?.trim();
+              const parts = lines[i].split(delim).map(p => p.trim());
+              const id = parts[idIdx];
+              const siriId = parts[siriIdx];
               if (id && siriId) {
                 siriIdMap.set(id, siriId);
                 const normId = id.replace(/^0+/, '');
@@ -538,43 +505,11 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     await fetchRoutes();
   }
   
-  const url = `${API_BASE}/api/transport/vehicles?t=${Date.now()}`;
+  const url = Capacitor.isNativePlatform()
+    ? 'https://gis.ee/tallinn/gps.php'
+    : `${API_BASE}/api/transport/vehicles`;
     
-  let responseText = '';
-  try {
-    responseText = await universalFetch(url);
-    if (responseText.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
-  } catch (e) {
-    console.warn('Failed to fetch from vehicles proxy, falling back to direct API', e);
-    const fallbackUrl = `https://transport.tallinn.ee/gps.txt?t=${Date.now()}`;
-    const rawText = await universalFetch(fallbackUrl);
-    
-    // Parse the raw gps.txt format
-    const lines = rawText.split('\n').filter(l => l.trim().length > 0);
-    const features = [];
-    for (const line of lines) {
-      const parts = line.split(',');
-      if (parts.length < 6) continue;
-      
-      const typeStr = parts[0];
-      let type = 2; // default bus
-      if (typeStr === '1') type = 1; // trolley
-      else if (typeStr === '3') type = 3; // tram
-      
-      features.push({
-        geometry: { coordinates: [parseFloat(parts[3]) / 1000000, parseFloat(parts[2]) / 1000000] },
-        properties: {
-          type,
-          line: parts[1],
-          direction: parseInt(parts[5], 10),
-          id: parts[1] + '_' + parts[2] + '_' + parts[3], // pseudo id
-          destination: '' // Not available in gps.txt directly
-        }
-      });
-    }
-    responseText = JSON.stringify({ features });
-  }
-  
+  const responseText = await universalFetch(url);
   const data = JSON.parse(responseText);
   const features = data?.features || [];
 
@@ -770,13 +705,18 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
     return null;
   }
   
-  const arrDest = (arrival.destination || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+  const arrDest = (arrival.destination || '').toLowerCase();
   
   // Try to match by destination
-  let destinationMatches = matching.filter(v => {
-    const vDest = (v.destination || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-    return vDest === arrDest || vDest.includes(arrDest) || arrDest.includes(vDest);
-  });
+  let destinationMatches = matching.filter(v => (v.destination || '').toLowerCase() === arrDest);
+  
+  // Try partial match if no exact match
+  if (destinationMatches.length === 0) {
+    destinationMatches = matching.filter(v => {
+      const vDest = (v.destination || '').toLowerCase();
+      return vDest.includes(arrDest) || arrDest.includes(vDest);
+    });
+  }
   
   // If still no match, just use all matching by line and type
   if (destinationMatches.length === 0) {
@@ -940,17 +880,7 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
     }
     
     if (approaching.length === 0) {
-      // If still no approaching vehicles, check if there are vehicles that JUST passed.
-      // If there is a vehicle that passed, return it so computeEtaToStop can mark it as departed.
-      const passed = vehicleStats.filter(vs => vs.closestIdx > targetIndex && !vs.isWrongDirection);
-      if (passed.length > 0) {
-        // Sort by how recently it passed (closest to targetIndex)
-        passed.sort((a, b) => a.closestIdx - b.closestIdx);
-        console.log(`getVehicleForArrival: returning passed vehicle for line ${arrival.line}`);
-        return passed[0].vehicle;
-      }
-      
-      console.log(`getVehicleForArrival: no approaching or recently passed vehicles found for line ${arrival.line} to ${arrival.destination}`);
+      console.log(`getVehicleForArrival: no approaching vehicles found for line ${arrival.line} to ${arrival.destination}`);
       return null; // Don't show a wrong bus
     }
     
@@ -972,8 +902,8 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
     return destinationMatches[index];
   }
   
-  console.log(`getVehicleForArrival: vehicleIndex ${index} is out of bounds (only ${destinationMatches.length} matches). Returning null.`);
-  return null;
+  console.log(`getVehicleForArrival: vehicleIndex ${index} is out of bounds, returning closest vehicle`);
+  return destinationMatches[0];
 }
 
 /**
@@ -1027,10 +957,10 @@ export async function computeEtaToStop(
   const distToTarget = getDistance(vehicle.lat, vehicle.lng, stop.lat, stop.lng);
 
   // 4b. If the vehicle has already passed the stop (by more than 50m), 
-  // mark it as departed (-1) so it gets filtered out, preventing "Double Now".
+  // don't show it as "Now" even if the schedule is stale.
   if (vehicleClosestIdx > targetIdx) {
     if (distToTarget > 0.05) {
-      return { etaMinutes: -1, source: 'gps' };
+      return { etaMinutes: Math.max(1, scheduleEta), source: 'schedule' };
     }
     return { etaMinutes: 0, source: 'gps' };
   }
@@ -1080,24 +1010,26 @@ export async function computeEtaToStop(
   const gpsEtaMinutes = ((totalDistKm / speedKmh) * 60) + dwellTimeMinutes;
 
   // 8. Sanity check: if the GPS ETA differs wildly from the schedule ETA the
-  // matched vehicle almost certainly belongs to a different trip.
-  // However, buses can easily be 15-25 minutes late in traffic. We should trust GPS if we have a match.
-  const lowerBound = Math.max(0, scheduleEta - 15);
-  const upperBound = scheduleEta + 30; // Allow up to 30 mins delay
+  // matched vehicle almost certainly belongs to a different trip (e.g. it just
+  // finished its previous run and is near the route start, or is a wrong match).
+  // Only trust GPS when it is within a reasonable band around the schedule.
+  const lowerBound = Math.max(0, scheduleEta - Math.max(5, scheduleEta * 0.5));
+  const upperBound = scheduleEta + Math.max(5, scheduleEta * 0.5);
   
   if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
     console.log(`computeEtaToStop: GPS ETA ${gpsEtaMinutes.toFixed(1)}m out of bounds [${lowerBound.toFixed(1)}, ${upperBound.toFixed(1)}] for ${arrival.line} to ${arrival.destination}. Falling back to schedule ${scheduleEta}m.`);
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
   
-  // Trust GPS heavily. The schedule is often wrong when there are delays.
+  // Trust GPS more when vehicle is close (1-3 stops away),
+  // blend equally when 4-6 stops, lean on schedule beyond that.
   let gpsWeight: number;
-  if (stopsAway <= 3) {
-    gpsWeight = 0.95;
-  } else if (stopsAway <= 8) {
-    gpsWeight = 0.80;
+  if (stopsAway <= 2) {
+    gpsWeight = 0.85;
+  } else if (stopsAway <= 5) {
+    gpsWeight = 0.60;
   } else {
-    gpsWeight = 0.65;
+    gpsWeight = 0.35;
   }
   
   const blendedEta = gpsWeight * gpsEtaMinutes + (1 - gpsWeight) * scheduleEta;
@@ -1114,33 +1046,12 @@ export async function computeEtaToStop(
     finalEta = Math.max(minMins, finalEta);
   } else {
     // stopsAway === 0 (vehicle is closest to this stop)
-    
-    // Check if the vehicle is approaching or leaving the stop
-    let isLeaving = false;
-    if (targetIdx < routeStops.length - 1) {
-      const nextStop = routeStops[targetIdx + 1];
-      const distToNext = getDistance(vehicle.lat, vehicle.lng, nextStop.lat, nextStop.lng);
-      const stopToNext = getDistance(stop.lat, stop.lng, nextStop.lat, nextStop.lng);
-      // If vehicle is closer to next stop than the current stop is, it's leaving
-      if (distToNext < stopToNext) {
-        isLeaving = true;
-      }
-    }
-
-    if (isLeaving) {
-      // If leaving, only show "Now" if very close (< 50m)
-      if (distToTarget > 0.05) {
-        finalEta = Math.max(1, finalEta);
-      } else {
-        finalEta = 0;
-      }
+    // Only show "Now" (0) if it's actually very close (< 70m)
+    // 70m is roughly the distance where a bus is definitely at the stop.
+    if (distToTarget > 0.07) {
+      finalEta = Math.max(1, finalEta);
     } else {
-      // If approaching, be more generous (180m)
-      if (distToTarget > 0.18) {
-        finalEta = Math.max(1, finalEta);
-      } else {
-        finalEta = 0;
-      }
+      finalEta = 0;
     }
   }
   
@@ -1199,29 +1110,27 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     // For now, let's use a proxy endpoint if possible, or just keep fetch but wrap it.
     // Actually, CapacitorHttp supports POST.
     
-    let data: any;
-    try {
-      const url = `${API_BASE}/api/transport/peatus/graphql?t=${Date.now()}`;
+    const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+    let text = '';
+    
+    if (Capacitor.isNativePlatform()) {
+      const response = await CapacitorHttp.post({
+        url,
+        headers: { 'Content-Type': 'application/json' },
+        data: { query }
+      });
+      text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    } else {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query })
       });
-      const text = await response.text();
-      if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
-      data = JSON.parse(text);
-    } catch (e) {
-      console.warn('Failed to fetch from peatus/graphql proxy, falling back to direct GraphQL', e);
-      const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
-      const response = await fetch(fallbackUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
-      });
-      data = await response.json();
+      text = await response.text();
     }
 
-    const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || data?.stop?.stoptimesWithoutPatterns || [];
+    const data = JSON.parse(text);
+    const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || [];
 
     const arrivals: Arrival[] = [];
 
@@ -1311,22 +1220,13 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
   
   try {
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
-    const cacheBuster = `_t=${Date.now()}`;
-    const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}&${cacheBuster}`;
+    const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
     
     let arrivals: Arrival[] = [];
     
     try {
       console.log(`fetchDepartures: Fetching from ${url}`);
-      let text = '';
-      try {
-        text = await universalFetch(url);
-        if (text.trim().startsWith('<')) throw new Error('Received HTML instead of text');
-      } catch (e) {
-        console.warn('Failed to fetch from departures proxy, falling back to direct API', e);
-        const fallbackUrl = `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}${time ? `&time=${time}` : ''}`;
-        text = await universalFetch(fallbackUrl);
-      }
+      const text = await universalFetch(url);
       
       if (text) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -1503,9 +1403,6 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
         }
       }));
     }
-
-    // Filter out departed vehicles (etaMinutes < 0)
-    arrivals = arrivals.filter(a => a.minutes >= 0);
 
     // Re-sort by updated minutes
     arrivals.sort((a, b) => a.minutes - b.minutes);

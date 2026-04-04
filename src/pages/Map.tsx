@@ -370,7 +370,7 @@ export const Map = () => {
     const coordMap: { [key: string]: number } = {};
     const validStops = stops.filter(s => isValidLngLat(s.lng, s.lat)).map(stop => {
       // Use a precise key for grouping identical stops
-      const key = `${Math.round(stop.lat * 1000000)},${Math.round(stop.lng * 1000000)}`;
+      const key = `${stop.lat.toFixed(6)},${stop.lng.toFixed(6)}`;
       const count = coordMap[key] || 0;
       coordMap[key] = count + 1;
       
