@@ -950,12 +950,22 @@ export async function computeEtaToStop(
     targetIdx = routeStops.findIndex(s => s.id.split('-')[0] === baseId);
   }
   
-  if (vehicleClosestIdx === -1 || targetIdx === -1 || vehicleClosestIdx >= targetIdx) {
-    // Vehicle has already passed the stop, or can't resolve position — fall back to sched
+  if (vehicleClosestIdx === -1 || targetIdx === -1) {
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
 
-  // 4b. If the vehicle is more than 500m from its closest route stop it is
+  const distToTarget = getDistance(vehicle.lat, vehicle.lng, stop.lat, stop.lng);
+
+  // 4b. If the vehicle has already passed the stop (by more than 50m), 
+  // don't show it as "Now" even if the schedule is stale.
+  if (vehicleClosestIdx > targetIdx) {
+    if (distToTarget > 0.05) {
+      return { etaMinutes: Math.max(1, scheduleEta), source: 'schedule' };
+    }
+    return { etaMinutes: 0, source: 'gps' };
+  }
+
+  // 4c. If the vehicle is more than 500m from its closest route stop it is
   // almost certainly parked at a depot and not currently in service.
   // Fall back to schedule so we don't produce fake GPS ETAs at night.
   if (minVehicleDist > 0.5) {
@@ -963,15 +973,20 @@ export async function computeEtaToStop(
   }
   
   // 5. Compute path distance: vehicle -> closest stop -> ... -> target stop
-  // First leg: vehicle to its closest stop (partial segment)
-  let totalDistKm = getDistance(vehicle.lat, vehicle.lng, routeStops[vehicleClosestIdx].lat, routeStops[vehicleClosestIdx].lng);
-  
-  // Middle legs: stop-to-stop along the route
-  for (let i = vehicleClosestIdx; i < targetIdx; i++) {
-    totalDistKm += getDistance(
-      routeStops[i].lat, routeStops[i].lng,
-      routeStops[i + 1].lat, routeStops[i + 1].lng
-    );
+  let totalDistKm = 0;
+  if (vehicleClosestIdx === targetIdx) {
+    totalDistKm = distToTarget;
+  } else {
+    // First leg: vehicle to its closest stop (partial segment)
+    totalDistKm = getDistance(vehicle.lat, vehicle.lng, routeStops[vehicleClosestIdx].lat, routeStops[vehicleClosestIdx].lng);
+    
+    // Middle legs: stop-to-stop along the route
+    for (let i = vehicleClosestIdx; i < targetIdx; i++) {
+      totalDistKm += getDistance(
+        routeStops[i].lat, routeStops[i].lng,
+        routeStops[i + 1].lat, routeStops[i + 1].lng
+      );
+    }
   }
   
   // 6. Estimate speed
@@ -1019,11 +1034,25 @@ export async function computeEtaToStop(
   
   const blendedEta = gpsWeight * gpsEtaMinutes + (1 - gpsWeight) * scheduleEta;
   
-  // If the vehicle is still at least 1 stop away, ensure we don't show 0 minutes
-  // unless it's extremely close (< 150m) to the target stop.
-  let finalEta = Math.max(0, Math.round(blendedEta));
-  if (stopsAway >= 1 && finalEta === 0 && totalDistKm > 0.15) {
-    finalEta = 1;
+  // 10. Final ETA calculation with "Now" protection
+  let finalEta = Math.round(blendedEta);
+
+  if (stopsAway >= 1) {
+    // If the vehicle is at least 1 stop away, it CANNOT be "Now".
+    // Each stop in between adds travel time + dwell time penalty.
+    const travelTime = (totalDistKm / (speedKmh / 60));
+    const dwellPenalty = stopsAway * 0.6; // 36s per stop
+    const minMins = Math.max(1, Math.ceil(travelTime + dwellPenalty));
+    finalEta = Math.max(minMins, finalEta);
+  } else {
+    // stopsAway === 0 (vehicle is closest to this stop)
+    // Only show "Now" (0) if it's actually very close (< 70m)
+    // 70m is roughly the distance where a bus is definitely at the stop.
+    if (distToTarget > 0.07) {
+      finalEta = Math.max(1, finalEta);
+    } else {
+      finalEta = 0;
+    }
   }
   
   console.log(`computeEtaToStop: ${arrival.line} to ${arrival.destination}: stopsAway=${stopsAway}, dist=${totalDistKm.toFixed(2)}km, gpsEta=${gpsEtaMinutes.toFixed(1)}m, schedEta=${scheduleEta}m, blended=${blendedEta.toFixed(1)}m -> final=${finalEta}m`);

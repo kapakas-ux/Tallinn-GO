@@ -18,7 +18,10 @@ interface ArrivalItemProps {
 export function getLiveMinutes(arrival: Arrival): number {
   if (arrival.departureTimeSeconds) {
     const diffSec = arrival.departureTimeSeconds - Date.now() / 1000;
-    return Math.max(0, Math.floor(diffSec / 60));
+    // Extremely strict "Now": only if less than 20 seconds away.
+    // Otherwise, show at least 1 minute.
+    if (diffSec < 20) return 0;
+    return Math.max(1, Math.round(diffSec / 60));
   }
   return arrival.minutes;
 }
