@@ -36,8 +36,9 @@ const API_BASE = getApiBaseUrl();
  * and standard fetch on web.
  */
 async function universalFetch(url: string, options?: RequestInit): Promise<string> {
-  // On native platforms, ALWAYS use CapacitorHttp to bypass CORS
-  if (Capacitor.isNativePlatform()) {
+  const isNative = Capacitor.isNativePlatform();
+  
+  if (isNative) {
     console.log(`universalFetch (native) START: ${url}`);
     try {
       const headers = (options?.headers as Record<string, string>) || {};
@@ -52,8 +53,8 @@ async function universalFetch(url: string, options?: RequestInit): Promise<strin
         method: options?.method || 'GET',
         headers,
         data: options?.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : undefined,
-        connectTimeout: 10000,
-        readTimeout: 10000
+        connectTimeout: 15000,
+        readTimeout: 15000
       };
       
       const response = await CapacitorHttp.request(optionsForCapacitor);
@@ -68,18 +69,28 @@ async function universalFetch(url: string, options?: RequestInit): Promise<strin
         throw new Error(`CapacitorHttp error: ${response.status}`);
       }
       
-      if (typeof response.data === 'object') {
-        return JSON.stringify(response.data);
+      // Check if we got HTML when we expected JSON/text (common for cookie walls)
+      const data = response.data;
+      if (typeof data === 'string' && data.trim().startsWith('<!DOCTYPE html')) {
+         throw new Error('Received HTML instead of expected data (likely cookie wall)');
       }
-      return String(response.data);
+
+      if (typeof data === 'object') {
+        return JSON.stringify(data);
+      }
+      return String(data);
     } catch (capErr) {
       console.warn(`universalFetch CapacitorHttp FAILED: ${url}`, capErr);
-      // If CapacitorHttp failed, we might still try standard fetch as a last resort,
-      // though it will likely fail due to CORS.
+      // On native, standard fetch will almost certainly fail with CORS for cross-origin.
+      // We only fall back to standard fetch if the URL is local or same-origin.
+      const isCrossOrigin = !url.startsWith('/') && !url.startsWith(window.location.origin);
+      if (isCrossOrigin) {
+        throw capErr; // Don't even try standard fetch, it will just CORS-error
+      }
     }
   }
 
-  // Standard fetch for web or as last-resort fallback for native
+  // Standard fetch for web or as last-resort fallback for native (if not cross-origin)
   console.log(`universalFetch (standard) START: ${url}`);
   const response = await fetch(url, options);
   if (!response.ok) {
