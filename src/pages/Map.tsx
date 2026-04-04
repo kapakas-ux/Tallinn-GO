@@ -587,8 +587,8 @@ export const Map = () => {
                   ` : ''}
                   <div class="text-right flex items-baseline gap-1">
                     ${d.isRealtime ? '<div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center"></div>' : ''}
-                    <span class="font-headline font-black text-lg text-primary flex items-baseline gap-1">
-                      ${(() => { const depSec = (d as any).departureTimeSeconds; const m = depSec ? Math.max(0, Math.floor((depSec - Date.now() / 1000) / 60)) : d.minutes; return m <= 1 ? 'Now' : (m <= 59 ? m + '<span class="text-xs font-medium text-secondary">min</span>' : (d.time ?? m + '<span class="text-xs font-medium text-secondary">min</span>')); })()}
+                    <span class="font-headline font-black text-lg text-primary">
+                      ${(() => { const depSec = (d as any).departureTimeSeconds; const m = depSec ? Math.max(0, Math.floor((depSec - Date.now() / 1000) / 60)) : d.minutes; return m <= 1 ? 'Now' : (d.time ?? m + ' min'); })()}
                     </span>
                   </div>
                 </div>

@@ -134,8 +134,8 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                 {arrival.isRealtime && (
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center" />
                 )}
-                <span className={cn("font-headline font-black text-primary flex items-baseline gap-1", isCompact ? "text-lg" : "text-xl")}>
-                  {liveMinutes <= 1 ? 'Now' : (liveMinutes <= 59 ? <>{liveMinutes}<span className="text-sm font-medium text-secondary">min</span></> : (arrival.time ?? <>{liveMinutes}<span className="text-sm font-medium text-secondary">min</span></>))}
+                <span className={cn("font-headline font-black text-primary", isCompact ? "text-lg" : "text-xl")}>
+                  {liveMinutes <= 1 ? 'Now' : (arrival.time ?? `${liveMinutes}m`)}
                 </span>
               </div>
               {expandable && (expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />)}
