@@ -960,74 +960,98 @@ export async function computeEtaToStop(
 
 export async function fetchDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
   try {
+    const nowSeconds = Math.floor(Date.now() / 1000);
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
-    const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch departures: ${response.status}`);
-    }
-    
-    const text = await response.text();
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    
-    if (lines.length <= 2) {
-      return []; // Empty or just headers
-    }
-    
-    // Header is usually: Transport,RouteNum,ExpectedTimeInSeconds,ScheduleTimeInSeconds,ServerTime,version...
-    const headerParts = lines[0].split(',');
-    const serverTimeSeconds = parseInt(headerParts[4], 10);
-    
+    const gtfsId = `estonia:${targetId}`;
+
+    const numberOfDepartures = time === '0' ? 50 : 15;
+
+    const query = `
+      {
+        stop(id: "${gtfsId}") {
+          name
+          stoptimesWithoutPatterns(numberOfDepartures: ${numberOfDepartures}, startTime: ${nowSeconds - 180}) {
+            scheduledDeparture
+            realtimeDeparture
+            realtime
+            realtimeState
+            headsign
+            serviceDay
+            trip {
+              route {
+                shortName
+                mode
+                agency {
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+
+    const data = await response.json();
+    const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || [];
+
     const arrivals: Arrival[] = [];
-    
-    for (let i = 2; i < lines.length; i++) {
-      const parts = lines[i].split(',');
-      if (parts.length < 5) continue;
-      
-      const typeStr = parts[0].toLowerCase();
+
+    for (const st of stoptimes) {
+      const modeStr = st.trip?.route?.mode?.toLowerCase() || 'bus';
+      const agencyName = st.trip?.route?.agency?.name || '';
       let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
-      if (typeStr === 'tram') type = 'tram';
-      else if (typeStr === 'trolley') type = 'trolley';
-      else if (typeStr === 'train' || typeStr === 'rail') type = 'train';
-      else if (typeStr === 'regional') type = 'regional';
       
-      const line = parts[1];
-      const expectedTime = parseInt(parts[2], 10);
-      const scheduledTime = parseInt(parts[3], 10);
-      const destination = parts[4];
+      if (modeStr.includes('tram')) type = 'tram';
+      else if (modeStr.includes('trolley')) type = 'trolley';
+      else if (modeStr.includes('rail') || modeStr.includes('train')) type = 'train';
+      else if (modeStr.includes('bus')) {
+        // Distinguish city buses from county buses
+        if (agencyName && !agencyName.toLowerCase().includes('tallinna linnatranspordi')) {
+          type = 'regional';
+        }
+      }
+
+      const line = st.trip?.route?.shortName || '';
+      const destination = st.headsign || '';
+
+      // Calculate time
+      const departureTimeSeconds = st.serviceDay + (st.realtimeDeparture || st.scheduledDeparture);
+      const diffSeconds = departureTimeSeconds - nowSeconds;
+      const isRealTime = st.realtime === true;
       
-      // Calculate minutes
-      let diffSeconds = expectedTime - serverTimeSeconds;
+      // If it's marked as departed or canceled, skip
+      if (st.realtimeState === 'DEPARTED' || st.realtimeState === 'CANCELED') continue;
       
-      // Handle midnight wrap-around
-      if (diffSeconds < -43200) diffSeconds += 86400;
-      if (diffSeconds > 43200) diffSeconds -= 86400;
+      // If it's real-time, trust the DEPARTED state mostly, but drop if it's extremely stale (e.g., > 3 mins past)
+      if (isRealTime && diffSeconds < -180) continue;
       
-      // Skip departed
-      if (diffSeconds < -60) continue;
+      // If it's scheduled (not real-time), drop if it's > 1 min past scheduled time
+      if (!isRealTime && diffSeconds < -60) continue;
       
-      const minutes = Math.max(0, Math.floor(diffSeconds / 60));
+      // Clamp negative minutes to 0 so buses just departing show as "Now"
+      let minutes = Math.max(0, Math.floor(diffSeconds / 60));
       
-      // Calculate time string
-      const hours = Math.floor(expectedTime / 3600) % 24;
-      const mins = Math.floor((expectedTime % 3600) / 60);
-      const timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-      
-      const isRealTime = expectedTime !== scheduledTime;
+      const depDate = new Date(departureTimeSeconds * 1000);
+      const hours = String(depDate.getHours()).padStart(2, '0');
+      const mins = String(depDate.getMinutes()).padStart(2, '0');
+      const timeStr = `${hours}:${mins}`;
+
       let status: 'on-time' | 'delayed' | 'expected' | 'departed' = 'expected';
       
       if (isRealTime) {
-        if (expectedTime > scheduledTime + 60) {
+        if (st.realtimeState === 'UPDATED' && st.realtimeDeparture > st.scheduledDeparture + 60) {
           status = 'delayed';
         } else {
           status = 'on-time';
         }
       }
-      
-      const nowUnixSeconds = Math.floor(Date.now() / 1000);
-      const departureTimeSeconds = nowUnixSeconds + diffSeconds;
-      
+
       arrivals.push({
         line,
         destination,
@@ -1039,7 +1063,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
         isRealtime: isRealTime
       });
     }
-    
+
     // Sort by minutes ascending
     arrivals.sort((a, b) => a.minutes - b.minutes);
 
@@ -1055,33 +1079,12 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       a.vehicleIndex = counts[key];
     });
 
-    // Compute ETA for all arrivals
-    await fetchStops(); // Ensure stops and maps are loaded
-    let targetStop = stopsByIdMap?.get(stopId);
-    if (!targetStop && siriId) {
-      // Fallback to searching by siriId if not found by id
-      const allStops = await fetchStops();
-      targetStop = allStops.find(s => s.siriId === siriId);
-    }
-    
-    if (targetStop) {
-      await Promise.all(arrivals.map(async (arrival) => {
-        const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
-        arrival.minutes = etaMinutes;
-        if (source === 'gps') {
-          arrival.info = 'Live GPS';
-        } else if (source === 'blended') {
-          arrival.info = 'GPS + Schedule';
-        }
-      }));
-    }
-
     // Re-sort by updated minutes
     arrivals.sort((a, b) => a.minutes - b.minutes);
 
     return arrivals.slice(0, time === '0' ? 50 : 10);
   } catch (error) {
-    console.error('Error fetching departures:', error);
+    console.error('Error fetching departures from peatus.ee:', error);
     return [];
   }
 }
