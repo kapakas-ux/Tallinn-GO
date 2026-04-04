@@ -92,91 +92,26 @@ export async function fetchRoutes(): Promise<void> {
   
   routesPromise = (async () => {
     try {
-      const url = `${API_BASE}/api/transport/routes`;
-      const text = await universalFetch(url);
-      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      const url = `${API_BASE}/api/transport/parsed-routes`;
+      const response = await fetch(url);
+      const data = await response.json();
       
-      console.log(`fetchRoutes: found ${lines.length} lines`);
+      routesMap = data.routesMap || {};
       
-      if (lines.length === 0) return;
-      
-      let delim = ';';
-      if (lines[0].includes(';')) delim = ';';
-      else if (lines[0].includes(',')) delim = ',';
-      else if (lines[0].includes('\t')) delim = '\t';
-      
-      const header = lines[0].split(delim).map(h => h.trim().toUpperCase());
-      const fld: Record<string, number> = {};
-      for (let i = 0; i < header.length; i++) {
-        fld[header[i]] = i;
+      // Update routeStopsMap
+      for (const [key, value] of Object.entries(data.routeStopsMap || {})) {
+        routeStopsMap[key] = value as any;
       }
       
-      let currentRouteNum = '';
-      let currentTransport = '';
-      let currentRouteName = '';
+      // Update usedStopsSet
+      (data.usedStopsArray || []).forEach((stop: string) => usedStopsSet.add(stop));
       
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.startsWith('#')) continue;
-        
-        const parts = line.split(delim).map(p => p.trim().replace(/"/g, ''));
-        
-        const routeNum = parts[fld['ROUTENUM']];
-        const transport = parts[fld['TRANSPORT']];
-        const routeName = parts[fld['ROUTENAME']];
-        
-        if (routeNum && routeNum !== '-') {
-          currentRouteNum = routeNum;
-        }
-        if (transport && transport !== '-') {
-          currentTransport = transport;
-        }
-        if (routeName && routeName !== '-') {
-          currentRouteName = routeName;
-        }
-        
-        if (currentRouteNum && currentRouteName) {
-          routesMap[currentRouteNum] = currentRouteName;
-          const normNum = currentRouteNum.replace(/^0+/, '');
-          if (normNum && normNum !== currentRouteNum) routesMap[normNum] = currentRouteName;
-        }
-        
-        const routeStops = parts[fld['ROUTESTOPS']];
-        if (routeStops) {
-          const stops = routeStops.split(',').filter(Boolean);
-          for (const stop of stops) {
-            const normStop = stop.replace(/^0+/, '');
-            usedStopsSet.add(stop);
-            usedStopsSet.add(normStop);
-            
-            if (currentTransport) {
-              let mode = currentTransport.toLowerCase();
-              if (mode === 'nightbus') mode = 'bus';
-              
-              if (!stopModesMap[stop]) stopModesMap[stop] = new Set();
-              if (!stopModesMap[normStop]) stopModesMap[normStop] = new Set();
-              
-              stopModesMap[stop].add(mode);
-              stopModesMap[normStop].add(mode);
-            }
-          }
-          if (currentRouteNum && currentRouteName) {
-            if (!routeStopsMap[currentRouteNum]) {
-              routeStopsMap[currentRouteNum] = [];
-            }
-            routeStopsMap[currentRouteNum].push({ name: currentRouteName, stops });
-            
-            const normNum = currentRouteNum.replace(/^0+/, '');
-            if (normNum && normNum !== currentRouteNum) {
-              if (!routeStopsMap[normNum]) {
-                routeStopsMap[normNum] = [];
-              }
-              routeStopsMap[normNum].push({ name: currentRouteName, stops });
-            }
-          }
-        }
+      // Update stopModesMap
+      for (const [key, value] of Object.entries(data.stopModesMap || {})) {
+        stopModesMap[key] = new Set(value as string[]);
       }
-      console.log(`Successfully parsed ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops`);
+      
+      console.log(`Successfully loaded ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops from parsed-routes`);
     } catch (error) {
       console.error('Error fetching/parsing routes:', error);
       routesPromise = null;
@@ -196,18 +131,13 @@ export async function fetchStops(): Promise<Stop[]> {
     
     try {
       console.log('Fetching stops from peatus.ee GraphQL API...');
-      const url = `https://api.peatus.ee/routing/v1/routers/estonia/index/graphql?t=${Date.now()}`;
-      const query = '{ stops { gtfsId name lat lon code desc zoneId parentStation { name } routes { mode } } }';
+      const url = `${API_BASE}/api/transport/peatus/stops`;
       
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
-      });
+      const response = await fetch(url);
       const text = await response.text();
       
       const data = JSON.parse(text);
-      const rawStops = data.data.stops;
+      const rawStops = data.data?.stops || data.stops;
       
       console.log(`fetchStops: received ${rawStops.length} stops from peatus.ee`);
       
@@ -216,7 +146,7 @@ export async function fetchStops(): Promise<Stop[]> {
       try {
         const url = `${API_BASE}/api/transport/stops`;
         const text = await universalFetch(url);
-        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+        const lines = text.split(/\r?\n/);
         if (lines.length > 0) {
           let delim = ';';
           if (lines[0].includes(';')) delim = ';';
@@ -228,9 +158,11 @@ export async function fetchStops(): Promise<Stop[]> {
           
           if (idIdx >= 0 && siriIdx >= 0) {
             for (let i = 1; i < lines.length; i++) {
-              const parts = lines[i].split(delim).map(p => p.trim());
-              const id = parts[idIdx];
-              const siriId = parts[siriIdx];
+              const line = lines[i];
+              if (!line || line.trim().length === 0) continue;
+              const parts = line.split(delim);
+              const id = parts[idIdx]?.trim();
+              const siriId = parts[siriIdx]?.trim();
               if (id && siriId) {
                 siriIdMap.set(id, siriId);
                 const normId = id.replace(/^0+/, '');
@@ -1067,7 +999,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     // For now, let's use a proxy endpoint if possible, or just keep fetch but wrap it.
     // Actually, CapacitorHttp supports POST.
     
-    const url = `https://api.peatus.ee/routing/v1/routers/estonia/index/graphql?t=${Date.now()}`;
+    const url = `${API_BASE}/api/transport/peatus/graphql?t=${Date.now()}`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -1077,7 +1009,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     const text = await response.text();
 
     const data = JSON.parse(text);
-    const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || [];
+    const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || data?.stop?.stoptimesWithoutPatterns || [];
 
     const arrivals: Arrival[] = [];
 

@@ -21,7 +21,7 @@ const config: CapacitorConfig = {
       splashImmersive: true,
     },
     CapacitorHttp: {
-      enabled: true,
+      enabled: false,
     },
   },
 };

@@ -8,6 +8,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(express.json());
+
   // Enable CORS for native app access
   app.use(cors({
     origin: (origin, callback) => {
@@ -43,8 +45,18 @@ async function startServer() {
     res.json({ status: "ok", time: new Date().toISOString(), env: process.env.NODE_ENV });
   });
 
+  let cachedStopsTxt: string | null = null;
+  let stopsTxtCacheTime = 0;
+
   // Proxy for Tallinn transport data
   app.get("/api/transport/stops", async (req, res) => {
+    const now = Date.now();
+    if (cachedStopsTxt && (now - stopsTxtCacheTime < 24 * 60 * 60 * 1000)) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(cachedStopsTxt);
+    }
+
     console.log("GET /api/transport/stops - Fetching from Tallinn...");
     const urls = [
       "https://transport.tallinn.ee/data/stops.txt"
@@ -101,10 +113,12 @@ async function startServer() {
         }
 
         console.log(`Decoded stops.txt from ${url}. First 100 chars: ${text.substring(0, 100)}`);
+        
+        cachedStopsTxt = text;
+        stopsTxtCacheTime = now;
+        
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
         return res.send(text);
       } catch (error: any) {
         console.error(`Error fetching stops from ${url}:`, error.message);
@@ -112,10 +126,174 @@ async function startServer() {
       }
     }
 
+    if (cachedStopsTxt) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.send(cachedStopsTxt);
+    }
+
     res.status(500).json({ error: "Failed to fetch stops from all sources", details: lastError?.message });
   });
 
+  let cachedRoutesTxt: string | null = null;
+  let routesTxtCacheTime = 0;
+
+  let cachedParsedRoutes: any = null;
+  let parsedRoutesCacheTime = 0;
+
+  app.get("/api/transport/parsed-routes", async (req, res) => {
+    const now = Date.now();
+    if (cachedParsedRoutes && (now - parsedRoutesCacheTime < 24 * 60 * 60 * 1000)) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.json(cachedParsedRoutes);
+    }
+
+    console.log("Fetching and parsing routes from Tallinn API...");
+    const url = `https://transport.tallinn.ee/data/routes.txt?t=${Date.now()}`;
+    try {
+      const response = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 30000,
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      const buffer = Buffer.from(response.data);
+      let text = '';
+      try {
+        text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+      } catch (e) {
+        try {
+          text = new TextDecoder('windows-1257').decode(buffer);
+        } catch (e2) {
+          text = new TextDecoder('iso-8859-1').decode(buffer);
+        }
+      }
+
+      const lines = text.split(/\r?\n/);
+      
+      const routesMap: Record<string, string> = {};
+      const routeStopsMap: Record<string, { name: string, stops: string[] }[]> = {};
+      const usedStopsSet = new Set<string>();
+      const stopModesMap: Record<string, Set<string>> = {};
+
+      if (lines.length > 0) {
+        let delim = ';';
+        if (lines[0].includes(';')) delim = ';';
+        else if (lines[0].includes(',')) delim = ',';
+        else if (lines[0].includes('\t')) delim = '\t';
+        
+        const header = lines[0].split(delim).map(h => h.trim().toUpperCase());
+        const fld: Record<string, number> = {};
+        for (let i = 0; i < header.length; i++) {
+          fld[header[i]] = i;
+        }
+        
+        let currentRouteNum = '';
+        let currentTransport = '';
+        let currentRouteName = '';
+        
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line || line.trim().length === 0 || line.startsWith('#')) continue;
+          
+          const parts = line.split(delim);
+          
+          const rawRouteNum = parts[fld['ROUTENUM']];
+          const rawTransport = parts[fld['TRANSPORT']];
+          const rawRouteName = parts[fld['ROUTENAME']];
+          const rawRouteStops = parts[fld['ROUTESTOPS']];
+          
+          const routeNum = rawRouteNum ? rawRouteNum.trim().replace(/"/g, '') : undefined;
+          const transport = rawTransport ? rawTransport.trim().replace(/"/g, '') : undefined;
+          const routeName = rawRouteName ? rawRouteName.trim().replace(/"/g, '') : undefined;
+          const routeStops = rawRouteStops ? rawRouteStops.trim().replace(/"/g, '') : undefined;
+          
+          if (routeNum && routeNum !== '-') {
+            currentRouteNum = routeNum;
+          }
+          if (transport && transport !== '-') {
+            currentTransport = transport;
+          }
+          if (routeName && routeName !== '-') {
+            currentRouteName = routeName;
+          }
+          
+          if (currentRouteNum && currentRouteName) {
+            routesMap[currentRouteNum] = currentRouteName;
+            const normNum = currentRouteNum.replace(/^0+/, '');
+            if (normNum && normNum !== currentRouteNum) routesMap[normNum] = currentRouteName;
+          }
+          
+          if (routeStops) {
+            const stops = routeStops.split(',').filter(Boolean);
+            for (const stop of stops) {
+              const normStop = stop.replace(/^0+/, '');
+              usedStopsSet.add(stop);
+              usedStopsSet.add(normStop);
+              
+              if (currentTransport) {
+                let mode = currentTransport.toLowerCase();
+                if (mode === 'nightbus') mode = 'bus';
+                
+                if (!stopModesMap[stop]) stopModesMap[stop] = new Set();
+                if (!stopModesMap[normStop]) stopModesMap[normStop] = new Set();
+                
+                stopModesMap[stop].add(mode);
+                stopModesMap[normStop].add(mode);
+              }
+            }
+            if (currentRouteNum && currentRouteName) {
+              if (!routeStopsMap[currentRouteNum]) {
+                routeStopsMap[currentRouteNum] = [];
+              }
+              routeStopsMap[currentRouteNum].push({ name: currentRouteName, stops });
+              
+              const normNum = currentRouteNum.replace(/^0+/, '');
+              if (normNum && normNum !== currentRouteNum) {
+                if (!routeStopsMap[normNum]) {
+                  routeStopsMap[normNum] = [];
+                }
+                routeStopsMap[normNum].push({ name: currentRouteName, stops });
+              }
+            }
+          }
+        }
+      }
+
+      // Convert Sets to Arrays for JSON serialization
+      const stopModesMapArray: Record<string, string[]> = {};
+      for (const [key, set] of Object.entries(stopModesMap)) {
+        stopModesMapArray[key] = Array.from(set);
+      }
+
+      cachedParsedRoutes = {
+        routesMap,
+        routeStopsMap,
+        usedStopsArray: Array.from(usedStopsSet),
+        stopModesMap: stopModesMapArray
+      };
+      parsedRoutesCacheTime = now;
+      
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.json(cachedParsedRoutes);
+    } catch (error: any) {
+      console.error(`Error fetching/parsing routes:`, error.message);
+      if (cachedParsedRoutes) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.json(cachedParsedRoutes);
+      }
+      res.status(500).json({ error: "Failed to fetch/parse routes", details: error.message });
+    }
+  });
+
   app.get("/api/transport/routes", async (req, res) => {
+    const now = Date.now();
+    if (cachedRoutesTxt && (now - routesTxtCacheTime < 24 * 60 * 60 * 1000)) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(cachedRoutesTxt);
+    }
+
     console.log("Fetching routes from Tallinn API...");
     const url = `https://transport.tallinn.ee/data/routes.txt?t=${Date.now()}`;
     try {
@@ -135,10 +313,19 @@ async function startServer() {
           text = new TextDecoder('iso-8859-1').decode(buffer);
         }
       }
+      
+      cachedRoutesTxt = text;
+      routesTxtCacheTime = now;
+      
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
       return res.send(text);
     } catch (error: any) {
       console.error(`Error fetching routes from ${url}:`, error.message);
+      if (cachedRoutesTxt) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        return res.send(cachedRoutesTxt);
+      }
       res.status(500).json({ error: "Failed to fetch routes", details: error.message });
     }
   });
@@ -371,6 +558,64 @@ async function startServer() {
     } catch (error: any) {
       console.error("Error fetching vehicles from gis.ee:", error.message);
       res.status(500).json({ error: "Failed to fetch vehicles data" });
+    }
+  });
+
+  let cachedPeatusStops: any = null;
+  let peatusStopsCacheTime = 0;
+
+  app.get("/api/transport/peatus/stops", async (req, res) => {
+    const now = Date.now();
+    // Cache for 24 hours
+    if (cachedPeatusStops && (now - peatusStopsCacheTime < 24 * 60 * 60 * 1000)) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.json(cachedPeatusStops);
+    }
+
+    try {
+      const query = '{ stops { gtfsId name lat lon code desc zoneId parentStation { name } routes { mode } } }';
+      const response = await axios.post("https://api.peatus.ee/routing/v1/routers/estonia/index/graphql", { query }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 30000
+      });
+      
+      cachedPeatusStops = response.data;
+      peatusStopsCacheTime = now;
+      
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.json(cachedPeatusStops);
+    } catch (error: any) {
+      console.error("Error fetching from Peatus GraphQL:", error.message);
+      if (cachedPeatusStops) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.json(cachedPeatusStops);
+      }
+      res.status(500).json({ error: "Failed to fetch from Peatus GraphQL" });
+    }
+  });
+
+  app.post("/api/transport/peatus/graphql", async (req, res) => {
+    try {
+      const response = await axios.post("https://api.peatus.ee/routing/v1/routers/estonia/index/graphql", req.body, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 10000
+      });
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.json(response.data);
+    } catch (error: any) {
+      console.error("Error fetching from Peatus GraphQL:", error.message);
+      res.status(500).json({ error: "Failed to fetch from Peatus GraphQL" });
     }
   });
 
