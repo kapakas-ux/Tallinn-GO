@@ -47,7 +47,7 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-headline font-bold text-xs text-primary uppercase tracking-widest">Set alert</h4>
+        <h4 className="font-headline font-bold text-xs text-primary uppercase tracking-widest">Set Alert</h4>
         <button onClick={onClose} className="text-secondary hover:text-primary">
           <X className="w-4 h-4" />
         </button>
@@ -60,13 +60,13 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
           onClick={() => handleSchedule(5)}
           className="w-full py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
         >
-          <Bell className="w-3 h-3" /> 5 minutes before
+          <Bell className="w-3 h-3" /> 5 Minutes Before
         </button>
         <button 
           onClick={() => handleSchedule(10)}
           className="w-full py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
         >
-          <Bell className="w-3 h-3" /> 10 minutes before
+          <Bell className="w-3 h-3" /> 10 Minutes Before
         </button>
       </div>
     </motion.div>

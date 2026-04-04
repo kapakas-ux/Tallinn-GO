@@ -36,7 +36,7 @@ export const SettingsModal = ({ onClose }: Props) => {
         <div className="p-6 overflow-y-auto space-y-6">
           <div>
             <h3 className="font-headline font-bold text-sm text-secondary uppercase tracking-widest mb-3">
-              Alert sound
+              Alert Sound
             </h3>
             <p className="text-xs text-secondary font-label mb-4 leading-relaxed">
               Choose the sound played when a departure alert fires. Press ▶ to preview.
@@ -75,7 +75,7 @@ export const SettingsModal = ({ onClose }: Props) => {
           {/* Daily Fact toggle */}
           <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-variant/20 bg-surface-container-low">
             <div>
-              <p className="font-headline font-bold text-sm text-primary">Daily transit fact</p>
+              <p className="font-headline font-bold text-sm text-primary">Daily Transit Fact</p>
               <p className="font-label text-[10px] text-secondary mt-0.5">Show a fun fact on the dashboard each day</p>
             </div>
             <button
@@ -93,7 +93,7 @@ export const SettingsModal = ({ onClose }: Props) => {
           {/* Show Favorites First toggle */}
           <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-variant/20 bg-surface-container-low">
             <div>
-              <p className="font-headline font-bold text-sm text-primary">Show favorites first</p>
+              <p className="font-headline font-bold text-sm text-primary">Show Favorites First</p>
               <p className="font-label text-[10px] text-secondary mt-0.5">Display favorites above nearby stops</p>
             </div>
             <button
