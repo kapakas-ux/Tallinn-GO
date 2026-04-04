@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, MapPin, Map, Star, Search } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
 
 export const TopBar = () => {
@@ -8,7 +8,6 @@ export const TopBar = () => {
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isGettingStartedOpen, setIsGettingStartedOpen] = useState(false);
 
   return (
     <>
@@ -40,19 +39,10 @@ export const TopBar = () => {
               <div className="absolute top-full left-6 mt-2 w-48 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 overflow-hidden z-50">
                 <button
                   onClick={() => {
-                    setIsGettingStartedOpen(true);
-                    setIsMenuOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
-                >
-                  🚀 Getting Started
-                </button>
-                <button
-                  onClick={() => {
                     setIsSettingsOpen(true);
                     setIsMenuOpen(false);
                   }}
-                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
                 >
                   ⚙️ Settings
                 </button>
@@ -91,80 +81,6 @@ export const TopBar = () => {
 
       {/* Settings Modal */}
       {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
-
-      {/* Getting Started Modal */}
-      {isGettingStartedOpen && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={() => setIsGettingStartedOpen(false)}
-        >
-          <div 
-            className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
-              <h2 className="font-headline font-black text-2xl text-primary">Getting Started</h2>
-              <button 
-                onClick={() => setIsGettingStartedOpen(false)}
-                className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-secondary"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto font-sans text-sm text-on-surface-variant space-y-6">
-              <p className="text-base text-primary font-medium">Welcome to Tallinn GO! Here's what you can do with the app:</p>
-              
-              <div className="flex gap-4 items-start">
-                <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-full text-blue-600 dark:text-blue-400 shrink-0">
-                  <MapPin className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Live Departures</h3>
-                  <p>See real-time public transport departures for stops near your location instantly on the dashboard.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-                <div className="bg-emerald-100 dark:bg-emerald-900/30 p-3 rounded-full text-emerald-600 dark:text-emerald-400 shrink-0">
-                  <Map className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Interactive Map</h3>
-                  <p>Explore all stops and track live vehicles (buses, trams, trolleys) moving on the map.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-                <div className="bg-amber-100 dark:bg-amber-900/30 p-3 rounded-full text-amber-600 dark:text-amber-400 shrink-0">
-                  <Star className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Favourite Stops</h3>
-                  <p>Save your most used stops to your favourites for quick access to their departures anytime.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-                <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-full text-purple-600 dark:text-purple-400 shrink-0">
-                  <Search className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Search</h3>
-                  <p>Easily find any stop in Tallinn by its name or ID using the Stops tab.</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">
-              <button 
-                onClick={() => setIsGettingStartedOpen(false)}
-                className="w-full py-3 bg-primary text-white rounded-xl font-bold font-headline hover:bg-primary/90 transition-colors"
-              >
-                Let's Go!
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Terms & Conditions Modal */}
       {isTermsOpen && (

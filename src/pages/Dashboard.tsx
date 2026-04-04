@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleColorClass } from '../lib/utils';
+import { cn, formatDistance, formatWalkingTime, getStopColorClass } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
 import { getFavorites, isFavorite, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
-import { ArrivalItem, getLiveMinutes } from '../components/ArrivalItem';
+import { ArrivalItem } from '../components/ArrivalItem';
 import { Stop, Arrival } from '../types';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { NotificationSelector } from '../components/NotificationSelector';
@@ -39,18 +39,11 @@ export const Dashboard = () => {
   const [editEmoji, setEditEmoji] = useState('');
   const [alertingArrival, setAlertingArrival] = useState<{ stop: Stop; arrival: Arrival } | null>(null);
   const [scheduledAlerts, setScheduledAlerts] = useState<any[]>([]);
-  const [settings, setSettings] = useState(getSettings());
   const [debugInfo, setDebugInfo] = useState<{ url: string, status: string, lastError: string | null }>({
     url: '',
     status: 'Checking...',
     lastError: null
   });
-
-  useEffect(() => {
-    const handleSettingsChange = () => setSettings(getSettings());
-    window.addEventListener('settings_changed', handleSettingsChange);
-    return () => window.removeEventListener('settings_changed', handleSettingsChange);
-  }, []);
 
   useEffect(() => {
     const checkApi = async () => {
@@ -143,12 +136,11 @@ export const Dashboard = () => {
     })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
     const nearest = sorted[0];
-    const nearby = sorted.slice(1, 4);
     
     // Only update departures if the closest stop actually changed
     if (!closestStop || nearest.id !== closestStop.id) {
       setClosestStop(nearest);
-      setNearbyStops(nearby);
+      setNearbyStops(sorted.slice(1, 4));
       setLoading(true);
       
       fetchDepartures(nearest.id, nearest.siriId).then(deps => {
@@ -160,27 +152,9 @@ export const Dashboard = () => {
     } else {
       // Just update distance
       setClosestStop(nearest);
-      setNearbyStops(nearby);
+      setNearbyStops(sorted.slice(1, 4));
     }
   }, [userLocation, allStops]);
-
-  // Auto-fetch departures for all nearby stops
-  useEffect(() => {
-    if (nearbyStops.length === 0) return;
-    nearbyStops.forEach(async (stop) => {
-      if (nearbyDepartures[stop.id]) return;
-      setNearbyLoading(prev => ({ ...prev, [stop.id]: true }));
-      try {
-        const deps = await fetchDepartures(stop.id, stop.siriId);
-        setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
-      } catch (err) {
-        console.error("Failed to load nearby departures", err);
-      } finally {
-        setNearbyLoading(prev => ({ ...prev, [stop.id]: false }));
-      }
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nearbyStops]);
 
   const handleNearbyClick = async (stop: Stop) => {
     const stopId = stop.id;
@@ -246,26 +220,21 @@ export const Dashboard = () => {
         }).catch(err => console.error("Failed to refresh closest stop departures", err));
       }
 
-      // Refresh nearby stops
-      nearbyStops.forEach(stop => {
-        fetchDepartures(stop.id, stop.siriId).then(deps => {
-          setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
-        }).catch(err => console.error("Failed to refresh nearby departures", err));
-      });
-
-      // Refresh expanded favorite
-      if (expandedNearby && !nearbyStops.some(s => s.id === expandedNearby)) {
-        const stop = favorites.find(f => f.id === expandedNearby);
+      // Refresh expanded nearby stop or favorite
+      if (expandedNearby) {
+        const stop = allStops.find(s => s.id === expandedNearby) || favorites.find(f => f.id === expandedNearby);
         if (stop) {
           fetchDepartures(stop.id, stop.siriId).then(deps => {
-            setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 3) }));
-          }).catch(err => console.error("Failed to refresh favorite departures", err));
+            // Favorites show 3, nearby show 6
+            const isFav = favorites.some(f => f.id === stop.id);
+            setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, isFav ? 3 : 6) }));
+          }).catch(err => console.error("Failed to refresh nearby departures", err));
         }
       }
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [closestStop, expandedNearby, allStops, favorites, nearbyStops]);
+  }, [closestStop, expandedNearby, allStops, favorites]);
 
   const handleSaveEdit = () => {
     if (editingFav) {
@@ -276,315 +245,6 @@ export const Dashboard = () => {
   };
 
   const visibleFavs = showAllFavs ? favorites : favorites.slice(0, 3);
-
-  const renderNearbyStops = () => (
-    nearbyStops.length > 0 && (
-      <section className="mb-12 space-y-4">
-        <div className="flex items-baseline justify-between">
-          <h3 className="font-headline font-bold text-2xl text-primary">Nearby Stops</h3>
-        </div>
-        <div className="grid grid-cols-1 gap-3">
-          {nearbyStops.map((stop) => (
-            <div key={stop.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all">
-              <div 
-                className={cn(
-                  "p-3 flex items-center justify-between hover:bg-surface-container-low transition-colors cursor-pointer group",
-                  expandedNearby === stop.id ? "rounded-t-[20px]" : "rounded-[20px]"
-                )}
-                onClick={() => handleNearbyClick(stop)}
-              >
-                <div className="flex items-center gap-4">
-                  <Link 
-                    to={`/map?lat=${stop.lat}&lng=${stop.lng}&zoom=20&stopId=${stop.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className={cn(
-                      "h-10 w-10 rounded-full flex items-center justify-center transition-colors active:scale-90",
-                      getStopColorClass(stop)
-                    )}
-                    title="View on Map"
-                  >
-                    <MapPin className="w-5 h-5" />
-                  </Link>
-                  <div>
-                    <h4 className="font-headline font-bold text-lg text-primary flex items-center gap-2">
-                      {favorites.find(f => f.id === stop.id)?.emoji && (
-                        <span className="text-lg">{favorites.find(f => f.id === stop.id)?.emoji}</span>
-                      )}
-                      {favorites.find(f => f.id === stop.id)?.customName || stop.name}
-                    </h4>
-                      <div className="flex flex-col mt-0.5">
-                        <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-                          {formatDistance(stop.distance! * 1000)}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Footprints className="w-2.5 h-2.5 text-secondary/60" />
-                          <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-                            {formatWalkingTime(stop.distance! * 1000)}
-                          </span>
-                        </div>
-                      </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(stop);
-                    }}
-                    className={cn(
-                      "h-10 w-10 rounded-full flex items-center justify-center transition-all",
-                      isFavorite(stop.id) ? "text-amber-400" : "text-secondary hover:text-amber-400"
-                    )}
-                  >
-                    <Star className={cn("w-5 h-5", isFavorite(stop.id) && "fill-current")} />
-                  </button>
-                  <div className="text-secondary ml-1">
-                    {expandedNearby === stop.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                  </div>
-                </div>
-              </div>
-
-              {/* Inline departure preview (always visible) */}
-              {!expandedNearby || expandedNearby !== stop.id ? (
-                nearbyLoading[stop.id] ? (
-                  <div className="flex items-center gap-2 px-3 pb-2.5">
-                    <Loader2 className="w-3 h-3 animate-spin text-secondary/40" />
-                    <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
-                  </div>
-                ) : nearbyDepartures[stop.id]?.length > 0 ? (
-                  <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 flex gap-3">
-                    {[nearbyDepartures[stop.id].slice(0, 1), nearbyDepartures[stop.id].slice(1, 2)].map((col, ci) => (
-                      <div key={ci} className="flex-1 min-w-0 space-y-0.5">
-                        {col.map((arr, i) => (
-                          <div key={i} className="flex items-center justify-between py-0.5 min-w-0">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
-                                {arr.line}
-                              </div>
-                              <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
-                                {arr.destination}
-                              </span>
-                            </div>
-                            <span className={cn(
-                              "font-headline font-black text-[11px] shrink-0 ml-1", 
-                              arr.status === 'departed' ? "text-secondary/40" : (arr.isRealtime ? "text-emerald-500 animate-pulse" : "text-primary")
-                            )}>
-                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) === 0 ? 'Now' : (arr.time ?? `${getLiveMinutes(arr)}m`)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                ) : null
-              ) : null}
-
-              {/* Expanded Nearby Departures */}
-              {expandedNearby === stop.id && (
-                <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
-                  {nearbyLoading[stop.id] ? (
-                    <div className="flex justify-center py-4">
-                      <Loader2 className="w-5 h-5 animate-spin text-secondary" />
-                    </div>
-                  ) : nearbyDepartures[stop.id]?.length > 0 ? (
-                    <div className="space-y-2">
-                      {nearbyDepartures[stop.id].map((arr, i) => (
-                        <div key={i} className="relative">
-                          <ArrivalItem 
-                            arrival={arr} 
-                            stop={stop} 
-                            variant="compact"
-                            isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
-                            onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
-                          />
-                          <AnimatePresence>
-                            {alertingArrival?.arrival === arr && alertingArrival?.stop === stop && (
-                              <NotificationSelector 
-                                stop={stop}
-                                arrival={arr}
-                                onClose={() => setAlertingArrival(null)}
-                                onScheduled={() => {
-                                  setScheduledAlerts(getActiveAlerts());
-                                }}
-                              />
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-4 text-center text-sm text-secondary">
-                      No upcoming departures
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-    )
-  );
-
-  const renderFavorites = () => (
-    <section className="space-y-4 mb-12">
-      <div className="flex items-baseline justify-between">
-        <h3 className="font-headline font-bold text-2xl text-primary">Favorites</h3>
-        {favorites.length > 0 && (
-          <button 
-            onClick={() => setIsEditingFavs(!isEditingFavs)}
-            className={cn(
-              "font-label text-xs font-bold uppercase tracking-widest transition-all px-3 py-1 rounded-full",
-              isEditingFavs ? "bg-primary text-white" : "text-primary hover:bg-primary/5"
-            )}
-          >
-            {isEditingFavs ? 'Done' : 'Edit'}
-          </button>
-        )}
-      </div>
-      
-      <div className="grid grid-cols-1 gap-3">
-        {visibleFavs.map((fav) => (
-          <div key={fav.id} className={cn(
-            "bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all",
-            isEditingFavs && "ring-2 ring-primary/20"
-          )}>
-            <div 
-              onClick={() => handleFavClick(fav)}
-              className={cn(
-                "p-3 flex items-center justify-between cursor-pointer hover:bg-surface-container-low transition-colors active:scale-[0.98]",
-                isEditingFavs && "bg-primary/5",
-                expandedNearby === fav.id ? "rounded-t-[20px]" : "rounded-[20px]"
-              )}
-            >
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Link 
-                    to={`/map?lat=${fav.lat}&lng=${fav.lng}&zoom=20&stopId=${fav.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="h-10 w-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center hover:bg-amber-500 hover:text-white transition-colors active:scale-90"
-                    title="View on Map"
-                  >
-                    {fav.emoji ? <span className="text-xl">{fav.emoji}</span> : <MapPin className="w-5 h-5" />}
-                  </Link>
-                  {isEditingFavs && (
-                    <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-1 shadow-sm">
-                      <Edit className="w-2.5 h-2.5" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h4 className="font-headline font-bold text-lg text-primary">
-                    {fav.customName || fav.name}
-                    {fav.customName && <span className="text-[10px] text-secondary font-normal ml-2 opacity-50 uppercase tracking-widest">({fav.name})</span>}
-                  </h4>
-                  {userLocation ? (
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider">
-                        {formatDistance(getDistance(userLocation.lat, userLocation.lng, fav.lat, fav.lng) * 1000)}
-                      </span>
-                      <span className="text-secondary opacity-30">•</span>
-                      <div className="flex items-center gap-1">
-                        <Footprints className="w-3 h-3 text-secondary/60" />
-                        <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider">
-                          {formatWalkingTime(getDistance(userLocation.lat, userLocation.lng, fav.lat, fav.lng) * 1000)}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1 text-secondary">
-                      <MapPin className="w-3 h-3" />
-                      <span className="font-label text-[10px] uppercase tracking-widest font-bold">Stop ID: {fav.id}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(fav);
-                  }}
-                  className="h-10 w-10 rounded-full flex items-center justify-center text-amber-400 active:scale-90 transition-all"
-                >
-                  <Star className="w-5 h-5 fill-current" />
-                </button>
-                <div className="text-secondary">
-                  {expandedNearby === fav.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                </div>
-              </div>
-            </div>
-            
-            {/* Expanded Departures */}
-            {expandedNearby === fav.id && (
-              <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
-                {nearbyLoading[fav.id] ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-secondary" />
-                  </div>
-                ) : nearbyDepartures[fav.id]?.length > 0 ? (
-                  <div className="space-y-2">
-                    {nearbyDepartures[fav.id].map((arr, i) => (
-                      <div key={i} className="relative">
-                        <ArrivalItem
-                          arrival={arr}
-                          stop={fav}
-                          variant="compact"
-                          isAlertActive={isAlertActive(fav.id, arr.line, arr.minutes)}
-                          onAlertClick={() => setAlertingArrival({ stop: fav, arrival: arr })}
-                        />
-                        <AnimatePresence>
-                          {alertingArrival?.arrival === arr && alertingArrival?.stop === fav && (
-                            <NotificationSelector 
-                              stop={fav}
-                              arrival={arr}
-                              onClose={() => setAlertingArrival(null)}
-                              onScheduled={() => {
-                                setScheduledAlerts(getActiveAlerts());
-                              }}
-                            />
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-4 text-center text-sm text-secondary">
-                    No upcoming departures
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      
-      {favorites.length > 3 && (
-        <button 
-          onClick={() => setShowAllFavs(!showAllFavs)}
-          className="w-full py-3 flex items-center justify-center gap-2 text-primary font-bold text-sm uppercase tracking-widest hover:bg-surface-container-low rounded-[20px] transition-colors"
-        >
-          {showAllFavs ? (
-            <>Show Less <ChevronUp className="w-4 h-4" /></>
-          ) : (
-            <>Show All {favorites.length} Favorites <ChevronDown className="w-4 h-4" /></>
-          )}
-        </button>
-      )}
-      
-      {favorites.length === 0 && (
-        <div className="p-10 bg-surface-container-lowest editorial-shadow rounded-[20px] text-center border-2 border-dashed border-outline-variant/20">
-          <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-400/40">
-            <Star className="w-8 h-8" />
-          </div>
-          <h4 className="font-headline font-bold text-primary mb-2 text-lg">No favorites yet</h4>
-          <p className="text-secondary text-sm max-w-[240px] mx-auto">
-            Add stops to your favourites for quick access to live departures.
-          </p>
-        </div>
-      )}
-    </section>
-  );
 
   return (
     <div className="max-w-screen-md mx-auto px-6 mt-4 pb-10">
@@ -800,18 +460,277 @@ export const Dashboard = () => {
         )}
       </section>
 
-      {/* Nearby Stations and Favorites Section */}
-      {settings.showFavoritesFirst ? (
-        <>
-          {renderFavorites()}
-          {renderNearbyStops()}
-        </>
-      ) : (
-        <>
-          {renderNearbyStops()}
-          {renderFavorites()}
-        </>
+      {/* Nearby Stations Section */}
+      {nearbyStops.length > 0 && (
+        <section className="mb-12 space-y-4">
+          <div className="flex items-baseline justify-between">
+            <h3 className="font-headline font-bold text-2xl text-primary">Nearby Stops</h3>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {nearbyStops.map((stop) => (
+              <div key={stop.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all">
+                <div 
+                  className={cn(
+                    "p-3 flex items-center justify-between hover:bg-surface-container-low transition-colors cursor-pointer group",
+                    expandedNearby === stop.id ? "rounded-t-[20px]" : "rounded-[20px]"
+                  )}
+                  onClick={() => handleNearbyClick(stop)}
+                >
+                  <div className="flex items-center gap-4">
+                    <Link 
+                      to={`/map?lat=${stop.lat}&lng=${stop.lng}&zoom=20&stopId=${stop.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className={cn(
+                        "h-10 w-10 rounded-full flex items-center justify-center transition-colors active:scale-90",
+                        getStopColorClass(stop)
+                      )}
+                      title="View on Map"
+                    >
+                      <MapPin className="w-5 h-5" />
+                    </Link>
+                    <div>
+                      <h4 className="font-headline font-bold text-lg text-primary flex items-center gap-2">
+                        {favorites.find(f => f.id === stop.id)?.emoji && (
+                          <span className="text-lg">{favorites.find(f => f.id === stop.id)?.emoji}</span>
+                        )}
+                        {favorites.find(f => f.id === stop.id)?.customName || stop.name}
+                      </h4>
+                        <div className="flex flex-col mt-0.5">
+                          <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
+                            {formatDistance(stop.distance! * 1000)}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Footprints className="w-2.5 h-2.5 text-secondary/60" />
+                            <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
+                              {formatWalkingTime(stop.distance! * 1000)}
+                            </span>
+                          </div>
+                        </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(stop);
+                      }}
+                      className={cn(
+                        "h-10 w-10 rounded-full flex items-center justify-center transition-all",
+                        isFavorite(stop.id) ? "text-amber-400" : "text-secondary hover:text-amber-400"
+                      )}
+                    >
+                      <Star className={cn("w-5 h-5", isFavorite(stop.id) && "fill-current")} />
+                    </button>
+                    <div className="text-secondary ml-1">
+                      {expandedNearby === stop.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded Nearby Departures */}
+                {expandedNearby === stop.id && (
+                  <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
+                    {nearbyLoading[stop.id] ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-secondary" />
+                      </div>
+                    ) : nearbyDepartures[stop.id]?.length > 0 ? (
+                      <div className="space-y-2">
+                        {nearbyDepartures[stop.id].map((arr, i) => (
+                          <div key={i} className="relative">
+                            <ArrivalItem 
+                              arrival={arr} 
+                              stop={stop} 
+                              variant="compact"
+                              isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
+                              onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
+                            />
+                            <AnimatePresence>
+                              {alertingArrival?.arrival === arr && alertingArrival?.stop === stop && (
+                                <NotificationSelector 
+                                  stop={stop}
+                                  arrival={arr}
+                                  onClose={() => setAlertingArrival(null)}
+                                  onScheduled={() => {
+                                    setScheduledAlerts(getActiveAlerts());
+                                  }}
+                                />
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-4 text-center text-sm text-secondary">
+                        No upcoming departures
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
       )}
+
+      {/* Favourites Section */}
+      <section className="space-y-4">
+        <div className="flex items-baseline justify-between">
+          <h3 className="font-headline font-bold text-2xl text-primary">Favorites</h3>
+          {favorites.length > 0 && (
+            <button 
+              onClick={() => setIsEditingFavs(!isEditingFavs)}
+              className={cn(
+                "font-label text-xs font-bold uppercase tracking-widest transition-all px-3 py-1 rounded-full",
+                isEditingFavs ? "bg-primary text-white" : "text-primary hover:bg-primary/5"
+              )}
+            >
+              {isEditingFavs ? 'Done' : 'Edit'}
+            </button>
+          )}
+        </div>
+        
+        <div className="grid grid-cols-1 gap-3">
+          {visibleFavs.map((fav) => (
+            <div key={fav.id} className={cn(
+              "bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all",
+              isEditingFavs && "ring-2 ring-primary/20"
+            )}>
+              <div 
+                onClick={() => handleFavClick(fav)}
+                className={cn(
+                  "p-3 flex items-center justify-between cursor-pointer hover:bg-surface-container-low transition-colors active:scale-[0.98]",
+                  isEditingFavs && "bg-primary/5",
+                  expandedNearby === fav.id ? "rounded-t-[20px]" : "rounded-[20px]"
+                )}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <Link 
+                      to={`/map?lat=${fav.lat}&lng=${fav.lng}&zoom=20&stopId=${fav.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-10 w-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center hover:bg-amber-500 hover:text-white transition-colors active:scale-90"
+                      title="View on Map"
+                    >
+                      {fav.emoji ? <span className="text-xl">{fav.emoji}</span> : <MapPin className="w-5 h-5" />}
+                    </Link>
+                    {isEditingFavs && (
+                      <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-1 shadow-sm">
+                        <Edit className="w-2.5 h-2.5" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-headline font-bold text-lg text-primary">
+                      {fav.customName || fav.name}
+                      {fav.customName && <span className="text-[10px] text-secondary font-normal ml-2 opacity-50 uppercase tracking-widest">({fav.name})</span>}
+                    </h4>
+                    {userLocation ? (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider">
+                          {formatDistance(getDistance(userLocation.lat, userLocation.lng, fav.lat, fav.lng) * 1000)}
+                        </span>
+                        <span className="text-secondary opacity-30">•</span>
+                        <div className="flex items-center gap-1">
+                          <Footprints className="w-3 h-3 text-secondary/60" />
+                          <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wider">
+                            {formatWalkingTime(getDistance(userLocation.lat, userLocation.lng, fav.lat, fav.lng) * 1000)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-secondary">
+                        <MapPin className="w-3 h-3" />
+                        <span className="font-label text-[10px] uppercase tracking-widest font-bold">Stop ID: {fav.id}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(fav);
+                    }}
+                    className="h-10 w-10 rounded-full flex items-center justify-center text-amber-400 active:scale-90 transition-all"
+                  >
+                    <Star className="w-5 h-5 fill-current" />
+                  </button>
+                  <div className="text-secondary">
+                    {expandedNearby === fav.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Expanded Departures */}
+              {expandedNearby === fav.id && (
+                <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
+                  {nearbyLoading[fav.id] ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-secondary" />
+                    </div>
+                  ) : nearbyDepartures[fav.id]?.length > 0 ? (
+                    <div className="space-y-2">
+                      {nearbyDepartures[fav.id].map((arr, i) => (
+                        <div key={i} className="relative">
+                          <ArrivalItem
+                            arrival={arr}
+                            stop={fav}
+                            variant="compact"
+                            isAlertActive={isAlertActive(fav.id, arr.line, arr.minutes)}
+                            onAlertClick={() => setAlertingArrival({ stop: fav, arrival: arr })}
+                          />
+                          <AnimatePresence>
+                            {alertingArrival?.arrival === arr && alertingArrival?.stop === fav && (
+                              <NotificationSelector 
+                                stop={fav}
+                                arrival={arr}
+                                onClose={() => setAlertingArrival(null)}
+                                onScheduled={() => {
+                                  setScheduledAlerts(getActiveAlerts());
+                                }}
+                              />
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-4 text-center text-sm text-secondary">
+                      No upcoming departures
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        
+        {favorites.length > 3 && (
+          <button 
+            onClick={() => setShowAllFavs(!showAllFavs)}
+            className="w-full py-3 flex items-center justify-center gap-2 text-primary font-bold text-sm uppercase tracking-widest hover:bg-surface-container-low rounded-[20px] transition-colors"
+          >
+            {showAllFavs ? (
+              <>Show Less <ChevronUp className="w-4 h-4" /></>
+            ) : (
+              <>Show All {favorites.length} Favorites <ChevronDown className="w-4 h-4" /></>
+            )}
+          </button>
+        )}
+        
+        {favorites.length === 0 && (
+          <div className="p-10 bg-surface-container-lowest editorial-shadow rounded-[20px] text-center border-2 border-dashed border-outline-variant/20">
+            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-400/40">
+              <Star className="w-8 h-8" />
+            </div>
+            <h4 className="font-headline font-bold text-primary mb-2 text-lg">No favorites yet</h4>
+            <p className="text-secondary text-sm max-w-[240px] mx-auto">
+              Add stops to your favourites for quick access to live departures.
+            </p>
+          </div>
+        )}
+      </section>
 
     </div>
   );

@@ -454,7 +454,7 @@ export const Stops = () => {
                         </div>
                       ) : nearbyDepartures[stop.id]?.length > 0 ? (
                         <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 flex gap-3">
-                          {[nearbyDepartures[stop.id].slice(0, 3), nearbyDepartures[stop.id].slice(3, 6)].map((col, ci) => (
+                          {[nearbyDepartures[stop.id].slice(0, 3), nearbyDepartures[stop.id].slice(3)].map((col, ci) => (
                             <div key={ci} className="flex-1 min-w-0 space-y-0.5">
                               {col.map((arr, i) => (
                                 <div key={i} className="flex items-center justify-between py-0.5 min-w-0">
