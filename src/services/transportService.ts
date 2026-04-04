@@ -705,18 +705,13 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
     return null;
   }
   
-  const arrDest = (arrival.destination || '').toLowerCase();
+  const arrDest = (arrival.destination || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
   
   // Try to match by destination
-  let destinationMatches = matching.filter(v => (v.destination || '').toLowerCase() === arrDest);
-  
-  // Try partial match if no exact match
-  if (destinationMatches.length === 0) {
-    destinationMatches = matching.filter(v => {
-      const vDest = (v.destination || '').toLowerCase();
-      return vDest.includes(arrDest) || arrDest.includes(vDest);
-    });
-  }
+  let destinationMatches = matching.filter(v => {
+    const vDest = (v.destination || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    return vDest === arrDest || vDest.includes(arrDest) || arrDest.includes(vDest);
+  });
   
   // If still no match, just use all matching by line and type
   if (destinationMatches.length === 0) {
@@ -1046,12 +1041,33 @@ export async function computeEtaToStop(
     finalEta = Math.max(minMins, finalEta);
   } else {
     // stopsAway === 0 (vehicle is closest to this stop)
-    // Only show "Now" (0) if it's actually very close (< 70m)
-    // 70m is roughly the distance where a bus is definitely at the stop.
-    if (distToTarget > 0.07) {
-      finalEta = Math.max(1, finalEta);
+    
+    // Check if the vehicle is approaching or leaving the stop
+    let isLeaving = false;
+    if (targetIdx < routeStops.length - 1) {
+      const nextStop = routeStops[targetIdx + 1];
+      const distToNext = getDistance(vehicle.lat, vehicle.lng, nextStop.lat, nextStop.lng);
+      const stopToNext = getDistance(stop.lat, stop.lng, nextStop.lat, nextStop.lng);
+      // If vehicle is closer to next stop than the current stop is, it's leaving
+      if (distToNext < stopToNext) {
+        isLeaving = true;
+      }
+    }
+
+    if (isLeaving) {
+      // If leaving, only show "Now" if very close (< 50m)
+      if (distToTarget > 0.05) {
+        finalEta = Math.max(1, finalEta);
+      } else {
+        finalEta = 0;
+      }
     } else {
-      finalEta = 0;
+      // If approaching, be more generous (180m)
+      if (distToTarget > 0.18) {
+        finalEta = Math.max(1, finalEta);
+      } else {
+        finalEta = 0;
+      }
     }
   }
   
@@ -1137,14 +1153,20 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     for (const st of stoptimes) {
       const modeStr = st.trip?.route?.mode?.toLowerCase() || 'bus';
       const agencyName = st.trip?.route?.agency?.name || '';
+      const line = st.trip?.route?.shortName || '';
       let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
       
       if (modeStr.includes('tram')) type = 'tram';
       else if (modeStr.includes('trolley')) type = 'trolley';
       else if (modeStr.includes('rail') || modeStr.includes('train')) type = 'train';
       else if (modeStr.includes('bus')) {
-        // Distinguish city buses from county buses
-        if (agencyName && !agencyName.toLowerCase().includes('tallinna linnatranspordi')) {
+        // Distinguish city buses from county/regional buses
+        const isCityAgency = agencyName.toLowerCase().includes('linnatransport') || 
+                            agencyName.toLowerCase().includes('linnatranspordi');
+        // City buses in Estonia typically have 1-2 digit line numbers
+        const isShortLine = /^\d{1,2}[A-Z]?$/.test(line);
+        
+        if (agencyName && !isCityAgency && !isShortLine) {
           type = 'regional';
         }
       }
@@ -1154,7 +1176,6 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
         continue;
       }
 
-      const line = st.trip?.route?.shortName || '';
       const destination = st.headsign || '';
 
       // Calculate time
@@ -1248,14 +1269,18 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
             const parts = lines[i].split(',');
             if (parts.length < 5) continue;
             
+            const line = parts[1];
             const typeStr = parts[0].toLowerCase();
             let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
             if (typeStr === 'tram') type = 'tram';
             else if (typeStr === 'trolley') type = 'trolley';
             else if (typeStr === 'train' || typeStr === 'rail') type = 'train';
-            else if (typeStr === 'regional') type = 'regional';
+            else if (typeStr === 'regional') {
+              // Re-classify short line numbers as city buses
+              const isShortLine = /^\d{1,2}[A-Z]?$/.test(line);
+              type = isShortLine ? 'bus' : 'regional';
+            }
             
-            const line = parts[1];
             const expectedTime = parseInt(parts[2], 10);
             const scheduledTime = parseInt(parts[3], 10);
             let destination = parts[4];
