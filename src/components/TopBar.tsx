@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, MapPin, Map, Star, Search, Bell, Lightbulb } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
+import { GettingStartedModal } from './GettingStartedModal';
 
 export const TopBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -89,102 +90,11 @@ export const TopBar = () => {
         </div>
       </header>
 
+      {/* Getting Started Modal */}
+      {isGettingStartedOpen && <GettingStartedModal onClose={() => setIsGettingStartedOpen(false)} />}
+
       {/* Settings Modal */}
       {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
-
-      {/* Getting Started Modal */}
-      {isGettingStartedOpen && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={() => setIsGettingStartedOpen(false)}
-        >
-          <div 
-            className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
-              <h2 className="font-headline font-black text-2xl text-primary">Getting started</h2>
-              <button 
-                onClick={() => setIsGettingStartedOpen(false)}
-                className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-secondary"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto font-sans text-sm text-on-surface-variant space-y-6">
-              <p className="text-base text-primary font-medium">Welcome to GO NOW! Here's what you can do with the app:</p>
-              
-              <div className="flex gap-4 items-start">
-                <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-full text-blue-600 dark:text-blue-400 shrink-0">
-                  <MapPin className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Live departures</h3>
-                  <p>See real-time departures in Tallinn, and scheduled departures for the rest of Estonia.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-                <div className="bg-emerald-50 dark:bg-emerald-900/10 p-3 rounded-full text-emerald-600 dark:text-emerald-400 shrink-0">
-                  <Map className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Interactive map</h3>
-                  <p>Explore all stops and track live vehicles (buses, trams, trolleys, trains) moving on the map.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-                <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-full text-amber-600 dark:text-amber-400 shrink-0">
-                  <Star className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Favourite stops</h3>
-                  <p>Save your most used stops to your favourites for quick access to their departures anytime.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-                <div className="bg-purple-50 dark:bg-purple-900/10 p-3 rounded-full text-purple-600 dark:text-purple-400 shrink-0">
-                  <Search className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Search</h3>
-                  <p>Easily find any stop in Tallinn by its name or ID using the Stops tab.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-                <div className="bg-rose-50 dark:bg-rose-900/10 p-3 rounded-full text-rose-600 dark:text-rose-400 shrink-0">
-                  <Bell className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Alerts</h3>
-                  <p>Set custom alerts to be notified when your bus is 5 or 10 minutes away. You can choose your alert sound in settings.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-                <div className="bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-full text-yellow-600 dark:text-yellow-400 shrink-0">
-                  <Lightbulb className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-primary text-base mb-1">Daily facts</h3>
-                  <p>Enjoy daily randomized interesting facts about Estonian public transport. These can be turned off in settings.</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">
-              <button 
-                onClick={() => setIsGettingStartedOpen(false)}
-                className="w-full py-3 bg-primary text-white rounded-xl font-bold font-headline hover:bg-primary/90 transition-colors"
-              >
-                Let's Go!
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Terms & Conditions Modal */}
       {isTermsOpen && (
@@ -197,7 +107,7 @@ export const TopBar = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
-              <h2 className="font-headline font-black text-2xl text-primary">Terms & conditions</h2>
+              <h2 className="font-headline font-black text-2xl text-primary">Terms & Conditions</h2>
               <button 
                 onClick={() => setIsTermsOpen(false)}
                 className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-secondary"
@@ -275,7 +185,7 @@ export const TopBar = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
-              <h2 className="font-headline font-black text-2xl text-primary">Privacy policy</h2>
+              <h2 className="font-headline font-black text-2xl text-primary">Privacy Policy</h2>
               <button 
                 onClick={() => setIsPrivacyOpen(false)}
                 className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-secondary"
@@ -284,7 +194,7 @@ export const TopBar = () => {
               </button>
             </div>
             <div className="p-6 overflow-y-auto font-sans text-sm text-on-surface-variant space-y-4">
-              <p>GO NOW ("we," "our," or "us") respects your privacy. This Privacy Policy explains how we handle your information when you use our app.</p>
+              <p>Tallinn GO ("we," "our," or "us") respects your privacy. This Privacy Policy explains how we handle your information when you use our app.</p>
               
               <div>
                 <h3 className="font-bold text-primary mb-1">Information We Collect</h3>

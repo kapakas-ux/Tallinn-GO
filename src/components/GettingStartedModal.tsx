@@ -16,7 +16,7 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
-          <h2 className="font-headline font-black text-2xl text-primary">Getting started</h2>
+          <h2 className="font-headline font-black text-2xl text-primary">Getting Started</h2>
           <button 
             onClick={onClose}
             className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-secondary"
@@ -34,7 +34,7 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
                 <Clock className="w-5 h-5 text-emerald-500" />
               </div>
               <div>
-                <h3 className="font-bold text-primary text-base mb-1">Real-time data</h3>
+                <h3 className="font-bold text-primary text-base mb-1">Real-Time Data</h3>
                 <p>
                   When you see the <span className="font-headline font-black text-primary text-lg ml-1">5<span className="text-sm font-medium text-emerald-500 animate-pulse">min</span></span> indicator pulsing in green, it means the bus has real-time GPS data and the arrival time is highly accurate.
                 </p>
@@ -70,7 +70,7 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
                 <MapPin className="w-5 h-5 text-purple-500" />
               </div>
               <div>
-                <h3 className="font-bold text-primary text-base mb-1">Map view</h3>
+                <h3 className="font-bold text-primary text-base mb-1">Map View</h3>
                 <p>
                   Tap the map pin icon to view a stop's exact location on the map, or tap on a departure to see the vehicle's live route.
                 </p>
@@ -82,7 +82,7 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
                 <Navigation className="w-5 h-5 text-rose-500" />
               </div>
               <div>
-                <h3 className="font-bold text-primary text-base mb-1">Live location</h3>
+                <h3 className="font-bold text-primary text-base mb-1">Live Location</h3>
                 <p>
                   Enable GPS to automatically see the closest stop and its live departures right when you open the app.
                 </p>

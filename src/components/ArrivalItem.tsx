@@ -18,10 +18,7 @@ interface ArrivalItemProps {
 export function getLiveMinutes(arrival: Arrival): number {
   if (arrival.departureTimeSeconds) {
     const diffSec = arrival.departureTimeSeconds - Date.now() / 1000;
-    if (diffSec < -60) return -1; // Mark as departed if more than 60s in the past
-    // 30 seconds is a better threshold for "Now" to account for boarding.
-    if (diffSec < 30) return 0;
-    return Math.max(1, Math.round(diffSec / 60));
+    return Math.max(0, Math.floor(diffSec / 60));
   }
   return arrival.minutes;
 }
@@ -134,28 +131,8 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                 </button>
               )}
               <div className="flex items-baseline gap-1">
-                <span className={cn(
-                  "font-headline font-black flex items-baseline gap-1", 
-                  isCompact ? "text-lg" : "text-xl",
-                  arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-primary"
-                )}>
-                  {liveMinutes === 0 ? (
-                    'Now'
-                  ) : (
-                    liveMinutes <= 59 ? (
-                      <>
-                        {liveMinutes}
-                        <span className="text-sm font-medium">min</span>
-                      </>
-                    ) : (
-                      arrival.time ?? (
-                        <>
-                          {liveMinutes}
-                          <span className="text-sm font-medium">min</span>
-                        </>
-                      )
-                    )
-                  )}
+                <span className={cn("font-headline font-black text-primary flex items-baseline gap-1", isCompact ? "text-lg" : "text-xl")}>
+                  {liveMinutes <= 1 ? 'Now' : (liveMinutes <= 59 ? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>min</span></> : (arrival.time ?? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>min</span></>))}
                 </span>
               </div>
               {expandable && (expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />)}

@@ -239,7 +239,7 @@ export const Stops = () => {
           <div className="bg-surface-container-lowest editorial-shadow w-full max-w-sm rounded-[32px] overflow-hidden">
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="font-headline font-bold text-2xl text-primary">Edit favorite</h3>
+                <h3 className="font-headline font-bold text-2xl text-primary">Edit Favorite</h3>
                 <button onClick={() => setEditingFav(null)} className="text-secondary hover:text-primary transition-colors">
                   <CloseIcon className="w-6 h-6" />
                 </button>
@@ -321,7 +321,7 @@ export const Stops = () => {
       {searchQuery.trim() ? (
         /* Search Results Section */
         <section className="px-6 mb-12">
-          <h2 className="font-headline text-2xl font-extrabold tracking-tight mb-6">Search results</h2>
+          <h2 className="font-headline text-2xl font-extrabold tracking-tight mb-6">Search Results</h2>
           {filteredStops.length > 0 ? (
             <div className="space-y-3">
               {filteredStops.map((stop) => (
@@ -380,7 +380,7 @@ export const Stops = () => {
                 <span className="font-label text-xs uppercase tracking-widest text-secondary mb-1 block">
                   Live Coverage
                 </span>
-                <h2 className="font-headline text-3xl font-extrabold tracking-tight">Nearby stops</h2>
+                <h2 className="font-headline text-3xl font-extrabold tracking-tight">Nearby Stops</h2>
               </div>
               {isSimulated && (
                 <div className="flex items-center gap-1.5 px-2 py-1 bg-error/10 text-error rounded-full text-[10px] font-bold uppercase tracking-widest border border-error/20">
@@ -665,7 +665,7 @@ export const Stops = () => {
                 <div className="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center mx-auto mb-4 text-secondary/40">
                   <Star className="w-8 h-8" />
                 </div>
-                <h3 className="font-headline font-bold text-primary mb-2">No favorites</h3>
+                <h3 className="font-headline font-bold text-primary mb-2">No Favorites</h3>
                 <p className="text-secondary text-sm max-w-[200px] mx-auto">
                   Add stops to your favorites for quick access.
                 </p>

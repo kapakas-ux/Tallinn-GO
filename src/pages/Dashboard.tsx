@@ -281,7 +281,7 @@ export const Dashboard = () => {
     nearbyStops.length > 0 && (
       <section className="mb-12 space-y-4">
         <div className="flex items-baseline justify-between">
-          <h3 className="font-headline font-bold text-2xl text-primary">Nearby stops</h3>
+          <h3 className="font-headline font-bold text-2xl text-primary">Nearby Stops</h3>
         </div>
         <div className="grid grid-cols-1 gap-3">
           {nearbyStops.map((stop) => (
@@ -365,11 +365,8 @@ export const Dashboard = () => {
                                 {arr.destination}
                               </span>
                             </div>
-                            <span className={cn(
-                              "font-headline font-black text-[11px] shrink-0 ml-1", 
-                              arr.status === 'departed' ? "text-secondary/40" : (arr.isRealtime ? "text-emerald-500 animate-pulse" : "text-primary")
-                            )}>
-                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) === 0 ? 'Now' : (arr.time ?? `${getLiveMinutes(arr)}m`)}
+                            <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
+                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? 'Now' : (arr.time ?? `${getLiveMinutes(arr)}m`)}
                             </span>
                           </div>
                         ))}
@@ -594,7 +591,7 @@ export const Dashboard = () => {
           <div className="bg-surface-container-lowest editorial-shadow w-full max-w-sm rounded-[32px] overflow-hidden">
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="font-headline font-bold text-2xl text-primary">Edit favorite</h3>
+                <h3 className="font-headline font-bold text-2xl text-primary">Edit Favorite</h3>
                 <button onClick={() => setEditingFav(null)} className="text-secondary hover:text-primary transition-colors">
                   <CloseIcon className="w-6 h-6" />
                 </button>
@@ -742,7 +739,7 @@ export const Dashboard = () => {
       {/* Real-Time Arrivals Section */}
       <section className="mb-12 space-y-6">
         <div className="flex items-baseline justify-between">
-          <h3 className="font-headline font-bold text-2xl text-primary">Live arrivals</h3>
+          <h3 className="font-headline font-bold text-2xl text-primary">Live Arrivals</h3>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-error rounded-full animate-pulse"></div>
             <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">

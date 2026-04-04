@@ -39,7 +39,7 @@ export const ActiveAlerts: React.FC<ActiveAlertsProps> = ({ onAlertsChange }) =>
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-amber-500 fill-amber-500/20" />
-          <h3 className="font-headline font-bold text-sm text-primary uppercase tracking-widest">Active alerts</h3>
+          <h3 className="font-headline font-bold text-sm text-primary uppercase tracking-widest">Active Alerts</h3>
         </div>
         <span className="font-label text-[10px] font-bold text-secondary uppercase tracking-widest bg-surface-container-high px-2 py-0.5 rounded-full">
           {alerts.length} {alerts.length === 1 ? 'Alert' : 'Alerts'}
