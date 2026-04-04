@@ -1168,6 +1168,10 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
 }
 
 export async function fetchDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
+  if (Object.keys(routesMap).length === 0) {
+    await fetchRoutes();
+  }
+  
   try {
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
     const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
@@ -1186,9 +1190,18 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
           const headerParts = lines[0].split(',');
           const serverTimeSeconds = parseInt(headerParts[4], 10);
           
-          if (isNaN(serverTimeSeconds)) {
-            console.error(`fetchDepartures: Invalid serverTimeSeconds in header: ${lines[0]}`);
-          }
+          const getTallinnSecondsFromMidnight = () => {
+            try {
+              const now = new Date();
+              const tallinnTime = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/Tallinn', hour12: false });
+              const [h, m, s] = tallinnTime.split(':').map(Number);
+              return h * 3600 + m * 60 + s;
+            } catch (e) {
+              return Math.floor(Date.now() / 1000) % 86400;
+            }
+          };
+
+          const nowInTallinn = getTallinnSecondsFromMidnight();
           
           for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(',');
@@ -1222,7 +1235,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
             }
             
             // Calculate minutes
-            let diffSeconds = expectedTime - (isNaN(serverTimeSeconds) ? Math.floor(Date.now() / 1000) % 86400 : serverTimeSeconds);
+            let diffSeconds = expectedTime - (isNaN(serverTimeSeconds) ? nowInTallinn : serverTimeSeconds);
             
             // Handle midnight wrap-around
             if (diffSeconds < -43200) diffSeconds += 86400;
@@ -1326,10 +1339,17 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       await Promise.all(arrivals.map(async (arrival) => {
         const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
         arrival.minutes = etaMinutes;
+        
+        // Update departureTimeSeconds to match the new GPS-based minutes
+        const nowUnixSeconds = Math.floor(Date.now() / 1000);
+        arrival.departureTimeSeconds = nowUnixSeconds + (etaMinutes * 60);
+        
         if (source === 'gps') {
           arrival.info = 'Live GPS';
+          arrival.isRealtime = true;
         } else if (source === 'blended') {
           arrival.info = 'GPS + Schedule';
+          arrival.isRealtime = true;
         }
       }));
     }
