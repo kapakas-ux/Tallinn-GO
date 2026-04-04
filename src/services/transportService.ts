@@ -19,7 +19,6 @@ const getApiBaseUrl = () => {
   if (isNative) {
     // Using the public Shared App URL. 
     // This avoids all local Windows Firewall and emulator networking issues.
-    // NOTE: If this URL is protected by a cookie wall, the app will fall back to direct APIs.
     const sharedUrl = 'https://ais-pre-4xsfvezpxu44gxul2ipqsy-662742466451.europe-west2.run.app';
     console.log('Native environment detected, using Shared App URL:', sharedUrl);
     return sharedUrl;
@@ -32,61 +31,49 @@ const getApiBaseUrl = () => {
 const API_BASE = getApiBaseUrl();
 
 /**
- * Universal fetch that uses CapacitorHttp on native platforms to bypass CORS
- * and standard fetch on web.
+ * Universal fetch that uses standard fetch.
+ * The proxy server handles CORS, so we don't need CapacitorHttp anymore.
+ * This vastly improves performance on Android for large files like routes.txt.
  */
 async function universalFetch(url: string, options?: RequestInit): Promise<string> {
-  // On native platforms, ALWAYS use CapacitorHttp to bypass CORS
-  if (Capacitor.isNativePlatform()) {
-    console.log(`universalFetch (native) START: ${url}`);
-    try {
-      const headers = (options?.headers as Record<string, string>) || {};
-      
-      // Add a default User-Agent to avoid 403s from some APIs (like transport.tallinn.ee)
-      if (!headers['User-Agent'] && !headers['user-agent']) {
-        headers['User-Agent'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
-      }
-
-      const optionsForCapacitor = {
-        url,
-        method: options?.method || 'GET',
-        headers,
-        data: options?.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : undefined,
-        connectTimeout: 10000,
-        readTimeout: 10000
-      };
-      
-      const response = await CapacitorHttp.request(optionsForCapacitor);
-      
-      // If we get a 403 or 401 from our own proxy, it's likely the cookie wall.
-      // We should throw so the caller can fall back to direct APIs.
-      if (response.status === 403 || response.status === 401) {
-        throw new Error(`Access denied (CORS or Cookie Wall): ${response.status}`);
-      }
-      
-      if (response.status >= 400) {
-        throw new Error(`CapacitorHttp error: ${response.status}`);
-      }
-      
-      if (typeof response.data === 'object') {
-        return JSON.stringify(response.data);
-      }
-      return String(response.data);
-    } catch (capErr) {
-      console.warn(`universalFetch CapacitorHttp FAILED: ${url}`, capErr);
-      // If CapacitorHttp failed, we might still try standard fetch as a last resort,
-      // though it will likely fail due to CORS.
+  console.log(`universalFetch START: ${url}`);
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`Fetch error: ${response.status}`);
     }
+    const text = await response.text();
+    return text;
+  } catch (err) {
+    console.warn(`universalFetch standard fetch FAILED: ${url}, trying CapacitorHttp fallback...`, err);
+    
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const optionsForCapacitor = {
+          url,
+          method: options?.method || 'GET',
+          headers: options?.headers as Record<string, string> || {},
+          data: options?.body ? JSON.parse(options.body as string) : undefined
+        };
+        
+        const response = await CapacitorHttp.request(optionsForCapacitor);
+        if (response.status >= 400) {
+          throw new Error(`CapacitorHttp error: ${response.status}`);
+        }
+        
+        // CapacitorHttp returns JSON objects if the content-type is json, otherwise string
+        if (typeof response.data === 'object') {
+          return JSON.stringify(response.data);
+        }
+        return String(response.data);
+      } catch (capErr) {
+        console.error(`universalFetch CapacitorHttp fallback FAILED: ${url}`, capErr);
+        throw capErr;
+      }
+    }
+    
+    throw err;
   }
-
-  // Standard fetch for web or as last-resort fallback for native
-  console.log(`universalFetch (standard) START: ${url}`);
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    throw new Error(`Fetch error: ${response.status}`);
-  }
-  const text = await response.text();
-  return text;
 }
 
 let stopsMap: { [key: string]: string } = {};
@@ -298,12 +285,12 @@ export async function fetchStops(): Promise<Stop[]> {
             }
           }
         `;
-        const text = await universalFetch(fallbackUrl, {
+        const response = await fetch(fallbackUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query })
         });
-        const data = JSON.parse(text);
+        const data = await response.json();
         rawStops = data.data?.stops || data.stops;
       }
       
@@ -1215,22 +1202,23 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     let data: any;
     try {
       const url = `${API_BASE}/api/transport/peatus/graphql?t=${Date.now()}`;
-      const text = await universalFetch(url, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query })
       });
+      const text = await response.text();
       if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
       data = JSON.parse(text);
     } catch (e) {
       console.warn('Failed to fetch from peatus/graphql proxy, falling back to direct GraphQL', e);
       const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
-      const text = await universalFetch(fallbackUrl, {
+      const response = await fetch(fallbackUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query })
       });
-      data = JSON.parse(text);
+      data = await response.json();
     }
 
     const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || data?.stop?.stoptimesWithoutPatterns || [];
