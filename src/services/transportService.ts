@@ -1,5 +1,5 @@
 import { Arrival, Stop, Vehicle } from '../types';
-import { CapacitorHttp, Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { getDistance, getBearing } from '../lib/geo';
 
 const getApiBaseUrl = () => {
@@ -31,73 +31,48 @@ const getApiBaseUrl = () => {
 const API_BASE = getApiBaseUrl();
 
 /**
- * Universal fetch that uses CapacitorHttp on native to bypass CORS
+ * Universal fetch that uses standard fetch.
+ * The proxy server handles CORS, so we don't need CapacitorHttp anymore.
+ * This vastly improves performance on Android for large files like routes.txt.
  */
-async function universalFetch(url: string): Promise<string> {
-  if (Capacitor.isNativePlatform()) {
-    console.log(`universalFetch (native) START: ${url}`);
-    const options = {
-      url,
-      headers: { 
-        'Accept': 'text/plain, */*',
-        'Cache-Control': 'no-cache'
-      },
-      connectTimeout: 20000,
-      readTimeout: 20000
-    };
-    try {
-      const response = await CapacitorHttp.get(options);
-      console.log(`universalFetch (native) RESPONSE: ${url} - Status: ${response.status}`);
-      
-      let dataStr = '';
-      if (typeof response.data === 'string') {
-        dataStr = response.data;
-      } else if (response.data !== null && response.data !== undefined) {
-        // If CapacitorHttp parsed it as JSON, convert it back to string if it's not what we wanted
-        // or if it's an error object
-        dataStr = JSON.stringify(response.data);
-        console.log(`universalFetch (native) WARNING: Data was parsed as object, stringified length: ${dataStr.length}`);
-      }
-      
-      console.log(`universalFetch (native) END: ${url} - Data length: ${dataStr.length}`);
-      
-      // Detect if we got an HTML response (likely a cookie wall or proxy page)
-      if (dataStr.trim().toLowerCase().startsWith('<!doctype html') || dataStr.trim().toLowerCase().startsWith('<html')) {
-        console.error(`universalFetch (native) ERROR: Received HTML instead of data for ${url}. This usually means a cookie wall or login page is blocking the API.`);
-        throw new Error(`API blocked by HTML response (cookie wall). Please check your VITE_API_URL.`);
-      }
-
-      // Log a sample of the raw data to help debug parsing
-      if (dataStr.length > 0) {
-        console.log(`RAW DATA SAMPLE (${url.split('/').pop()}): ${dataStr.substring(0, 300).replace(/\n/g, '\\n')}`);
-      } else {
-        console.warn(`universalFetch (native) EMPTY DATA for ${url}`);
-      }
-      
-      if (response.status >= 400) {
-        throw new Error(`CapacitorHttp error: ${response.status} - ${dataStr.substring(0, 100)}`);
-      }
-      
-      return dataStr;
-    } catch (err) {
-      console.error(`universalFetch (native) FAILED: ${url}`, err);
-      throw err;
+async function universalFetch(url: string, options?: RequestInit): Promise<string> {
+  console.log(`universalFetch START: ${url}`);
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`Fetch error: ${response.status}`);
     }
-  } else {
-    console.log(`universalFetch (web) START: ${url}`);
-    try {
-      const response = await fetch(url);
-      console.log(`universalFetch (web) END: ${url} - Status: ${response.status}`);
-      if (!response.ok) {
-        throw new Error(`Fetch error: ${response.status}`);
+    const text = await response.text();
+    return text;
+  } catch (err) {
+    console.warn(`universalFetch standard fetch FAILED: ${url}, trying CapacitorHttp fallback...`, err);
+    
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const optionsForCapacitor = {
+          url,
+          method: options?.method || 'GET',
+          headers: options?.headers as Record<string, string> || {},
+          data: options?.body ? JSON.parse(options.body as string) : undefined
+        };
+        
+        const response = await CapacitorHttp.request(optionsForCapacitor);
+        if (response.status >= 400) {
+          throw new Error(`CapacitorHttp error: ${response.status}`);
+        }
+        
+        // CapacitorHttp returns JSON objects if the content-type is json, otherwise string
+        if (typeof response.data === 'object') {
+          return JSON.stringify(response.data);
+        }
+        return String(response.data);
+      } catch (capErr) {
+        console.error(`universalFetch CapacitorHttp fallback FAILED: ${url}`, capErr);
+        throw capErr;
       }
-      const text = await response.text();
-      console.log(`RAW DATA SAMPLE (web): ${text.substring(0, 200)}`);
-      return text;
-    } catch (err) {
-      console.error(`universalFetch (web) FAILED: ${url}`, err);
-      throw err;
     }
+    
+    throw err;
   }
 }
 
@@ -143,13 +118,40 @@ export async function fetchRoutes(): Promise<void> {
   
   routesPromise = (async () => {
     try {
-      const url = Capacitor.isNativePlatform() 
-        ? `https://transport.tallinn.ee/data/routes.txt?t=${Date.now()}`
-        : `${API_BASE}/api/transport/routes`;
-      const text = await universalFetch(url);
-      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      let text: string;
+      try {
+        const url = `${API_BASE}/api/transport/parsed-routes`;
+        text = await universalFetch(url);
+        if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
+        const data = JSON.parse(text);
+        
+        routesMap = data.routesMap || {};
+        
+        // Update routeStopsMap
+        for (const [key, value] of Object.entries(data.routeStopsMap || {})) {
+          routeStopsMap[key] = value as any;
+        }
+        
+        // Update usedStopsSet
+        (data.usedStopsArray || []).forEach((stop: string) => usedStopsSet.add(stop));
+        
+        // Update stopModesMap
+        for (const [key, value] of Object.entries(data.stopModesMap || {})) {
+          stopModesMap[key] = new Set(value as string[]);
+        }
+        
+        console.log(`Successfully loaded ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops from parsed-routes`);
+        return; // Success, exit early
+      } catch (e) {
+        console.warn('Failed to fetch from parsed-routes, falling back to raw routes.txt', e);
+        // Fallback to direct API
+        const fallbackUrl = `https://transport.tallinn.ee/data/routes.txt`;
+        text = await universalFetch(fallbackUrl);
+      }
       
-      console.log(`fetchRoutes: found ${lines.length} lines`);
+      // Fallback parsing logic
+      const lines = text.split(/\r?\n/);
+      console.log(`fetchRoutes fallback: found ${lines.length} lines`);
       
       if (lines.length === 0) return;
       
@@ -170,13 +172,19 @@ export async function fetchRoutes(): Promise<void> {
       
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        if (line.startsWith('#')) continue;
+        if (!line || line.trim().length === 0 || line.startsWith('#')) continue;
         
-        const parts = line.split(delim).map(p => p.trim().replace(/"/g, ''));
+        const parts = line.split(delim);
         
-        const routeNum = parts[fld['ROUTENUM']];
-        const transport = parts[fld['TRANSPORT']];
-        const routeName = parts[fld['ROUTENAME']];
+        const rawRouteNum = parts[fld['ROUTENUM']];
+        const rawTransport = parts[fld['TRANSPORT']];
+        const rawRouteName = parts[fld['ROUTENAME']];
+        const rawRouteStops = parts[fld['ROUTESTOPS']];
+        
+        const routeNum = rawRouteNum ? rawRouteNum.trim().replace(/"/g, '') : undefined;
+        const transport = rawTransport ? rawTransport.trim().replace(/"/g, '') : undefined;
+        const routeName = rawRouteName ? rawRouteName.trim().replace(/"/g, '') : undefined;
+        const routeStops = rawRouteStops ? rawRouteStops.trim().replace(/"/g, '') : undefined;
         
         if (routeNum && routeNum !== '-') {
           currentRouteNum = routeNum;
@@ -194,7 +202,6 @@ export async function fetchRoutes(): Promise<void> {
           if (normNum && normNum !== currentRouteNum) routesMap[normNum] = currentRouteName;
         }
         
-        const routeStops = parts[fld['ROUTESTOPS']];
         if (routeStops) {
           const stops = routeStops.split(',').filter(Boolean);
           for (const stop of stops) {
@@ -203,7 +210,9 @@ export async function fetchRoutes(): Promise<void> {
             usedStopsSet.add(normStop);
             
             if (currentTransport) {
-              const mode = currentTransport.toLowerCase();
+              let mode = currentTransport.toLowerCase();
+              if (mode === 'nightbus') mode = 'bus';
+              
               if (!stopModesMap[stop]) stopModesMap[stop] = new Set();
               if (!stopModesMap[normStop]) stopModesMap[normStop] = new Set();
               
@@ -227,7 +236,7 @@ export async function fetchRoutes(): Promise<void> {
           }
         }
       }
-      console.log(`Successfully parsed ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops`);
+      console.log(`Successfully loaded ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops from fallback`);
     } catch (error) {
       console.error('Error fetching/parsing routes:', error);
       routesPromise = null;
@@ -247,23 +256,100 @@ export async function fetchStops(): Promise<Stop[]> {
     
     try {
       console.log('Fetching stops from peatus.ee GraphQL API...');
-      const response = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: '{ stops { gtfsId name lat lon code desc zoneId parentStation { name } routes { mode } } }' })
-      });
+      let rawStops: any[] = [];
       
-      const data = await response.json();
-      const rawStops = data.data.stops;
+      try {
+        const url = `${API_BASE}/api/transport/peatus/stops`;
+        const text = await universalFetch(url);
+        if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
+        const data = JSON.parse(text);
+        rawStops = data.data?.stops || data.stops;
+      } catch (e) {
+        console.warn('Failed to fetch from peatus/stops proxy, falling back to direct GraphQL', e);
+        const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
+        const query = `
+          query {
+            stops {
+              gtfsId
+              name
+              lat
+              lon
+              code
+              zoneId
+              parentStation {
+                name
+              }
+              routes {
+                mode
+              }
+            }
+          }
+        `;
+        const response = await fetch(fallbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const data = await response.json();
+        rawStops = data.data?.stops || data.stops;
+      }
       
+      if (!rawStops) rawStops = [];
       console.log(`fetchStops: received ${rawStops.length} stops from peatus.ee`);
+      
+      // Fetch Tallinn stops.txt to get correct SiriIDs
+      const siriIdMap = new Map<string, string>();
+      try {
+        let text = '';
+        try {
+          const url = `${API_BASE}/api/transport/stops`;
+          text = await universalFetch(url);
+          // If it returned HTML (cookie check), throw error
+          if (text.trim().startsWith('<')) throw new Error('Received HTML instead of stops.txt');
+        } catch (e) {
+          console.warn('Failed to fetch from stops proxy, falling back to direct API', e);
+          const fallbackUrl = `https://transport.tallinn.ee/data/stops.txt`;
+          text = await universalFetch(fallbackUrl);
+        }
+        
+        const lines = text.split(/\r?\n/);
+        if (lines.length > 0) {
+          let delim = ';';
+          if (lines[0].includes(';')) delim = ';';
+          else if (lines[0].includes(',')) delim = ',';
+          
+          const header = lines[0].split(delim).map(h => h.trim().toUpperCase());
+          const idIdx = header.indexOf('ID');
+          const siriIdx = header.indexOf('SIRIID');
+          
+          if (idIdx >= 0 && siriIdx >= 0) {
+            for (let i = 1; i < lines.length; i++) {
+              const line = lines[i];
+              if (!line || line.trim().length === 0) continue;
+              const parts = line.split(delim);
+              const id = parts[idIdx]?.trim();
+              const siriId = parts[siriIdx]?.trim();
+              if (id && siriId) {
+                siriIdMap.set(id, siriId);
+                const normId = id.replace(/^0+/, '');
+                if (normId && normId !== id) siriIdMap.set(normId, siriId);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching stops.txt for SiriIDs:', e);
+      }
       
       const stops: Stop[] = [];
       
       for (const raw of rawStops) {
         const gtfsId = raw.gtfsId.replace('estonia:', '');
         const internalId = raw.code || gtfsId;
-        const siriId = gtfsId !== '0' ? gtfsId : undefined;
+        
+        // Use SiriID from stops.txt if available, otherwise fallback to gtfsId
+        const siriId = siriIdMap.get(internalId) || siriIdMap.get(internalId.replace(/^0+/, '')) || (gtfsId !== '0' ? gtfsId : undefined);
+        
         const name = raw.name;
         const lat = raw.lat;
         const lng = raw.lon;
@@ -356,6 +442,7 @@ export async function fetchStops(): Promise<Stop[]> {
         stops.push({
           id: internalId,
           siriId: siriId,
+          gtfsId: gtfsId,
           name: name,
           lat: lat,
           lng: lng,
@@ -447,21 +534,48 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
-  let data;
-  
-  if (Capacitor.isNativePlatform()) {
-    const url = 'https://gis.ee/tallinn/gps.php';
-    const responseText = await universalFetch(url);
-    data = JSON.parse(responseText);
-  } else {
-    // Use our backend proxy for web
-    const url = `${API_BASE}/api/transport/vehicles`;
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error(`gis.ee API error via proxy: ${response.status}`);
-    }
-    data = await response.json();
+  if (Object.keys(routesMap).length === 0) {
+    await fetchRoutes();
   }
+  
+  const url = `${API_BASE}/api/transport/vehicles?t=${Date.now()}`;
+    
+  let responseText = '';
+  try {
+    responseText = await universalFetch(url);
+    if (responseText.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
+  } catch (e) {
+    console.warn('Failed to fetch from vehicles proxy, falling back to direct API', e);
+    const fallbackUrl = `https://transport.tallinn.ee/gps.txt?t=${Date.now()}`;
+    const rawText = await universalFetch(fallbackUrl);
+    
+    // Parse the raw gps.txt format
+    const lines = rawText.split('\n').filter(l => l.trim().length > 0);
+    const features = [];
+    for (const line of lines) {
+      const parts = line.split(',');
+      if (parts.length < 6) continue;
+      
+      const typeStr = parts[0];
+      let type = 2; // default bus
+      if (typeStr === '1') type = 1; // trolley
+      else if (typeStr === '3') type = 3; // tram
+      
+      features.push({
+        geometry: { coordinates: [parseFloat(parts[3]) / 1000000, parseFloat(parts[2]) / 1000000] },
+        properties: {
+          type,
+          line: parts[1],
+          direction: parseInt(parts[5], 10),
+          id: parts[1] + '_' + parts[2] + '_' + parts[3], // pseudo id
+          destination: '' // Not available in gps.txt directly
+        }
+      });
+    }
+    responseText = JSON.stringify({ features });
+  }
+  
+  const data = JSON.parse(responseText);
   const features = data?.features || [];
 
   const vehicles: Vehicle[] = [];
@@ -483,15 +597,28 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
 
     const jitter = (Math.random() - 0.5) * 0.000001;
     
+    const line = props.line?.toString() || '';
+    let destination = props.destination || '';
+    
+    // Fallback for missing destination (common for night buses)
+    if (!destination && line && routesMap[line]) {
+      const routeName = routesMap[line];
+      if (routeName.includes(' - ')) {
+        destination = routeName.split(' - ')[1];
+      } else {
+        destination = routeName;
+      }
+    }
+    
     vehicles.push({
       id: props.id?.toString() || Math.random().toString(),
       type,
-      line: props.line?.toString() || '',
+      line,
       lng: coords[0] + jitter,
       lat: coords[1] + jitter,
       bearing: props.direction || 0,
       speed: 0,
-      destination: props.destination || ''
+      destination
     });
   }
   
@@ -643,18 +770,13 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
     return null;
   }
   
-  const arrDest = (arrival.destination || '').toLowerCase();
+  const arrDest = (arrival.destination || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
   
   // Try to match by destination
-  let destinationMatches = matching.filter(v => (v.destination || '').toLowerCase() === arrDest);
-  
-  // Try partial match if no exact match
-  if (destinationMatches.length === 0) {
-    destinationMatches = matching.filter(v => {
-      const vDest = (v.destination || '').toLowerCase();
-      return vDest.includes(arrDest) || arrDest.includes(vDest);
-    });
-  }
+  let destinationMatches = matching.filter(v => {
+    const vDest = (v.destination || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    return vDest === arrDest || vDest.includes(arrDest) || arrDest.includes(vDest);
+  });
   
   // If still no match, just use all matching by line and type
   if (destinationMatches.length === 0) {
@@ -818,7 +940,17 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
     }
     
     if (approaching.length === 0) {
-      console.log(`getVehicleForArrival: no approaching vehicles found for line ${arrival.line} to ${arrival.destination}`);
+      // If still no approaching vehicles, check if there are vehicles that JUST passed.
+      // If there is a vehicle that passed, return it so computeEtaToStop can mark it as departed.
+      const passed = vehicleStats.filter(vs => vs.closestIdx > targetIndex && !vs.isWrongDirection);
+      if (passed.length > 0) {
+        // Sort by how recently it passed (closest to targetIndex)
+        passed.sort((a, b) => a.closestIdx - b.closestIdx);
+        console.log(`getVehicleForArrival: returning passed vehicle for line ${arrival.line}`);
+        return passed[0].vehicle;
+      }
+      
+      console.log(`getVehicleForArrival: no approaching or recently passed vehicles found for line ${arrival.line} to ${arrival.destination}`);
       return null; // Don't show a wrong bus
     }
     
@@ -840,8 +972,8 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
     return destinationMatches[index];
   }
   
-  console.log(`getVehicleForArrival: vehicleIndex ${index} is out of bounds, returning closest vehicle`);
-  return destinationMatches[0];
+  console.log(`getVehicleForArrival: vehicleIndex ${index} is out of bounds (only ${destinationMatches.length} matches). Returning null.`);
+  return null;
 }
 
 /**
@@ -888,12 +1020,22 @@ export async function computeEtaToStop(
     targetIdx = routeStops.findIndex(s => s.id.split('-')[0] === baseId);
   }
   
-  if (vehicleClosestIdx === -1 || targetIdx === -1 || vehicleClosestIdx >= targetIdx) {
-    // Vehicle has already passed the stop, or can't resolve position — fall back to sched
+  if (vehicleClosestIdx === -1 || targetIdx === -1) {
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
 
-  // 4b. If the vehicle is more than 500m from its closest route stop it is
+  const distToTarget = getDistance(vehicle.lat, vehicle.lng, stop.lat, stop.lng);
+
+  // 4b. If the vehicle has already passed the stop (by more than 50m), 
+  // mark it as departed (-1) so it gets filtered out, preventing "Double Now".
+  if (vehicleClosestIdx > targetIdx) {
+    if (distToTarget > 0.05) {
+      return { etaMinutes: -1, source: 'gps' };
+    }
+    return { etaMinutes: 0, source: 'gps' };
+  }
+
+  // 4c. If the vehicle is more than 500m from its closest route stop it is
   // almost certainly parked at a depot and not currently in service.
   // Fall back to schedule so we don't produce fake GPS ETAs at night.
   if (minVehicleDist > 0.5) {
@@ -901,15 +1043,20 @@ export async function computeEtaToStop(
   }
   
   // 5. Compute path distance: vehicle -> closest stop -> ... -> target stop
-  // First leg: vehicle to its closest stop (partial segment)
-  let totalDistKm = getDistance(vehicle.lat, vehicle.lng, routeStops[vehicleClosestIdx].lat, routeStops[vehicleClosestIdx].lng);
-  
-  // Middle legs: stop-to-stop along the route
-  for (let i = vehicleClosestIdx; i < targetIdx; i++) {
-    totalDistKm += getDistance(
-      routeStops[i].lat, routeStops[i].lng,
-      routeStops[i + 1].lat, routeStops[i + 1].lng
-    );
+  let totalDistKm = 0;
+  if (vehicleClosestIdx === targetIdx) {
+    totalDistKm = distToTarget;
+  } else {
+    // First leg: vehicle to its closest stop (partial segment)
+    totalDistKm = getDistance(vehicle.lat, vehicle.lng, routeStops[vehicleClosestIdx].lat, routeStops[vehicleClosestIdx].lng);
+    
+    // Middle legs: stop-to-stop along the route
+    for (let i = vehicleClosestIdx; i < targetIdx; i++) {
+      totalDistKm += getDistance(
+        routeStops[i].lat, routeStops[i].lng,
+        routeStops[i + 1].lat, routeStops[i + 1].lng
+      );
+    }
   }
   
   // 6. Estimate speed
@@ -924,45 +1071,98 @@ export async function computeEtaToStop(
   
   const speedKmh = AVG_SPEED_KMH[vehicle.type] ?? 22;
   
-  // 7. GPS-derived ETA
-  const gpsEtaMinutes = (totalDistKm / speedKmh) * 60;
-
-  // 8. Sanity check: if the GPS ETA differs wildly from the schedule ETA the
-  // matched vehicle almost certainly belongs to a different trip (e.g. it just
-  // finished its previous run and is near the route start, or is a wrong match).
-  // Only trust GPS when it is within a reasonable band around the schedule.
-  const lowerBound = Math.max(0, scheduleEta - Math.max(5, scheduleEta * 0.5));
-  const upperBound = scheduleEta + Math.max(5, scheduleEta * 0.5);
-  if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
-    return { etaMinutes: scheduleEta, source: 'schedule' };
-  }
-
   // 9. Blend: how many stops away is the vehicle?
   const stopsAway = targetIdx - vehicleClosestIdx;
+
+  // 7. GPS-derived ETA
+  // Add 30 seconds of dwell time for each stop in between
+  const dwellTimeMinutes = stopsAway * 0.5; // ~30 seconds per stop
+  const gpsEtaMinutes = ((totalDistKm / speedKmh) * 60) + dwellTimeMinutes;
+
+  // 8. Sanity check: if the GPS ETA differs wildly from the schedule ETA the
+  // matched vehicle almost certainly belongs to a different trip.
+  // However, buses can easily be 15-25 minutes late in traffic. We should trust GPS if we have a match.
+  const lowerBound = Math.max(0, scheduleEta - 15);
+  const upperBound = scheduleEta + 30; // Allow up to 30 mins delay
   
-  // Trust GPS more when vehicle is close (1-3 stops away),
-  // blend equally when 4-6 stops, lean on schedule beyond that.
+  if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
+    console.log(`computeEtaToStop: GPS ETA ${gpsEtaMinutes.toFixed(1)}m out of bounds [${lowerBound.toFixed(1)}, ${upperBound.toFixed(1)}] for ${arrival.line} to ${arrival.destination}. Falling back to schedule ${scheduleEta}m.`);
+    return { etaMinutes: scheduleEta, source: 'schedule' };
+  }
+  
+  // Trust GPS heavily. The schedule is often wrong when there are delays.
   let gpsWeight: number;
-  if (stopsAway <= 2) {
-    gpsWeight = 0.85;
-  } else if (stopsAway <= 5) {
-    gpsWeight = 0.60;
+  if (stopsAway <= 3) {
+    gpsWeight = 0.95;
+  } else if (stopsAway <= 8) {
+    gpsWeight = 0.80;
   } else {
-    gpsWeight = 0.35;
+    gpsWeight = 0.65;
   }
   
   const blendedEta = gpsWeight * gpsEtaMinutes + (1 - gpsWeight) * scheduleEta;
-  const finalEta = Math.max(0, Math.round(blendedEta));
+  
+  // 10. Final ETA calculation with "Now" protection
+  let finalEta = Math.round(blendedEta);
+
+  if (stopsAway >= 1) {
+    // If the vehicle is at least 1 stop away, it CANNOT be "Now".
+    // Each stop in between adds travel time + dwell time penalty.
+    const travelTime = (totalDistKm / (speedKmh / 60));
+    const dwellPenalty = stopsAway * 0.6; // 36s per stop
+    const minMins = Math.max(1, Math.ceil(travelTime + dwellPenalty));
+    finalEta = Math.max(minMins, finalEta);
+  } else {
+    // stopsAway === 0 (vehicle is closest to this stop)
+    
+    // Check if the vehicle is approaching or leaving the stop
+    let isLeaving = false;
+    if (targetIdx < routeStops.length - 1) {
+      const nextStop = routeStops[targetIdx + 1];
+      const distToNext = getDistance(vehicle.lat, vehicle.lng, nextStop.lat, nextStop.lng);
+      const stopToNext = getDistance(stop.lat, stop.lng, nextStop.lat, nextStop.lng);
+      // If vehicle is closer to next stop than the current stop is, it's leaving
+      if (distToNext < stopToNext) {
+        isLeaving = true;
+      }
+    }
+
+    if (isLeaving) {
+      // If leaving, only show "Now" if very close (< 50m)
+      if (distToTarget > 0.05) {
+        finalEta = Math.max(1, finalEta);
+      } else {
+        finalEta = 0;
+      }
+    } else {
+      // If approaching, be more generous (180m)
+      if (distToTarget > 0.18) {
+        finalEta = Math.max(1, finalEta);
+      } else {
+        finalEta = 0;
+      }
+    }
+  }
+  
+  console.log(`computeEtaToStop: ${arrival.line} to ${arrival.destination}: stopsAway=${stopsAway}, dist=${totalDistKm.toFixed(2)}km, gpsEta=${gpsEtaMinutes.toFixed(1)}m, schedEta=${scheduleEta}m, blended=${blendedEta.toFixed(1)}m -> final=${finalEta}m`);
   
   const source = gpsWeight >= 0.75 ? 'gps' : 'blended';
   return { etaMinutes: finalEta, source };
 }
 
-async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
+async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: string, allModes: boolean = false): Promise<Arrival[]> {
   try {
     const nowSeconds = Math.floor(Date.now() / 1000);
-    const targetId = siriId && siriId !== '0' ? siriId : stopId;
-    const gtfsId = `estonia:${targetId}`;
+    
+    // Find the stop to get its real gtfsId
+    await fetchStops();
+    let gtfsId = `estonia:${stopId}`;
+    if (stopsByIdMap) {
+      const stop = stopsByIdMap.get(stopId);
+      if (stop && stop.gtfsId) {
+        gtfsId = `estonia:${stop.gtfsId}`;
+      }
+    }
 
     const numberOfDepartures = time === '0' ? 50 : 15;
 
@@ -991,38 +1191,66 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       }
     `;
 
-    const response = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    });
+    console.log(`fetchPeatusDepartures: Fetching for ${gtfsId} (allModes: ${allModes})`);
+    
+    // Use universalFetch for Peatus API too, but we need to handle GraphQL POST
+    // Actually, universalFetch currently only supports GET. 
+    // Let's modify universalFetch to support options or just use a proxy for Peatus too.
+    // For now, let's use a proxy endpoint if possible, or just keep fetch but wrap it.
+    // Actually, CapacitorHttp supports POST.
+    
+    let data: any;
+    try {
+      const url = `${API_BASE}/api/transport/peatus/graphql?t=${Date.now()}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const text = await response.text();
+      if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
+      data = JSON.parse(text);
+    } catch (e) {
+      console.warn('Failed to fetch from peatus/graphql proxy, falling back to direct GraphQL', e);
+      const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
+      const response = await fetch(fallbackUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      data = await response.json();
+    }
 
-    const data = await response.json();
-    const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || [];
+    const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || data?.stop?.stoptimesWithoutPatterns || [];
 
     const arrivals: Arrival[] = [];
 
     for (const st of stoptimes) {
       const modeStr = st.trip?.route?.mode?.toLowerCase() || 'bus';
       const agencyName = st.trip?.route?.agency?.name || '';
+      const line = st.trip?.route?.shortName || '';
       let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
       
       if (modeStr.includes('tram')) type = 'tram';
       else if (modeStr.includes('trolley')) type = 'trolley';
       else if (modeStr.includes('rail') || modeStr.includes('train')) type = 'train';
       else if (modeStr.includes('bus')) {
-        // Distinguish city buses from county buses
-        if (agencyName && !agencyName.toLowerCase().includes('tallinna linnatranspordi')) {
+        // Distinguish city buses from county/regional buses
+        const isCityAgency = agencyName.toLowerCase().includes('linnatransport') || 
+                            agencyName.toLowerCase().includes('linnatranspordi');
+        // City buses in Estonia typically have 1-2 digit line numbers
+        const isShortLine = /^\d{1,2}[A-Z]?$/.test(line);
+        
+        if (agencyName && !isCityAgency && !isShortLine) {
           type = 'regional';
         }
       }
 
-      // ONLY return regional and train from peatus.ee to avoid duplicates with SIRI
-      if (type !== 'regional' && type !== 'train') {
+      // If not allModes, ONLY return regional and train from peatus.ee to avoid duplicates with SIRI
+      if (!allModes && type !== 'regional' && type !== 'train') {
         continue;
       }
 
-      const line = st.trip?.route?.shortName || '';
       const destination = st.headsign || '';
 
       // Calculate time
@@ -1077,16 +1305,30 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
 }
 
 export async function fetchDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
+  if (Object.keys(routesMap).length === 0) {
+    await fetchRoutes();
+  }
+  
   try {
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
-    const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
+    const cacheBuster = `_t=${Date.now()}`;
+    const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}&${cacheBuster}`;
     
     let arrivals: Arrival[] = [];
     
     try {
-      const response = await fetch(url);
-      if (response.ok) {
-        const text = await response.text();
+      console.log(`fetchDepartures: Fetching from ${url}`);
+      let text = '';
+      try {
+        text = await universalFetch(url);
+        if (text.trim().startsWith('<')) throw new Error('Received HTML instead of text');
+      } catch (e) {
+        console.warn('Failed to fetch from departures proxy, falling back to direct API', e);
+        const fallbackUrl = `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}${time ? `&time=${time}` : ''}`;
+        text = await universalFetch(fallbackUrl);
+      }
+      
+      if (text) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
         if (lines.length > 2) {
@@ -1094,24 +1336,56 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
           const headerParts = lines[0].split(',');
           const serverTimeSeconds = parseInt(headerParts[4], 10);
           
+          const getTallinnSecondsFromMidnight = () => {
+            try {
+              const now = new Date();
+              const tallinnTime = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/Tallinn', hour12: false });
+              const [h, m, s] = tallinnTime.split(':').map(Number);
+              return h * 3600 + m * 60 + s;
+            } catch (e) {
+              return Math.floor(Date.now() / 1000) % 86400;
+            }
+          };
+
+          const nowInTallinn = getTallinnSecondsFromMidnight();
+          
           for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(',');
             if (parts.length < 5) continue;
             
+            const line = parts[1];
             const typeStr = parts[0].toLowerCase();
             let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
             if (typeStr === 'tram') type = 'tram';
             else if (typeStr === 'trolley') type = 'trolley';
             else if (typeStr === 'train' || typeStr === 'rail') type = 'train';
-            else if (typeStr === 'regional') type = 'regional';
+            else if (typeStr === 'regional') {
+              // Re-classify short line numbers as city buses
+              const isShortLine = /^\d{1,2}[A-Z]?$/.test(line);
+              type = isShortLine ? 'bus' : 'regional';
+            }
             
-            const line = parts[1];
             const expectedTime = parseInt(parts[2], 10);
             const scheduledTime = parseInt(parts[3], 10);
-            const destination = parts[4];
+            let destination = parts[4];
+            
+            // Fallback for missing destination
+            if (!destination && line && routesMap[line]) {
+              const routeName = routesMap[line];
+              if (routeName.includes(' - ')) {
+                destination = routeName.split(' - ')[1];
+              } else {
+                destination = routeName;
+              }
+            }
+            
+            if (isNaN(expectedTime) || isNaN(scheduledTime)) {
+              console.warn(`fetchDepartures: Skipping line with invalid times: ${lines[i]}`);
+              continue;
+            }
             
             // Calculate minutes
-            let diffSeconds = expectedTime - serverTimeSeconds;
+            let diffSeconds = expectedTime - (isNaN(serverTimeSeconds) ? nowInTallinn : serverTimeSeconds);
             
             // Handle midnight wrap-around
             if (diffSeconds < -43200) diffSeconds += 86400;
@@ -1152,6 +1426,8 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
               isRealtime: isRealTime
             });
           }
+        } else {
+          console.log(`fetchDepartures: No departures found in response for ${targetId}`);
         }
       }
     } catch (e) {
@@ -1159,8 +1435,31 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     }
     
     // Fetch regional/train departures from peatus.ee
-    const peatusArrivals = await fetchPeatusDepartures(stopId, siriId, time);
+    const peatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, false);
     arrivals = [...arrivals, ...peatusArrivals];
+    
+    // If next departure is far away (> 15 mins) or we have very few departures,
+    // try Peatus for ALL modes to catch night buses or early morning gaps.
+    const nextDepartureMins = arrivals.length > 0 ? Math.min(...arrivals.map(a => a.minutes)) : Infinity;
+    
+    if (arrivals.length < 5 || nextDepartureMins > 15) {
+      console.log(`fetchDepartures: SIRI data sparse (next: ${nextDepartureMins}m, count: ${arrivals.length}), fetching all modes from Peatus for ${stopId}`);
+      const allPeatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, true);
+      
+      // Merge allPeatusArrivals into arrivals, avoiding duplicates
+      allPeatusArrivals.forEach(pa => {
+        const isDuplicate = arrivals.some(a => 
+          a.line === pa.line && 
+          Math.abs(a.minutes - pa.minutes) < 3 &&
+          (a.destination.toLowerCase().includes(pa.destination.toLowerCase()) || 
+           pa.destination.toLowerCase().includes(a.destination.toLowerCase()))
+        );
+        
+        if (!isDuplicate) {
+          arrivals.push(pa);
+        }
+      });
+    }
     
     // Sort by minutes ascending
     arrivals.sort((a, b) => a.minutes - b.minutes);
@@ -1190,13 +1489,23 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       await Promise.all(arrivals.map(async (arrival) => {
         const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
         arrival.minutes = etaMinutes;
+        
+        // Update departureTimeSeconds to match the new GPS-based minutes
+        const nowUnixSeconds = Math.floor(Date.now() / 1000);
+        arrival.departureTimeSeconds = nowUnixSeconds + (etaMinutes * 60);
+        
         if (source === 'gps') {
           arrival.info = 'Live GPS';
+          arrival.isRealtime = true;
         } else if (source === 'blended') {
           arrival.info = 'GPS + Schedule';
+          arrival.isRealtime = true;
         }
       }));
     }
+
+    // Filter out departed vehicles (etaMinutes < 0)
+    arrivals = arrivals.filter(a => a.minutes >= 0);
 
     // Re-sort by updated minutes
     arrivals.sort((a, b) => a.minutes - b.minutes);

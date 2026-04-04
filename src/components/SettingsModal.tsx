@@ -8,6 +8,7 @@ export const SettingsModal = ({ onClose }: Props) => {
   const handleClose = () => { stopPreview(); onClose(); };
   const [selectedSound, setSelectedSound] = useState(getSettings().alarmSound);
   const [showFact, setShowFact] = useState(getSettings().showDailyFact);
+  const [showFavoritesFirst, setShowFavoritesFirst] = useState(getSettings().showFavoritesFirst);
 
   const handleSelect = (id: string) => {
     setSelectedSound(id);
@@ -35,7 +36,7 @@ export const SettingsModal = ({ onClose }: Props) => {
         <div className="p-6 overflow-y-auto space-y-6">
           <div>
             <h3 className="font-headline font-bold text-sm text-secondary uppercase tracking-widest mb-3">
-              Alert Sound
+              Alert sound
             </h3>
             <p className="text-xs text-secondary font-label mb-4 leading-relaxed">
               Choose the sound played when a departure alert fires. Press ▶ to preview.
@@ -74,7 +75,7 @@ export const SettingsModal = ({ onClose }: Props) => {
           {/* Daily Fact toggle */}
           <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-variant/20 bg-surface-container-low">
             <div>
-              <p className="font-headline font-bold text-sm text-primary">Daily Transit Fact</p>
+              <p className="font-headline font-bold text-sm text-primary">Daily transit fact</p>
               <p className="font-label text-[10px] text-secondary mt-0.5">Show a fun fact on the dashboard each day</p>
             </div>
             <button
@@ -86,6 +87,24 @@ export const SettingsModal = ({ onClose }: Props) => {
               className={`relative w-11 h-6 rounded-full transition-colors ${showFact ? 'bg-primary' : 'bg-outline-variant/40'}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showFact ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
+          {/* Show Favorites First toggle */}
+          <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-variant/20 bg-surface-container-low">
+            <div>
+              <p className="font-headline font-bold text-sm text-primary">Show favorites first</p>
+              <p className="font-label text-[10px] text-secondary mt-0.5">Display favorites above nearby stops</p>
+            </div>
+            <button
+              onClick={() => {
+                const next = !showFavoritesFirst;
+                setShowFavoritesFirst(next);
+                saveSettings({ showFavoritesFirst: next });
+              }}
+              className={`relative w-11 h-6 rounded-full transition-colors ${showFavoritesFirst ? 'bg-primary' : 'bg-outline-variant/40'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showFavoritesFirst ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>
