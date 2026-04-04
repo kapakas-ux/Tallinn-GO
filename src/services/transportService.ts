@@ -1,5 +1,5 @@
 import { Arrival, Stop, Vehicle } from '../types';
-import { CapacitorHttp, Capacitor } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { getDistance, getBearing } from '../lib/geo';
 
 const getApiBaseUrl = () => {
@@ -31,73 +31,22 @@ const getApiBaseUrl = () => {
 const API_BASE = getApiBaseUrl();
 
 /**
- * Universal fetch that uses CapacitorHttp on native to bypass CORS
+ * Universal fetch that uses standard fetch.
+ * The proxy server handles CORS, so we don't need CapacitorHttp anymore.
+ * This vastly improves performance on Android for large files like routes.txt.
  */
 async function universalFetch(url: string): Promise<string> {
-  if (Capacitor.isNativePlatform()) {
-    console.log(`universalFetch (native) START: ${url}`);
-    const options = {
-      url,
-      headers: { 
-        'Accept': 'text/plain, */*',
-        'Cache-Control': 'no-cache'
-      },
-      connectTimeout: 20000,
-      readTimeout: 20000
-    };
-    try {
-      const response = await CapacitorHttp.get(options);
-      console.log(`universalFetch (native) RESPONSE: ${url} - Status: ${response.status}`);
-      
-      let dataStr = '';
-      if (typeof response.data === 'string') {
-        dataStr = response.data;
-      } else if (response.data !== null && response.data !== undefined) {
-        // If CapacitorHttp parsed it as JSON, convert it back to string if it's not what we wanted
-        // or if it's an error object
-        dataStr = JSON.stringify(response.data);
-        console.log(`universalFetch (native) WARNING: Data was parsed as object, stringified length: ${dataStr.length}`);
-      }
-      
-      console.log(`universalFetch (native) END: ${url} - Data length: ${dataStr.length}`);
-      
-      // Detect if we got an HTML response (likely a cookie wall or proxy page)
-      if (dataStr.trim().toLowerCase().startsWith('<!doctype html') || dataStr.trim().toLowerCase().startsWith('<html')) {
-        console.error(`universalFetch (native) ERROR: Received HTML instead of data for ${url}. This usually means a cookie wall or login page is blocking the API.`);
-        throw new Error(`API blocked by HTML response (cookie wall). Please check your VITE_API_URL.`);
-      }
-
-      // Log a sample of the raw data to help debug parsing
-      if (dataStr.length > 0) {
-        console.log(`RAW DATA SAMPLE (${url.split('/').pop()}): ${dataStr.substring(0, 300).replace(/\n/g, '\\n')}`);
-      } else {
-        console.warn(`universalFetch (native) EMPTY DATA for ${url}`);
-      }
-      
-      if (response.status >= 400) {
-        throw new Error(`CapacitorHttp error: ${response.status} - ${dataStr.substring(0, 100)}`);
-      }
-      
-      return dataStr;
-    } catch (err) {
-      console.error(`universalFetch (native) FAILED: ${url}`, err);
-      throw err;
+  console.log(`universalFetch START: ${url}`);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Fetch error: ${response.status}`);
     }
-  } else {
-    console.log(`universalFetch (web) START: ${url}`);
-    try {
-      const response = await fetch(url);
-      console.log(`universalFetch (web) END: ${url} - Status: ${response.status}`);
-      if (!response.ok) {
-        throw new Error(`Fetch error: ${response.status}`);
-      }
-      const text = await response.text();
-      console.log(`RAW DATA SAMPLE (web): ${text.substring(0, 200)}`);
-      return text;
-    } catch (err) {
-      console.error(`universalFetch (web) FAILED: ${url}`, err);
-      throw err;
-    }
+    const text = await response.text();
+    return text;
+  } catch (err) {
+    console.error(`universalFetch FAILED: ${url}`, err);
+    throw err;
   }
 }
 
@@ -143,9 +92,7 @@ export async function fetchRoutes(): Promise<void> {
   
   routesPromise = (async () => {
     try {
-      const url = Capacitor.isNativePlatform() 
-        ? `https://transport.tallinn.ee/data/routes.txt?t=${Date.now()}`
-        : `${API_BASE}/api/transport/routes`;
+      const url = `${API_BASE}/api/transport/routes`;
       const text = await universalFetch(url);
       const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
       
@@ -252,22 +199,12 @@ export async function fetchStops(): Promise<Stop[]> {
       const url = `https://api.peatus.ee/routing/v1/routers/estonia/index/graphql?t=${Date.now()}`;
       const query = '{ stops { gtfsId name lat lon code desc zoneId parentStation { name } routes { mode } } }';
       
-      let text = '';
-      if (Capacitor.isNativePlatform()) {
-        const response = await CapacitorHttp.post({
-          url,
-          headers: { 'Content-Type': 'application/json' },
-          data: { query }
-        });
-        text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-      } else {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query })
-        });
-        text = await response.text();
-      }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const text = await response.text();
       
       const data = JSON.parse(text);
       const rawStops = data.data.stops;
@@ -277,9 +214,7 @@ export async function fetchStops(): Promise<Stop[]> {
       // Fetch Tallinn stops.txt to get correct SiriIDs
       const siriIdMap = new Map<string, string>();
       try {
-        const url = Capacitor.isNativePlatform() 
-          ? `https://transport.tallinn.ee/data/stops.txt?t=${Date.now()}`
-          : `${API_BASE}/api/transport/stops`;
+        const url = `${API_BASE}/api/transport/stops`;
         const text = await universalFetch(url);
         const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
         if (lines.length > 0) {
@@ -505,9 +440,7 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     await fetchRoutes();
   }
   
-  const url = Capacitor.isNativePlatform()
-    ? `https://gis.ee/tallinn/gps.php?t=${Date.now()}`
-    : `${API_BASE}/api/transport/vehicles?t=${Date.now()}`;
+  const url = `${API_BASE}/api/transport/vehicles?t=${Date.now()}`;
     
   const responseText = await universalFetch(url);
   const data = JSON.parse(responseText);
@@ -875,7 +808,17 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
     }
     
     if (approaching.length === 0) {
-      console.log(`getVehicleForArrival: no approaching vehicles found for line ${arrival.line} to ${arrival.destination}`);
+      // If still no approaching vehicles, check if there are vehicles that JUST passed.
+      // If there is a vehicle that passed, return it so computeEtaToStop can mark it as departed.
+      const passed = vehicleStats.filter(vs => vs.closestIdx > targetIndex && !vs.isWrongDirection);
+      if (passed.length > 0) {
+        // Sort by how recently it passed (closest to targetIndex)
+        passed.sort((a, b) => a.closestIdx - b.closestIdx);
+        console.log(`getVehicleForArrival: returning passed vehicle for line ${arrival.line}`);
+        return passed[0].vehicle;
+      }
+      
+      console.log(`getVehicleForArrival: no approaching or recently passed vehicles found for line ${arrival.line} to ${arrival.destination}`);
       return null; // Don't show a wrong bus
     }
     
@@ -897,8 +840,8 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
     return destinationMatches[index];
   }
   
-  console.log(`getVehicleForArrival: vehicleIndex ${index} is out of bounds, returning closest vehicle`);
-  return destinationMatches[0];
+  console.log(`getVehicleForArrival: vehicleIndex ${index} is out of bounds (only ${destinationMatches.length} matches). Returning null.`);
+  return null;
 }
 
 /**
@@ -952,10 +895,10 @@ export async function computeEtaToStop(
   const distToTarget = getDistance(vehicle.lat, vehicle.lng, stop.lat, stop.lng);
 
   // 4b. If the vehicle has already passed the stop (by more than 50m), 
-  // don't show it as "Now" even if the schedule is stale.
+  // mark it as departed (-1) so it gets filtered out, preventing "Double Now".
   if (vehicleClosestIdx > targetIdx) {
     if (distToTarget > 0.05) {
-      return { etaMinutes: Math.max(1, scheduleEta), source: 'schedule' };
+      return { etaMinutes: -1, source: 'gps' };
     }
     return { etaMinutes: 0, source: 'gps' };
   }
@@ -1005,26 +948,24 @@ export async function computeEtaToStop(
   const gpsEtaMinutes = ((totalDistKm / speedKmh) * 60) + dwellTimeMinutes;
 
   // 8. Sanity check: if the GPS ETA differs wildly from the schedule ETA the
-  // matched vehicle almost certainly belongs to a different trip (e.g. it just
-  // finished its previous run and is near the route start, or is a wrong match).
-  // Only trust GPS when it is within a reasonable band around the schedule.
-  const lowerBound = Math.max(0, scheduleEta - Math.max(5, scheduleEta * 0.5));
-  const upperBound = scheduleEta + Math.max(5, scheduleEta * 0.5);
+  // matched vehicle almost certainly belongs to a different trip.
+  // However, buses can easily be 15-25 minutes late in traffic. We should trust GPS if we have a match.
+  const lowerBound = Math.max(0, scheduleEta - 15);
+  const upperBound = scheduleEta + 30; // Allow up to 30 mins delay
   
   if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
     console.log(`computeEtaToStop: GPS ETA ${gpsEtaMinutes.toFixed(1)}m out of bounds [${lowerBound.toFixed(1)}, ${upperBound.toFixed(1)}] for ${arrival.line} to ${arrival.destination}. Falling back to schedule ${scheduleEta}m.`);
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
   
-  // Trust GPS more when vehicle is close (1-3 stops away),
-  // blend equally when 4-6 stops, lean on schedule beyond that.
+  // Trust GPS heavily. The schedule is often wrong when there are delays.
   let gpsWeight: number;
-  if (stopsAway <= 2) {
-    gpsWeight = 0.85;
-  } else if (stopsAway <= 5) {
-    gpsWeight = 0.60;
+  if (stopsAway <= 3) {
+    gpsWeight = 0.95;
+  } else if (stopsAway <= 8) {
+    gpsWeight = 0.80;
   } else {
-    gpsWeight = 0.35;
+    gpsWeight = 0.65;
   }
   
   const blendedEta = gpsWeight * gpsEtaMinutes + (1 - gpsWeight) * scheduleEta;
@@ -1127,23 +1068,13 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     // Actually, CapacitorHttp supports POST.
     
     const url = `https://api.peatus.ee/routing/v1/routers/estonia/index/graphql?t=${Date.now()}`;
-    let text = '';
     
-    if (Capacitor.isNativePlatform()) {
-      const response = await CapacitorHttp.post({
-        url,
-        headers: { 'Content-Type': 'application/json' },
-        data: { query }
-      });
-      text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-    } else {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
-      });
-      text = await response.text();
-    }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    const text = await response.text();
 
     const data = JSON.parse(text);
     const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || [];
@@ -1420,6 +1351,9 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
         }
       }));
     }
+
+    // Filter out departed vehicles (etaMinutes < 0)
+    arrivals = arrivals.filter(a => a.minutes >= 0);
 
     // Re-sort by updated minutes
     arrivals.sort((a, b) => a.minutes - b.minutes);
