@@ -17,13 +17,11 @@ const getApiBaseUrl = () => {
   const isNative = origin.includes('localhost') || origin.includes('capacitor://');
   
   if (isNative) {
-    // Using the current dev URL if available, otherwise fallback to shared
-    // This ensures the native app sees the latest changes during development
-    const devUrl = 'https://ais-dev-4xsfvezpxu44gxul2ipqsy-662742466451.europe-west2.run.app';
+    // Using the public Shared App URL. 
+    // This avoids all local Windows Firewall and emulator networking issues.
     const sharedUrl = 'https://ais-pre-4xsfvezpxu44gxul2ipqsy-662742466451.europe-west2.run.app';
-    
-    console.log('Native environment detected. Dev URL:', devUrl);
-    return devUrl;
+    console.log('Native environment detected, using Shared App URL:', sharedUrl);
+    return sharedUrl;
   }
   
   // 3. Web environment (relative paths work fine)
@@ -507,69 +505,60 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     await fetchRoutes();
   }
   
-  const url = `${API_BASE}/api/transport/vehicles`;
+  const url = Capacitor.isNativePlatform()
+    ? 'https://gis.ee/tallinn/gps.php'
+    : `${API_BASE}/api/transport/vehicles`;
     
-  console.log(`fetchVehiclesFromApi: Fetching from ${url}`);
   const responseText = await universalFetch(url);
-  if (!responseText) {
-    console.warn('fetchVehiclesFromApi: Received empty response');
-    return [];
-  }
+  const data = JSON.parse(responseText);
+  const features = data?.features || [];
+
+  const vehicles: Vehicle[] = [];
   
-  try {
-    const data = JSON.parse(responseText);
-    const features = data?.features || [];
-
-    const vehicles: Vehicle[] = [];
+  for (const feature of features) {
+    const props = feature.properties;
+    const coords = feature.geometry?.coordinates;
     
-    for (const feature of features) {
-      const props = feature.properties;
-      const coords = feature.geometry?.coordinates;
-      
-      if (!coords || coords.length < 2) continue;
+    if (!coords || coords.length < 2) continue;
 
-      let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
-      
-      if (props.type === 1) type = 'trolley';
-      else if (props.type === 2) type = 'bus';
-      else if (props.type === 3) type = 'tram';
-      else if (props.type === 7) type = 'bus'; // nightbus
-      else if (props.type === 10) type = 'train';
-      else if (props.type === 20) type = 'regional';
+    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
+    
+    if (props.type === 1) type = 'trolley';
+    else if (props.type === 2) type = 'bus';
+    else if (props.type === 3) type = 'tram';
+    else if (props.type === 7) type = 'bus'; // nightbus
+    else if (props.type === 10) type = 'train';
+    else if (props.type === 20) type = 'regional';
 
-      const jitter = (Math.random() - 0.5) * 0.000001;
-      
-      const line = props.line?.toString() || '';
-      let destination = props.destination || '';
-      
-      // Fallback for missing destination (common for night buses)
-      if (!destination && line && routesMap[line]) {
-        const routeName = routesMap[line];
-        if (routeName.includes(' - ')) {
-          destination = routeName.split(' - ')[1];
-        } else {
-          destination = routeName;
-        }
+    const jitter = (Math.random() - 0.5) * 0.000001;
+    
+    const line = props.line?.toString() || '';
+    let destination = props.destination || '';
+    
+    // Fallback for missing destination (common for night buses)
+    if (!destination && line && routesMap[line]) {
+      const routeName = routesMap[line];
+      if (routeName.includes(' - ')) {
+        destination = routeName.split(' - ')[1];
+      } else {
+        destination = routeName;
       }
-      
-      vehicles.push({
-        id: props.id?.toString() || Math.random().toString(),
-        type,
-        line,
-        lng: coords[0] + jitter,
-        lat: coords[1] + jitter,
-        bearing: props.direction || 0,
-        speed: 0,
-        destination
-      });
     }
     
-    console.log(`fetchVehicles: parsed ${vehicles.length} vehicles successfully`);
-    return vehicles;
-  } catch (err) {
-    console.error('fetchVehiclesFromApi: Failed to parse JSON', err);
-    return [];
+    vehicles.push({
+      id: props.id?.toString() || Math.random().toString(),
+      type,
+      line,
+      lng: coords[0] + jitter,
+      lat: coords[1] + jitter,
+      bearing: props.direction || 0,
+      speed: 0,
+      destination
+    });
   }
+  
+  console.log(`fetchVehicles: parsed ${vehicles.length} vehicles successfully from gis.ee`);
+  return vehicles;
 }
 
 export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]> {
@@ -717,23 +706,15 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
   }
   
   const arrDest = (arrival.destination || '').toLowerCase();
-  console.log(`getVehicleForArrival: [${arrival.line}] target dest: "${arrDest}"`);
   
   // Try to match by destination
-  let destinationMatches = matching.filter(v => {
-    const vDest = (v.destination || '').toLowerCase();
-    const match = vDest === arrDest;
-    if (match) console.log(`getVehicleForArrival: [${arrival.line}] Exact dest match: "${vDest}"`);
-    return match;
-  });
+  let destinationMatches = matching.filter(v => (v.destination || '').toLowerCase() === arrDest);
   
   // Try partial match if no exact match
   if (destinationMatches.length === 0) {
     destinationMatches = matching.filter(v => {
       const vDest = (v.destination || '').toLowerCase();
-      const match = vDest.includes(arrDest) || arrDest.includes(vDest);
-      if (match) console.log(`getVehicleForArrival: [${arrival.line}] Partial dest match: "${vDest}" vs "${arrDest}"`);
-      return match;
+      return vDest.includes(arrDest) || arrDest.includes(vDest);
     });
   }
   
@@ -971,7 +952,6 @@ export async function computeEtaToStop(
   
   if (vehicleClosestIdx === -1 || targetIdx === -1 || vehicleClosestIdx >= targetIdx) {
     // Vehicle has already passed the stop, or can't resolve position — fall back to sched
-    console.log(`computeEtaToStop: [${arrival.line}] Rejecting GPS. vehicleIdx: ${vehicleClosestIdx}, targetIdx: ${targetIdx}`);
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
 
@@ -979,7 +959,6 @@ export async function computeEtaToStop(
   // almost certainly parked at a depot and not currently in service.
   // Fall back to schedule so we don't produce fake GPS ETAs at night.
   if (minVehicleDist > 0.5) {
-    console.log(`computeEtaToStop: [${arrival.line}] Rejecting GPS. Vehicle too far from route: ${minVehicleDist.toFixed(2)}km`);
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
   
@@ -1017,7 +996,6 @@ export async function computeEtaToStop(
   const lowerBound = Math.max(0, scheduleEta - Math.max(5, scheduleEta * 0.5));
   const upperBound = scheduleEta + Math.max(5, scheduleEta * 0.5);
   if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
-    console.log(`computeEtaToStop: [${arrival.line}] Rejecting GPS. Out of bounds. GPS: ${gpsEtaMinutes.toFixed(1)}m, Sched: ${scheduleEta}m, Bounds: [${lowerBound.toFixed(1)}, ${upperBound.toFixed(1)}]`);
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
 
@@ -1358,30 +1336,20 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     }
     
     if (targetStop) {
-      console.log(`fetchDepartures: Computing ETAs for ${arrivals.length} arrivals at ${targetStop.name}`);
       await Promise.all(arrivals.map(async (arrival) => {
         const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
+        arrival.minutes = etaMinutes;
         
-        if (source !== 'schedule') {
-          console.log(`fetchDepartures: [${arrival.line}] GPS match! ${arrival.minutes}m -> ${etaMinutes}m (${source})`);
-          arrival.minutes = etaMinutes;
-          
-          // Update departureTimeSeconds to match the new GPS-based minutes
-          const nowUnixSeconds = Math.floor(Date.now() / 1000);
-          arrival.departureTimeSeconds = nowUnixSeconds + (etaMinutes * 60);
-          
-          if (source === 'gps') {
-            arrival.info = 'Live GPS';
-            arrival.isRealtime = true;
-          } else if (source === 'blended') {
-            arrival.info = 'GPS + Schedule';
-            arrival.isRealtime = true;
-          }
-        } else {
-          // If it's already marked as realtime by the API (expectedTime !== scheduledTime), keep it
-          if (arrival.isRealtime) {
-            arrival.info = arrival.info || 'Real-time API';
-          }
+        // Update departureTimeSeconds to match the new GPS-based minutes
+        const nowUnixSeconds = Math.floor(Date.now() / 1000);
+        arrival.departureTimeSeconds = nowUnixSeconds + (etaMinutes * 60);
+        
+        if (source === 'gps') {
+          arrival.info = 'Live GPS';
+          arrival.isRealtime = true;
+        } else if (source === 'blended') {
+          arrival.info = 'GPS + Schedule';
+          arrival.isRealtime = true;
         }
       }));
     }
