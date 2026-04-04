@@ -92,26 +92,124 @@ export async function fetchRoutes(): Promise<void> {
   
   routesPromise = (async () => {
     try {
-      const url = `${API_BASE}/api/transport/parsed-routes`;
-      const response = await fetch(url);
-      const data = await response.json();
-      
-      routesMap = data.routesMap || {};
-      
-      // Update routeStopsMap
-      for (const [key, value] of Object.entries(data.routeStopsMap || {})) {
-        routeStopsMap[key] = value as any;
+      let text: string;
+      try {
+        const url = `${API_BASE}/api/transport/parsed-routes`;
+        text = await universalFetch(url);
+        const data = JSON.parse(text);
+        
+        routesMap = data.routesMap || {};
+        
+        // Update routeStopsMap
+        for (const [key, value] of Object.entries(data.routeStopsMap || {})) {
+          routeStopsMap[key] = value as any;
+        }
+        
+        // Update usedStopsSet
+        (data.usedStopsArray || []).forEach((stop: string) => usedStopsSet.add(stop));
+        
+        // Update stopModesMap
+        for (const [key, value] of Object.entries(data.stopModesMap || {})) {
+          stopModesMap[key] = new Set(value as string[]);
+        }
+        
+        console.log(`Successfully loaded ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops from parsed-routes`);
+        return; // Success, exit early
+      } catch (e) {
+        console.warn('Failed to fetch from parsed-routes, falling back to raw routes.txt', e);
+        // Fallback to old endpoint
+        const fallbackUrl = `${API_BASE}/api/transport/routes`;
+        text = await universalFetch(fallbackUrl);
       }
       
-      // Update usedStopsSet
-      (data.usedStopsArray || []).forEach((stop: string) => usedStopsSet.add(stop));
+      // Fallback parsing logic
+      const lines = text.split(/\r?\n/);
+      console.log(`fetchRoutes fallback: found ${lines.length} lines`);
       
-      // Update stopModesMap
-      for (const [key, value] of Object.entries(data.stopModesMap || {})) {
-        stopModesMap[key] = new Set(value as string[]);
+      if (lines.length === 0) return;
+      
+      let delim = ';';
+      if (lines[0].includes(';')) delim = ';';
+      else if (lines[0].includes(',')) delim = ',';
+      else if (lines[0].includes('\t')) delim = '\t';
+      
+      const header = lines[0].split(delim).map(h => h.trim().toUpperCase());
+      const fld: Record<string, number> = {};
+      for (let i = 0; i < header.length; i++) {
+        fld[header[i]] = i;
       }
       
-      console.log(`Successfully loaded ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops from parsed-routes`);
+      let currentRouteNum = '';
+      let currentTransport = '';
+      let currentRouteName = '';
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line || line.trim().length === 0 || line.startsWith('#')) continue;
+        
+        const parts = line.split(delim);
+        
+        const rawRouteNum = parts[fld['ROUTENUM']];
+        const rawTransport = parts[fld['TRANSPORT']];
+        const rawRouteName = parts[fld['ROUTENAME']];
+        const rawRouteStops = parts[fld['ROUTESTOPS']];
+        
+        const routeNum = rawRouteNum ? rawRouteNum.trim().replace(/"/g, '') : undefined;
+        const transport = rawTransport ? rawTransport.trim().replace(/"/g, '') : undefined;
+        const routeName = rawRouteName ? rawRouteName.trim().replace(/"/g, '') : undefined;
+        const routeStops = rawRouteStops ? rawRouteStops.trim().replace(/"/g, '') : undefined;
+        
+        if (routeNum && routeNum !== '-') {
+          currentRouteNum = routeNum;
+        }
+        if (transport && transport !== '-') {
+          currentTransport = transport;
+        }
+        if (routeName && routeName !== '-') {
+          currentRouteName = routeName;
+        }
+        
+        if (currentRouteNum && currentRouteName) {
+          routesMap[currentRouteNum] = currentRouteName;
+          const normNum = currentRouteNum.replace(/^0+/, '');
+          if (normNum && normNum !== currentRouteNum) routesMap[normNum] = currentRouteName;
+        }
+        
+        if (routeStops) {
+          const stops = routeStops.split(',').filter(Boolean);
+          for (const stop of stops) {
+            const normStop = stop.replace(/^0+/, '');
+            usedStopsSet.add(stop);
+            usedStopsSet.add(normStop);
+            
+            if (currentTransport) {
+              let mode = currentTransport.toLowerCase();
+              if (mode === 'nightbus') mode = 'bus';
+              
+              if (!stopModesMap[stop]) stopModesMap[stop] = new Set();
+              if (!stopModesMap[normStop]) stopModesMap[normStop] = new Set();
+              
+              stopModesMap[stop].add(mode);
+              stopModesMap[normStop].add(mode);
+            }
+          }
+          if (currentRouteNum && currentRouteName) {
+            if (!routeStopsMap[currentRouteNum]) {
+              routeStopsMap[currentRouteNum] = [];
+            }
+            routeStopsMap[currentRouteNum].push({ name: currentRouteName, stops });
+            
+            const normNum = currentRouteNum.replace(/^0+/, '');
+            if (normNum && normNum !== currentRouteNum) {
+              if (!routeStopsMap[normNum]) {
+                routeStopsMap[normNum] = [];
+              }
+              routeStopsMap[normNum].push({ name: currentRouteName, stops });
+            }
+          }
+        }
+      }
+      console.log(`Successfully loaded ${Object.keys(routesMap).length} route mappings and ${usedStopsSet.size} used stops from fallback`);
     } catch (error) {
       console.error('Error fetching/parsing routes:', error);
       routesPromise = null;
@@ -131,14 +229,44 @@ export async function fetchStops(): Promise<Stop[]> {
     
     try {
       console.log('Fetching stops from peatus.ee GraphQL API...');
-      const url = `${API_BASE}/api/transport/peatus/stops`;
+      let rawStops: any[] = [];
       
-      const response = await fetch(url);
-      const text = await response.text();
+      try {
+        const url = `${API_BASE}/api/transport/peatus/stops`;
+        const text = await universalFetch(url);
+        const data = JSON.parse(text);
+        rawStops = data.data?.stops || data.stops;
+      } catch (e) {
+        console.warn('Failed to fetch from peatus/stops proxy, falling back to direct GraphQL', e);
+        const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
+        const query = `
+          query {
+            stops {
+              gtfsId
+              name
+              lat
+              lon
+              code
+              zoneId
+              parentStation {
+                name
+              }
+              routes {
+                mode
+              }
+            }
+          }
+        `;
+        const response = await fetch(fallbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const data = await response.json();
+        rawStops = data.data?.stops || data.stops;
+      }
       
-      const data = JSON.parse(text);
-      const rawStops = data.data?.stops || data.stops;
-      
+      if (!rawStops) rawStops = [];
       console.log(`fetchStops: received ${rawStops.length} stops from peatus.ee`);
       
       // Fetch Tallinn stops.txt to get correct SiriIDs
@@ -374,7 +502,40 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
   
   const url = `${API_BASE}/api/transport/vehicles?t=${Date.now()}`;
     
-  const responseText = await universalFetch(url);
+  let responseText = '';
+  try {
+    responseText = await universalFetch(url);
+  } catch (e) {
+    console.warn('Failed to fetch from vehicles proxy, falling back to direct API', e);
+    const fallbackUrl = `https://transport.tallinn.ee/gps.txt?t=${Date.now()}`;
+    const rawText = await universalFetch(fallbackUrl);
+    
+    // Parse the raw gps.txt format
+    const lines = rawText.split('\n').filter(l => l.trim().length > 0);
+    const features = [];
+    for (const line of lines) {
+      const parts = line.split(',');
+      if (parts.length < 6) continue;
+      
+      const typeStr = parts[0];
+      let type = 2; // default bus
+      if (typeStr === '1') type = 1; // trolley
+      else if (typeStr === '3') type = 3; // tram
+      
+      features.push({
+        geometry: { coordinates: [parseFloat(parts[3]) / 1000000, parseFloat(parts[2]) / 1000000] },
+        properties: {
+          type,
+          line: parts[1],
+          direction: parseInt(parts[5], 10),
+          id: parts[1] + '_' + parts[2] + '_' + parts[3], // pseudo id
+          destination: '' // Not available in gps.txt directly
+        }
+      });
+    }
+    responseText = JSON.stringify({ features });
+  }
+  
   const data = JSON.parse(responseText);
   const features = data?.features || [];
 
@@ -999,16 +1160,27 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     // For now, let's use a proxy endpoint if possible, or just keep fetch but wrap it.
     // Actually, CapacitorHttp supports POST.
     
-    const url = `${API_BASE}/api/transport/peatus/graphql?t=${Date.now()}`;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    });
-    const text = await response.text();
+    let data: any;
+    try {
+      const url = `${API_BASE}/api/transport/peatus/graphql?t=${Date.now()}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const text = await response.text();
+      data = JSON.parse(text);
+    } catch (e) {
+      console.warn('Failed to fetch from peatus/graphql proxy, falling back to direct GraphQL', e);
+      const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
+      const response = await fetch(fallbackUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      data = await response.json();
+    }
 
-    const data = JSON.parse(text);
     const stoptimes = data?.data?.stop?.stoptimesWithoutPatterns || data?.stop?.stoptimesWithoutPatterns || [];
 
     const arrivals: Arrival[] = [];
@@ -1106,7 +1278,14 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     
     try {
       console.log(`fetchDepartures: Fetching from ${url}`);
-      const text = await universalFetch(url);
+      let text = '';
+      try {
+        text = await universalFetch(url);
+      } catch (e) {
+        console.warn('Failed to fetch from departures proxy, falling back to direct API', e);
+        const fallbackUrl = `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}${time ? `&time=${time}` : ''}`;
+        text = await universalFetch(fallbackUrl);
+      }
       
       if (text) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
