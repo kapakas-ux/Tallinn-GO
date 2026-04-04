@@ -1,5 +1,5 @@
 import { Arrival, Stop, Vehicle } from '../types';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { getDistance, getBearing } from '../lib/geo';
 
 const getApiBaseUrl = () => {
@@ -35,17 +35,43 @@ const API_BASE = getApiBaseUrl();
  * The proxy server handles CORS, so we don't need CapacitorHttp anymore.
  * This vastly improves performance on Android for large files like routes.txt.
  */
-async function universalFetch(url: string): Promise<string> {
+async function universalFetch(url: string, options?: RequestInit): Promise<string> {
   console.log(`universalFetch START: ${url}`);
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, options);
     if (!response.ok) {
       throw new Error(`Fetch error: ${response.status}`);
     }
     const text = await response.text();
     return text;
   } catch (err) {
-    console.error(`universalFetch FAILED: ${url}`, err);
+    console.warn(`universalFetch standard fetch FAILED: ${url}, trying CapacitorHttp fallback...`, err);
+    
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const optionsForCapacitor = {
+          url,
+          method: options?.method || 'GET',
+          headers: options?.headers as Record<string, string> || {},
+          data: options?.body ? JSON.parse(options.body as string) : undefined
+        };
+        
+        const response = await CapacitorHttp.request(optionsForCapacitor);
+        if (response.status >= 400) {
+          throw new Error(`CapacitorHttp error: ${response.status}`);
+        }
+        
+        // CapacitorHttp returns JSON objects if the content-type is json, otherwise string
+        if (typeof response.data === 'object') {
+          return JSON.stringify(response.data);
+        }
+        return String(response.data);
+      } catch (capErr) {
+        console.error(`universalFetch CapacitorHttp fallback FAILED: ${url}`, capErr);
+        throw capErr;
+      }
+    }
+    
     throw err;
   }
 }
@@ -96,6 +122,7 @@ export async function fetchRoutes(): Promise<void> {
       try {
         const url = `${API_BASE}/api/transport/parsed-routes`;
         text = await universalFetch(url);
+        if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
         const data = JSON.parse(text);
         
         routesMap = data.routesMap || {};
@@ -117,8 +144,8 @@ export async function fetchRoutes(): Promise<void> {
         return; // Success, exit early
       } catch (e) {
         console.warn('Failed to fetch from parsed-routes, falling back to raw routes.txt', e);
-        // Fallback to old endpoint
-        const fallbackUrl = `${API_BASE}/api/transport/routes`;
+        // Fallback to direct API
+        const fallbackUrl = `https://transport.tallinn.ee/data/routes.txt`;
         text = await universalFetch(fallbackUrl);
       }
       
@@ -234,6 +261,7 @@ export async function fetchStops(): Promise<Stop[]> {
       try {
         const url = `${API_BASE}/api/transport/peatus/stops`;
         const text = await universalFetch(url);
+        if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
         const data = JSON.parse(text);
         rawStops = data.data?.stops || data.stops;
       } catch (e) {
@@ -272,8 +300,18 @@ export async function fetchStops(): Promise<Stop[]> {
       // Fetch Tallinn stops.txt to get correct SiriIDs
       const siriIdMap = new Map<string, string>();
       try {
-        const url = `${API_BASE}/api/transport/stops`;
-        const text = await universalFetch(url);
+        let text = '';
+        try {
+          const url = `${API_BASE}/api/transport/stops`;
+          text = await universalFetch(url);
+          // If it returned HTML (cookie check), throw error
+          if (text.trim().startsWith('<')) throw new Error('Received HTML instead of stops.txt');
+        } catch (e) {
+          console.warn('Failed to fetch from stops proxy, falling back to direct API', e);
+          const fallbackUrl = `https://transport.tallinn.ee/data/stops.txt`;
+          text = await universalFetch(fallbackUrl);
+        }
+        
         const lines = text.split(/\r?\n/);
         if (lines.length > 0) {
           let delim = ';';
@@ -505,6 +543,7 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
   let responseText = '';
   try {
     responseText = await universalFetch(url);
+    if (responseText.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
   } catch (e) {
     console.warn('Failed to fetch from vehicles proxy, falling back to direct API', e);
     const fallbackUrl = `https://transport.tallinn.ee/gps.txt?t=${Date.now()}`;
@@ -1169,6 +1208,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
         body: JSON.stringify({ query })
       });
       const text = await response.text();
+      if (text.trim().startsWith('<')) throw new Error('Received HTML instead of JSON');
       data = JSON.parse(text);
     } catch (e) {
       console.warn('Failed to fetch from peatus/graphql proxy, falling back to direct GraphQL', e);
@@ -1281,6 +1321,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       let text = '';
       try {
         text = await universalFetch(url);
+        if (text.trim().startsWith('<')) throw new Error('Received HTML instead of text');
       } catch (e) {
         console.warn('Failed to fetch from departures proxy, falling back to direct API', e);
         const fallbackUrl = `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}${time ? `&time=${time}` : ''}`;
