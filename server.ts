@@ -270,23 +270,16 @@ async function startServer() {
           const ridangoRes = await axios.get(ridangoUrl, { timeout: 5000 });
           if (ridangoRes.data && ridangoRes.data.departures && ridangoRes.data.departures.length > 0) {
             console.log(`Ridango fallback successful for ${ridId}, found ${ridangoRes.data.departures.length} departures`);
-            const serverTimeUnix = Math.floor(Date.now() / 1000);
-            let siriText = `1,${ridId},0,0,${serverTimeUnix},0\n\n`;
+            let siriText = `RidangoFallback,${ridId},${Date.now()}\n`;
             ridangoRes.data.departures.forEach((d: any) => {
               const type = d.vehicle_type === 'tram' ? 'tram' : (d.vehicle_type === 'trolley' ? 'trolley' : 'bus');
               const depTime = new Date(d.expected_time || d.scheduled_time);
-              const expectedTimeUnix = Math.floor(depTime.getTime() / 1000);
-              const schedTime = new Date(d.scheduled_time || d.expected_time);
-              const scheduledTimeUnix = Math.floor(schedTime.getTime() / 1000);
-              
-              // Clean up route code (sometimes it's like "6.486")
-              let line = d.route_code || '';
-              if (line.includes('.')) {
-                line = line.split('.')[0];
-              }
-              
-              // Format: type, line, expectedTime, scheduledTime, destination
-              siriText += `${type},${line},${expectedTimeUnix},${scheduledTimeUnix},${d.destination || ''}\n`;
+              const seconds = Math.max(0, Math.round((depTime.getTime() - Date.now()) / 1000));
+              const hours = String(depTime.getHours()).padStart(2, '0');
+              const mins = String(depTime.getMinutes()).padStart(2, '0');
+              const timeStr = `${hours}:${mins}`;
+              // Format: type, line, destination_id, seconds, time, destination_name
+              siriText += `${type},${d.route_code},${d.destination},${seconds},${timeStr},${d.destination}\n`;
             });
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(siriText);
@@ -305,23 +298,16 @@ async function startServer() {
           const piletRes = await axios.get(piletUrl, { timeout: 5000 });
           if (piletRes.data && piletRes.data.departures && piletRes.data.departures.length > 0) {
             console.log(`iil.pilet.ee fallback successful for ${ridId}, found ${piletRes.data.departures.length} departures`);
-            const serverTimeUnix = Math.floor(Date.now() / 1000);
-            let siriText = `1,${ridId},0,0,${serverTimeUnix},0\n\n`;
+            let siriText = `PiletFallback,${ridId},${Date.now()}\n`;
             piletRes.data.departures.forEach((d: any) => {
               const type = d.vehicle_type === 'tram' ? 'tram' : (d.vehicle_type === 'trolley' ? 'trolley' : 'bus');
               const depTime = new Date(d.expected_time || d.scheduled_time);
-              const expectedTimeUnix = Math.floor(depTime.getTime() / 1000);
-              const schedTime = new Date(d.scheduled_time || d.expected_time);
-              const scheduledTimeUnix = Math.floor(schedTime.getTime() / 1000);
-              
-              // Clean up route code
-              let line = d.route_code || '';
-              if (line.includes('.')) {
-                line = line.split('.')[0];
-              }
-              
-              // Format: type, line, expectedTime, scheduledTime, destination
-              siriText += `${type},${line},${expectedTimeUnix},${scheduledTimeUnix},${d.destination || ''}\n`;
+              const seconds = Math.max(0, Math.round((depTime.getTime() - Date.now()) / 1000));
+              const hours = String(depTime.getHours()).padStart(2, '0');
+              const mins = String(depTime.getMinutes()).padStart(2, '0');
+              const timeStr = `${hours}:${mins}`;
+              // Format: type, line, destination_id, seconds, time, destination_name
+              siriText += `${type},${d.route_code},${d.destination},${seconds},${timeStr},${d.destination}\n`;
             });
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(siriText);

@@ -2,14 +2,12 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
-import { GettingStartedModal } from './GettingStartedModal';
 
 export const TopBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isGettingStartedOpen, setIsGettingStartedOpen] = useState(false);
 
   return (
     <>
@@ -41,19 +39,10 @@ export const TopBar = () => {
               <div className="absolute top-full left-6 mt-2 w-48 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 overflow-hidden z-50">
                 <button
                   onClick={() => {
-                    setIsGettingStartedOpen(true);
-                    setIsMenuOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
-                >
-                  🚀 Getting Started
-                </button>
-                <button
-                  onClick={() => {
                     setIsSettingsOpen(true);
                     setIsMenuOpen(false);
                   }}
-                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
                 >
                   ⚙️ Settings
                 </button>
@@ -89,9 +78,6 @@ export const TopBar = () => {
           )}
         </div>
       </header>
-
-      {/* Getting Started Modal */}
-      {isGettingStartedOpen && <GettingStartedModal onClose={() => setIsGettingStartedOpen(false)} />}
 
       {/* Settings Modal */}
       {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}

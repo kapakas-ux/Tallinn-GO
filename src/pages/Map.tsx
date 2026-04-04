@@ -448,7 +448,6 @@ export const Map = () => {
               // Any bus, trolley, regional, commercial, or suburban
               ['any',
                 ['in', 'bus', ['get', 'modes']],
-                ['in', 'nightbus', ['get', 'modes']],
                 ['in', 'trolley', ['get', 'modes']],
                 ['in', 'regional', ['get', 'modes']],
                 ['in', 'commercial', ['get', 'modes']],
