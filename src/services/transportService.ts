@@ -249,7 +249,7 @@ export async function fetchStops(): Promise<Stop[]> {
     
     try {
       console.log('Fetching stops from peatus.ee GraphQL API...');
-      const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+      const url = `https://api.peatus.ee/routing/v1/routers/estonia/index/graphql?t=${Date.now()}`;
       const query = '{ stops { gtfsId name lat lon code desc zoneId parentStation { name } routes { mode } } }';
       
       let text = '';
@@ -506,8 +506,8 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
   }
   
   const url = Capacitor.isNativePlatform()
-    ? 'https://gis.ee/tallinn/gps.php'
-    : `${API_BASE}/api/transport/vehicles`;
+    ? `https://gis.ee/tallinn/gps.php?t=${Date.now()}`
+    : `${API_BASE}/api/transport/vehicles?t=${Date.now()}`;
     
   const responseText = await universalFetch(url);
   const data = JSON.parse(responseText);
@@ -1126,7 +1126,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     // For now, let's use a proxy endpoint if possible, or just keep fetch but wrap it.
     // Actually, CapacitorHttp supports POST.
     
-    const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+    const url = `https://api.peatus.ee/routing/v1/routers/estonia/index/graphql?t=${Date.now()}`;
     let text = '';
     
     if (Capacitor.isNativePlatform()) {
@@ -1236,7 +1236,8 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
   
   try {
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
-    const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
+    const cacheBuster = `_t=${Date.now()}`;
+    const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}&${cacheBuster}`;
     
     let arrivals: Arrival[] = [];
     

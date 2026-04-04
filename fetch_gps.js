@@ -1,8 +1,6 @@
 const https = require('https');
-https.get('https://transport.tallinn.ee/gps.txt', (res) => {
+https.get('https://gis.ee/tallinn/gps.php', (res) => {
   let data = '';
   res.on('data', (chunk) => { data += chunk; });
-  res.on('end', () => {
-    console.log(data.split('\n').slice(0, 10).join('\n'));
-  });
+  res.on('end', () => { console.log(data.substring(0, 1000)); });
 });
