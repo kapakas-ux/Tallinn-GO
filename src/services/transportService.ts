@@ -950,22 +950,12 @@ export async function computeEtaToStop(
     targetIdx = routeStops.findIndex(s => s.id.split('-')[0] === baseId);
   }
   
-  if (vehicleClosestIdx === -1 || targetIdx === -1) {
+  if (vehicleClosestIdx === -1 || targetIdx === -1 || vehicleClosestIdx >= targetIdx) {
+    // Vehicle has already passed the stop, or can't resolve position — fall back to sched
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
 
-  const distToTarget = getDistance(vehicle.lat, vehicle.lng, stop.lat, stop.lng);
-
-  // 4b. If the vehicle has already passed the stop (by more than 50m), 
-  // don't show it as "Now" even if the schedule is stale.
-  if (vehicleClosestIdx > targetIdx) {
-    if (distToTarget > 0.05) {
-      return { etaMinutes: Math.max(1, scheduleEta), source: 'schedule' };
-    }
-    return { etaMinutes: 0, source: 'gps' };
-  }
-
-  // 4c. If the vehicle is more than 500m from its closest route stop it is
+  // 4b. If the vehicle is more than 500m from its closest route stop it is
   // almost certainly parked at a depot and not currently in service.
   // Fall back to schedule so we don't produce fake GPS ETAs at night.
   if (minVehicleDist > 0.5) {
@@ -973,20 +963,15 @@ export async function computeEtaToStop(
   }
   
   // 5. Compute path distance: vehicle -> closest stop -> ... -> target stop
-  let totalDistKm = 0;
-  if (vehicleClosestIdx === targetIdx) {
-    totalDistKm = distToTarget;
-  } else {
-    // First leg: vehicle to its closest stop (partial segment)
-    totalDistKm = getDistance(vehicle.lat, vehicle.lng, routeStops[vehicleClosestIdx].lat, routeStops[vehicleClosestIdx].lng);
-    
-    // Middle legs: stop-to-stop along the route
-    for (let i = vehicleClosestIdx; i < targetIdx; i++) {
-      totalDistKm += getDistance(
-        routeStops[i].lat, routeStops[i].lng,
-        routeStops[i + 1].lat, routeStops[i + 1].lng
-      );
-    }
+  // First leg: vehicle to its closest stop (partial segment)
+  let totalDistKm = getDistance(vehicle.lat, vehicle.lng, routeStops[vehicleClosestIdx].lat, routeStops[vehicleClosestIdx].lng);
+  
+  // Middle legs: stop-to-stop along the route
+  for (let i = vehicleClosestIdx; i < targetIdx; i++) {
+    totalDistKm += getDistance(
+      routeStops[i].lat, routeStops[i].lng,
+      routeStops[i + 1].lat, routeStops[i + 1].lng
+    );
   }
   
   // 6. Estimate speed
@@ -1001,13 +986,8 @@ export async function computeEtaToStop(
   
   const speedKmh = AVG_SPEED_KMH[vehicle.type] ?? 22;
   
-  // 9. Blend: how many stops away is the vehicle?
-  const stopsAway = targetIdx - vehicleClosestIdx;
-
   // 7. GPS-derived ETA
-  // Add 30 seconds of dwell time for each stop in between
-  const dwellTimeMinutes = stopsAway * 0.5; // ~30 seconds per stop
-  const gpsEtaMinutes = ((totalDistKm / speedKmh) * 60) + dwellTimeMinutes;
+  const gpsEtaMinutes = (totalDistKm / speedKmh) * 60;
 
   // 8. Sanity check: if the GPS ETA differs wildly from the schedule ETA the
   // matched vehicle almost certainly belongs to a different trip (e.g. it just
@@ -1015,11 +995,12 @@ export async function computeEtaToStop(
   // Only trust GPS when it is within a reasonable band around the schedule.
   const lowerBound = Math.max(0, scheduleEta - Math.max(5, scheduleEta * 0.5));
   const upperBound = scheduleEta + Math.max(5, scheduleEta * 0.5);
-  
   if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
-    console.log(`computeEtaToStop: GPS ETA ${gpsEtaMinutes.toFixed(1)}m out of bounds [${lowerBound.toFixed(1)}, ${upperBound.toFixed(1)}] for ${arrival.line} to ${arrival.destination}. Falling back to schedule ${scheduleEta}m.`);
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
+
+  // 9. Blend: how many stops away is the vehicle?
+  const stopsAway = targetIdx - vehicleClosestIdx;
   
   // Trust GPS more when vehicle is close (1-3 stops away),
   // blend equally when 4-6 stops, lean on schedule beyond that.
@@ -1033,29 +1014,7 @@ export async function computeEtaToStop(
   }
   
   const blendedEta = gpsWeight * gpsEtaMinutes + (1 - gpsWeight) * scheduleEta;
-  
-  // 10. Final ETA calculation with "Now" protection
-  let finalEta = Math.round(blendedEta);
-
-  if (stopsAway >= 1) {
-    // If the vehicle is at least 1 stop away, it CANNOT be "Now".
-    // Each stop in between adds travel time + dwell time penalty.
-    const travelTime = (totalDistKm / (speedKmh / 60));
-    const dwellPenalty = stopsAway * 0.6; // 36s per stop
-    const minMins = Math.max(1, Math.ceil(travelTime + dwellPenalty));
-    finalEta = Math.max(minMins, finalEta);
-  } else {
-    // stopsAway === 0 (vehicle is closest to this stop)
-    // Only show "Now" (0) if it's actually very close (< 70m)
-    // 70m is roughly the distance where a bus is definitely at the stop.
-    if (distToTarget > 0.07) {
-      finalEta = Math.max(1, finalEta);
-    } else {
-      finalEta = 0;
-    }
-  }
-  
-  console.log(`computeEtaToStop: ${arrival.line} to ${arrival.destination}: stopsAway=${stopsAway}, dist=${totalDistKm.toFixed(2)}km, gpsEta=${gpsEtaMinutes.toFixed(1)}m, schedEta=${scheduleEta}m, blended=${blendedEta.toFixed(1)}m -> final=${finalEta}m`);
+  const finalEta = Math.max(0, Math.round(blendedEta));
   
   const source = gpsWeight >= 0.75 ? 'gps' : 'blended';
   return { etaMinutes: finalEta, source };
@@ -1075,7 +1034,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       }
     }
 
-    const numberOfDepartures = time === '0' ? 50 : 15;
+    const numberOfDepartures = (time === '0' || allModes) ? 50 : 25;
 
     const query = `
       {
@@ -1102,7 +1061,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       }
     `;
 
-    console.log(`fetchPeatusDepartures: Fetching for ${gtfsId} (allModes: ${allModes})`);
+    console.log(`fetchPeatusDepartures: Fetching for ${gtfsId} (allModes: ${allModes}, count: ${numberOfDepartures})`);
     
     // Use universalFetch for Peatus API too, but we need to handle GraphQL POST
     // Actually, universalFetch currently only supports GET. 
@@ -1137,20 +1096,14 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
     for (const st of stoptimes) {
       const modeStr = st.trip?.route?.mode?.toLowerCase() || 'bus';
       const agencyName = st.trip?.route?.agency?.name || '';
-      const line = st.trip?.route?.shortName || '';
       let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
       
       if (modeStr.includes('tram')) type = 'tram';
       else if (modeStr.includes('trolley')) type = 'trolley';
       else if (modeStr.includes('rail') || modeStr.includes('train')) type = 'train';
       else if (modeStr.includes('bus')) {
-        // Distinguish city buses from county/regional buses
-        const isCityAgency = agencyName.toLowerCase().includes('linnatransport') || 
-                            agencyName.toLowerCase().includes('linnatranspordi');
-        // City buses in Estonia typically have 1-2 digit line numbers
-        const isShortLine = /^\d{1,2}[A-Z]?$/.test(line);
-        
-        if (agencyName && !isCityAgency && !isShortLine) {
+        // Distinguish city buses from county buses
+        if (agencyName && !agencyName.toLowerCase().includes('tallinna linnatranspordi')) {
           type = 'regional';
         }
       }
@@ -1160,7 +1113,20 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
         continue;
       }
 
-      const destination = st.headsign || '';
+      const line = st.trip?.route?.shortName || '';
+      let destination = st.headsign || '';
+
+      // Fallback for missing destination
+      if ((!destination || destination === 'Unknown Destination') && line) {
+        const routeName = routesMap[line] || routesMap[line.replace(/^0+/, '')];
+        if (routeName) {
+          if (routeName.includes(' - ')) {
+            destination = routeName.split(' - ')[1];
+          } else {
+            destination = routeName;
+          }
+        }
+      }
 
       // Calculate time
       const departureTimeSeconds = st.serviceDay + (st.realtimeDeparture || st.scheduledDeparture);
@@ -1170,11 +1136,11 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       // If it's marked as departed or canceled, skip
       if (st.realtimeState === 'DEPARTED' || st.realtimeState === 'CANCELED') continue;
       
-      // If it's real-time, trust the DEPARTED state mostly, but drop if it's extremely stale (e.g., > 3 mins past)
-      if (isRealTime && diffSeconds < -180) continue;
+      // If it's real-time, trust the DEPARTED state mostly, but drop if it's extremely stale (e.g., > 5 mins past)
+      if (isRealTime && diffSeconds < -300) continue;
       
-      // If it's scheduled (not real-time), drop if it's > 1 min past scheduled time
-      if (!isRealTime && diffSeconds < -60) continue;
+      // If it's scheduled (not real-time), drop if it's > 2 min past scheduled time
+      if (!isRealTime && diffSeconds < -120) continue;
       
       // Clamp negative minutes to 0 so buses just departing show as "Now"
       let minutes = Math.max(0, Math.floor(diffSeconds / 60));
@@ -1214,10 +1180,6 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
 }
 
 export async function fetchDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
-  if (Object.keys(routesMap).length === 0) {
-    await fetchRoutes();
-  }
-  
   try {
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
     const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
@@ -1236,46 +1198,35 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
           const headerParts = lines[0].split(',');
           const serverTimeSeconds = parseInt(headerParts[4], 10);
           
-          const getTallinnSecondsFromMidnight = () => {
-            try {
-              const now = new Date();
-              const tallinnTime = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/Tallinn', hour12: false });
-              const [h, m, s] = tallinnTime.split(':').map(Number);
-              return h * 3600 + m * 60 + s;
-            } catch (e) {
-              return Math.floor(Date.now() / 1000) % 86400;
-            }
-          };
-
-          const nowInTallinn = getTallinnSecondsFromMidnight();
+          if (isNaN(serverTimeSeconds)) {
+            console.error(`fetchDepartures: Invalid serverTimeSeconds in header: ${lines[0]}`);
+          }
           
           for (let i = 2; i < lines.length; i++) {
             const parts = lines[i].split(',');
             if (parts.length < 5) continue;
             
-            const line = parts[1];
             const typeStr = parts[0].toLowerCase();
             let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
             if (typeStr === 'tram') type = 'tram';
             else if (typeStr === 'trolley') type = 'trolley';
             else if (typeStr === 'train' || typeStr === 'rail') type = 'train';
-            else if (typeStr === 'regional') {
-              // Re-classify short line numbers as city buses
-              const isShortLine = /^\d{1,2}[A-Z]?$/.test(line);
-              type = isShortLine ? 'bus' : 'regional';
-            }
+            else if (typeStr === 'regional') type = 'regional';
             
-            const expectedTime = parseInt(parts[2], 10);
-            const scheduledTime = parseInt(parts[3], 10);
+            const line = parts[1];
+            let expectedTime = parseInt(parts[2], 10);
+            let scheduledTime = parseInt(parts[3], 10);
             let destination = parts[4];
             
             // Fallback for missing destination
-            if (!destination && line && routesMap[line]) {
-              const routeName = routesMap[line];
-              if (routeName.includes(' - ')) {
-                destination = routeName.split(' - ')[1];
-              } else {
-                destination = routeName;
+            if ((!destination || destination === 'Unknown Destination') && line) {
+              const routeName = routesMap[line] || routesMap[line.replace(/^0+/, '')];
+              if (routeName) {
+                if (routeName.includes(' - ')) {
+                  destination = routeName.split(' - ')[1];
+                } else {
+                  destination = routeName;
+                }
               }
             }
             
@@ -1284,22 +1235,47 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
               continue;
             }
             
-            // Calculate minutes
-            let diffSeconds = expectedTime - (isNaN(serverTimeSeconds) ? nowInTallinn : serverTimeSeconds);
+            // Calculate minutes - handle both timestamps and seconds-from-start-of-day
+            const isExpectedTimestamp = expectedTime > 1000000000;
+            const isServerTimestamp = !isNaN(serverTimeSeconds) && serverTimeSeconds > 1000000000;
             
-            // Handle midnight wrap-around
-            if (diffSeconds < -43200) diffSeconds += 86400;
-            if (diffSeconds > 43200) diffSeconds -= 86400;
+            let currentRefTime = isNaN(serverTimeSeconds) ? Math.floor(Date.now() / 1000) : serverTimeSeconds;
             
-            // Skip departed
-            if (diffSeconds < -60) continue;
+            // Normalize: if one is timestamp and other is not, convert to same base
+            if (isExpectedTimestamp && !isServerTimestamp) {
+              // Convert serverTimeSeconds (local seconds) to timestamp
+              const now = new Date();
+              const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
+              currentRefTime = startOfDay + serverTimeSeconds;
+            } else if (!isExpectedTimestamp && isServerTimestamp) {
+              // Convert serverTimeSeconds (timestamp) to local seconds
+              const date = new Date(serverTimeSeconds * 1000);
+              currentRefTime = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+            }
+            
+            let diffSeconds = expectedTime - currentRefTime;
+            
+            // Handle midnight wrap-around for seconds-from-start-of-day
+            if (!isExpectedTimestamp) {
+              if (diffSeconds < -43200) diffSeconds += 86400;
+              if (diffSeconds > 43200) diffSeconds -= 86400;
+            }
+            
+            // Skip departed (be lenient with -120s)
+            if (diffSeconds < -120) continue;
             
             const minutes = Math.max(0, Math.floor(diffSeconds / 60));
             
             // Calculate time string
-            const hours = Math.floor(expectedTime / 3600) % 24;
-            const mins = Math.floor((expectedTime % 3600) / 60);
-            const timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+            let timeStr = '';
+            if (isExpectedTimestamp) {
+              const depDate = new Date(expectedTime * 1000);
+              timeStr = `${String(depDate.getHours()).padStart(2, '0')}:${String(depDate.getMinutes()).padStart(2, '0')}`;
+            } else {
+              const hours = Math.floor(expectedTime / 3600) % 24;
+              const mins = Math.floor((expectedTime % 3600) / 60);
+              timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+            }
             
             const isRealTime = expectedTime !== scheduledTime;
             let status: 'on-time' | 'delayed' | 'expected' | 'departed' = 'expected';
@@ -1313,17 +1289,17 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
             }
             
             const nowUnixSeconds = Math.floor(Date.now() / 1000);
-            const departureTimeSeconds = nowUnixSeconds + diffSeconds;
+            const departureTimeSeconds = isExpectedTimestamp ? expectedTime : (nowUnixSeconds + diffSeconds);
             
             arrivals.push({
               line,
-              destination,
+              destination: destination || 'Unknown Destination',
               type,
               minutes,
-              departureTimeSeconds,
               time: timeStr,
               status,
-              isRealtime: isRealTime
+              isRealtime: isRealTime,
+              departureTimeSeconds,
             });
           }
         } else {
@@ -1343,10 +1319,11 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     const nextDepartureMins = arrivals.length > 0 ? Math.min(...arrivals.map(a => a.minutes)) : Infinity;
     
     if (arrivals.length < 5 || nextDepartureMins > 15) {
-      console.log(`fetchDepartures: SIRI data sparse (next: ${nextDepartureMins}m, count: ${arrivals.length}), fetching all modes from Peatus for ${stopId}`);
+      console.log(`fetchDepartures: SIRI data sparse (next: ${nextDepartureMins === Infinity ? 'N/A' : nextDepartureMins}m, count: ${arrivals.length}), fetching all modes from Peatus for ${stopId}`);
       const allPeatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, true);
       
-      // Merge allPeatusArrivals into arrivals, avoiding duplicates
+      console.log(`fetchDepartures: Peatus returned ${allPeatusArrivals.length} arrivals for all modes`);
+      
       allPeatusArrivals.forEach(pa => {
         const isDuplicate = arrivals.some(a => 
           a.line === pa.line && 
@@ -1356,6 +1333,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
         );
         
         if (!isDuplicate) {
+          console.log(`fetchDepartures: Adding missing departure from Peatus: ${pa.line} to ${pa.destination} in ${pa.minutes}m`);
           arrivals.push(pa);
         }
       });
@@ -1389,17 +1367,10 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       await Promise.all(arrivals.map(async (arrival) => {
         const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
         arrival.minutes = etaMinutes;
-        
-        // Update departureTimeSeconds to match the new GPS-based minutes
-        const nowUnixSeconds = Math.floor(Date.now() / 1000);
-        arrival.departureTimeSeconds = nowUnixSeconds + (etaMinutes * 60);
-        
         if (source === 'gps') {
           arrival.info = 'Live GPS';
-          arrival.isRealtime = true;
         } else if (source === 'blended') {
           arrival.info = 'GPS + Schedule';
-          arrival.isRealtime = true;
         }
       }));
     }
