@@ -20,8 +20,19 @@ function AppContent() {
       SplashScreen.hide();
       
       // Set status bar style
-      StatusBar.setStyle({ style: Style.Light });
-      StatusBar.setBackgroundColor({ color: '#ffffff' });
+      const updateStatusBar = () => {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // Top bar is always dark (primary in light mode, slate-950 in dark mode)
+        // so we always want light text (Style.Dark)
+        StatusBar.setStyle({ style: Style.Dark });
+        StatusBar.setBackgroundColor({ color: isDark ? '#020617' : '#003571' });
+      };
+
+      updateStatusBar();
+
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = () => updateStatusBar();
+      mediaQuery.addEventListener('change', listener);
 
       // Handle back button
       const backListener = CapApp.addListener('backButton', ({ canGoBack }) => {
@@ -34,6 +45,7 @@ function AppContent() {
 
       return () => {
         backListener.then(l => l.remove());
+        mediaQuery.removeEventListener('change', listener);
       };
     }
   }, [navigate, location]);

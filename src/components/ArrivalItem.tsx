@@ -18,7 +18,10 @@ interface ArrivalItemProps {
 export function getLiveMinutes(arrival: Arrival): number {
   if (arrival.departureTimeSeconds) {
     const diffSec = arrival.departureTimeSeconds - Date.now() / 1000;
-    return Math.max(0, Math.floor(diffSec / 60));
+    if (diffSec < -60) return -1; // Mark as departed if more than 60s in the past
+    // 30 seconds is a better threshold for "Now" to account for boarding.
+    if (diffSec < 30) return 0;
+    return Math.max(1, Math.round(diffSec / 60));
   }
   return arrival.minutes;
 }
@@ -100,7 +103,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
               isCompact ? "text-sm" : "text-sm",
               arrival.status === 'departed' && "line-through text-on-surface-variant"
             )}>
-              {arrival.destination}
+              {arrival.destination || 'Unknown Destination'}
             </span>
             {!isCompact && (
               <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-widest">
@@ -114,7 +117,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
             <CheckCircle2 className="text-on-surface-variant w-4 h-4" />
           ) : (
             <div className="flex items-center gap-2">
-              {onAlertClick && liveMinutes > 5 && (
+              {onAlertClick && liveMinutes >= 15 && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -131,11 +134,28 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                 </button>
               )}
               <div className="flex items-baseline gap-1">
-                {arrival.isRealtime && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center" />
-                )}
-                <span className={cn("font-headline font-black text-primary", isCompact ? "text-lg" : "text-xl")}>
-                  {liveMinutes <= 1 ? 'Now' : (arrival.time ?? `${liveMinutes}m`)}
+                <span className={cn(
+                  "font-headline font-black flex items-baseline gap-1", 
+                  isCompact ? "text-lg" : "text-xl",
+                  arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-primary"
+                )}>
+                  {liveMinutes === 0 ? (
+                    'Now'
+                  ) : (
+                    liveMinutes <= 59 ? (
+                      <>
+                        {liveMinutes}
+                        <span className="text-sm font-medium">min</span>
+                      </>
+                    ) : (
+                      arrival.time ?? (
+                        <>
+                          {liveMinutes}
+                          <span className="text-sm font-medium">min</span>
+                        </>
+                      )
+                    )
+                  )}
                 </span>
               </div>
               {expandable && (expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />)}

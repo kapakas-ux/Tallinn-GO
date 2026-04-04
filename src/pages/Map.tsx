@@ -370,7 +370,7 @@ export const Map = () => {
     const coordMap: { [key: string]: number } = {};
     const validStops = stops.filter(s => isValidLngLat(s.lng, s.lat)).map(stop => {
       // Use a precise key for grouping identical stops
-      const key = `${stop.lat.toFixed(6)},${stop.lng.toFixed(6)}`;
+      const key = `${Math.round(stop.lat * 1000000)},${Math.round(stop.lng * 1000000)}`;
       const count = coordMap[key] || 0;
       coordMap[key] = count + 1;
       
@@ -448,6 +448,7 @@ export const Map = () => {
               // Any bus, trolley, regional, commercial, or suburban
               ['any',
                 ['in', 'bus', ['get', 'modes']],
+                ['in', 'nightbus', ['get', 'modes']],
                 ['in', 'trolley', ['get', 'modes']],
                 ['in', 'regional', ['get', 'modes']],
                 ['in', 'commercial', ['get', 'modes']],
@@ -565,7 +566,7 @@ export const Map = () => {
           departuresHtml = departures.map(d => {
             const liveMins = (d as any).departureTimeSeconds ? Math.max(0, Math.floor(((d as any).departureTimeSeconds - Date.now() / 1000) / 60)) : d.minutes;
             const isScheduled = isAlertActive(id, d.line, d.minutes);
-            const showAlarm = liveMins > 5 && d.status !== 'departed';
+            const showAlarm = liveMins >= 15 && d.status !== 'departed';
             
             return `
               <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0 relative">
@@ -586,9 +587,8 @@ export const Map = () => {
                     </button>
                   ` : ''}
                   <div class="text-right flex items-baseline gap-1">
-                    ${d.isRealtime ? '<div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-0.5 self-center"></div>' : ''}
-                    <span class="font-headline font-black text-lg text-primary">
-                      ${(() => { const depSec = (d as any).departureTimeSeconds; const m = depSec ? Math.max(0, Math.floor((depSec - Date.now() / 1000) / 60)) : d.minutes; return m <= 1 ? 'Now' : (d.time ?? m + ' min'); })()}
+                    <span class="font-headline font-black text-lg text-primary flex items-baseline gap-1">
+                      ${(() => { const depSec = (d as any).departureTimeSeconds; const m = depSec ? Math.max(0, Math.floor((depSec - Date.now() / 1000) / 60)) : d.minutes; return m <= 1 ? 'Now' : (m <= 59 ? m + '<span class="text-xs font-medium ' + (d.isRealtime ? 'text-emerald-500 animate-pulse' : 'text-secondary') + '">min</span>' : (d.time ?? m + '<span class="text-xs font-medium ' + (d.isRealtime ? 'text-emerald-500 animate-pulse' : 'text-secondary') + '">min</span>')); })()}
                     </span>
                   </div>
                 </div>

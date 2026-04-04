@@ -1,6 +1,7 @@
 export interface Stop {
   id: string;
   siriId?: string;
+  gtfsId?: string;
   name: string;
   lat: number;
   lng: number;
