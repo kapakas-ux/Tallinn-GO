@@ -36,9 +36,8 @@ const API_BASE = getApiBaseUrl();
  * and standard fetch on web.
  */
 async function universalFetch(url: string, options?: RequestInit): Promise<string> {
-  const isNative = Capacitor.isNativePlatform();
-  
-  if (isNative) {
+  // On native platforms, ALWAYS use CapacitorHttp to bypass CORS
+  if (Capacitor.isNativePlatform()) {
     console.log(`universalFetch (native) START: ${url}`);
     try {
       const headers = (options?.headers as Record<string, string>) || {};
@@ -53,8 +52,8 @@ async function universalFetch(url: string, options?: RequestInit): Promise<strin
         method: options?.method || 'GET',
         headers,
         data: options?.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : undefined,
-        connectTimeout: 15000,
-        readTimeout: 15000
+        connectTimeout: 10000,
+        readTimeout: 10000
       };
       
       const response = await CapacitorHttp.request(optionsForCapacitor);
@@ -62,35 +61,25 @@ async function universalFetch(url: string, options?: RequestInit): Promise<strin
       // If we get a 403 or 401 from our own proxy, it's likely the cookie wall.
       // We should throw so the caller can fall back to direct APIs.
       if (response.status === 403 || response.status === 401) {
-        throw new Error(`Access denied (CORS or Cookie Wall): ${response.status} for ${url}`);
+        throw new Error(`Access denied (CORS or Cookie Wall): ${response.status}`);
       }
       
       if (response.status >= 400) {
-        throw new Error(`CapacitorHttp error: ${response.status} for ${url}`);
+        throw new Error(`CapacitorHttp error: ${response.status}`);
       }
       
-      // Check if we got HTML when we expected JSON/text (common for cookie walls)
-      const data = response.data;
-      if (typeof data === 'string' && data.trim().startsWith('<!DOCTYPE html')) {
-         throw new Error(`Received HTML instead of expected data (likely cookie wall) for ${url}`);
+      if (typeof response.data === 'object') {
+        return JSON.stringify(response.data);
       }
-
-      if (typeof data === 'object') {
-        return JSON.stringify(data);
-      }
-      return String(data);
+      return String(response.data);
     } catch (capErr) {
       console.warn(`universalFetch CapacitorHttp FAILED: ${url}`, capErr);
-      // On native, standard fetch will almost certainly fail with CORS for cross-origin.
-      // We only fall back to standard fetch if the URL is local or same-origin.
-      const isCrossOrigin = !url.startsWith('/') && !url.startsWith(window.location.origin);
-      if (isCrossOrigin) {
-        throw capErr; // Don't even try standard fetch, it will just CORS-error
-      }
+      // If CapacitorHttp failed, we might still try standard fetch as a last resort,
+      // though it will likely fail due to CORS.
     }
   }
 
-  // Standard fetch for web or as last-resort fallback for native (if not cross-origin)
+  // Standard fetch for web or as last-resort fallback for native
   console.log(`universalFetch (standard) START: ${url}`);
   const response = await fetch(url, options);
   if (!response.ok) {
@@ -290,7 +279,7 @@ export async function fetchStops(): Promise<Stop[]> {
         rawStops = data.data?.stops || data.stops;
       } catch (e) {
         console.warn('Failed to fetch from peatus/stops proxy, falling back to direct GraphQL', e);
-        const fallbackUrl = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+        const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
         const query = `
           query {
             stops {
@@ -1235,7 +1224,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       data = JSON.parse(text);
     } catch (e) {
       console.warn('Failed to fetch from peatus/graphql proxy, falling back to direct GraphQL', e);
-      const fallbackUrl = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+      const fallbackUrl = 'https://peatus.ee/api/v1/graphql';
       const text = await universalFetch(fallbackUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

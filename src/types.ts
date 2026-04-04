@@ -24,7 +24,6 @@ export interface Arrival {
   info?: string;
   vehicleId?: string;
   vehicleIndex?: number;
-  tripId?: string;
 }
 
 export interface Vehicle {
