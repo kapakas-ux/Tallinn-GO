@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map as MapIcon } from 'lucide-react';
+import { LayoutDashboard, Map as MapIcon, Route as RouteIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const StopsIcon = ({ className }: { className?: string }) => (
@@ -32,6 +32,7 @@ export const BottomNav = () => {
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/stops', icon: StopsIcon, label: 'Stops' },
     { to: '/map', icon: MapIcon, label: 'Map' },
+    { to: '/plan', icon: RouteIcon, label: 'Plan' },
   ];
 
   return (

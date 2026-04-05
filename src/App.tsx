@@ -9,6 +9,7 @@ import { BottomNav } from './components/BottomNav';
 import { Dashboard } from './pages/Dashboard';
 import { Stops } from './pages/Stops';
 import { Map } from './pages/Map';
+import { Planner } from './pages/Planner';
 import { getSettings } from './services/settingsService';
 import type { AppTheme } from './services/settingsService';
 
@@ -85,6 +86,7 @@ function AppContent() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/stops" element={<Stops />} />
             <Route path="/map" element={<Map />} />
+            <Route path="/plan" element={<Planner />} />
           </Routes>
         </main>
         <BottomNav />

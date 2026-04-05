@@ -20,3 +20,37 @@ export function getBearing(lat1: number, lon1: number, lat2: number, lon2: numbe
   const x = Math.cos(l1) * Math.sin(l2) - Math.sin(l1) * Math.cos(l2) * Math.cos(dLon);
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
+
+/**
+ * Decode a Google-encoded polyline string into an array of [lng, lat] pairs
+ * suitable for GeoJSON (note: GeoJSON is [lon, lat] order).
+ */
+export function decodePolyline(encoded: string): [number, number][] {
+  const coords: [number, number][] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  while (index < encoded.length) {
+    let b: number;
+    let shift = 0;
+    let result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = (result & 1) ? ~(result >> 1) : result >> 1;
+    lat += dlat;
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = (result & 1) ? ~(result >> 1) : result >> 1;
+    lng += dlng;
+    coords.push([lng / 1e5, lat / 1e5]); // [lon, lat] for GeoJSON
+  }
+  return coords;
+}

@@ -1441,3 +1441,86 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     return [];
   }
 }
+
+// ─── JOURNEY PLANNER ─────────────────────────────────────────────────────────
+
+import type { PlanItinerary } from '../types';
+
+export async function planJourney(
+  fromLat: number,
+  fromLon: number,
+  toLat: number,
+  toLon: number,
+  numItineraries = 3
+): Promise<PlanItinerary[]> {
+  const query = `
+    {
+      plan(
+        from: { lat: ${fromLat}, lon: ${fromLon} }
+        to: { lat: ${toLat}, lon: ${toLon} }
+        numItineraries: ${numItineraries}
+        transportModes: [
+          { mode: WALK }
+          { mode: BUS }
+          { mode: TRAM }
+          { mode: RAIL }
+        ]
+      ) {
+        itineraries {
+          duration
+          startTime
+          endTime
+          walkTime
+          walkDistance
+          transfers
+          legs {
+            startTime
+            endTime
+            mode
+            distance
+            duration
+            realTime
+            from { name lat lon stopId }
+            to   { name lat lon stopId }
+            route { shortName }
+            headsign
+            legGeometry { points length }
+          }
+        }
+      }
+    }
+  `;
+
+  const res = await fetch('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  });
+
+  if (!res.ok) throw new Error(`planJourney HTTP ${res.status}`);
+
+  const json = await res.json();
+  const itineraries: PlanItinerary[] = (json?.data?.plan?.itineraries ?? []).map((it: any): PlanItinerary => ({
+    duration: it.duration,
+    startTime: it.startTime,
+    endTime: it.endTime,
+    walkTime: it.walkTime,
+    walkDistance: it.walkDistance,
+    transfers: it.transfers,
+    legs: (it.legs ?? []).map((leg: any) => ({
+      startTime: leg.startTime,
+      endTime: leg.endTime,
+      mode: leg.mode,
+      distance: leg.distance,
+      duration: leg.duration,
+      realTime: leg.realTime ?? false,
+      from: { name: leg.from?.name ?? '', lat: leg.from?.lat, lon: leg.from?.lon, stopId: leg.from?.stopId },
+      to:   { name: leg.to?.name   ?? '', lat: leg.to?.lat,   lon: leg.to?.lon,   stopId: leg.to?.stopId   },
+      routeShortName: leg.route?.shortName ?? undefined,
+      headsign: leg.headsign ?? undefined,
+      legGeometry: { points: leg.legGeometry?.points ?? '', length: leg.legGeometry?.length ?? 0 },
+    })),
+  }));
+
+  return itineraries;
+}

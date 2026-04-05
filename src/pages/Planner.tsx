@@ -1,71 +1,295 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Navigation, ArrowUpDown, History, Filter, Bus, TrainFront as Tram, MoveRight, Footprints, Search, X, Loader2 } from 'lucide-react';
-import { MOCK_ROUTES } from '../mockData';
-import { cn, getVehicleColorClass } from '../lib/utils';
-import { fetchStops } from '../services/transportService';
+import maplibregl from 'maplibre-gl';
+import {
+  MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram,
+  Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon
+} from 'lucide-react';
+import { cn } from '../lib/utils';
+import { fetchStops, planJourney } from '../services/transportService';
 import { watchLocation } from '../services/locationService';
-import { Stop } from '../types';
+import { decodePolyline } from '../lib/geo';
+import type { Stop, PlanItinerary, LegMode } from '../types';
+
+// â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+const fmtTime = (ms: number) =>
+  new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+const fmtDuration = (seconds: number) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m} min`;
+};
+
+const fmtDistance = (metres: number) =>
+  metres < 1000 ? `${Math.round(metres)}m` : `${(metres / 1000).toFixed(1)}km`;
+
+function modeColor(mode: LegMode): string {
+  switch (mode) {
+    case 'TRAM': return '#DC143C';
+    case 'RAIL': return '#f37021';
+    case 'BUS':  return '#003571';
+    default:     return '#6b7280';
+  }
+}
+
+function ModeIcon({ mode, className }: { mode: LegMode; className?: string }) {
+  if (mode === 'WALK') return <Footprints className={className} />;
+  if (mode === 'TRAM') return <Tram className={className} />;
+  return <Bus className={className} />;
+}
+
+// â”€â”€â”€ mini-map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+const ItineraryMap: React.FC<{ itinerary: PlanItinerary }> = ({ itinerary }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: 'https://tiles.openfreemap.org/styles/bright',
+      attributionControl: false,
+      interactive: false,
+    });
+
+    map.on('load', () => {
+      const allCoords: [number, number][] = [];
+
+      itinerary.legs.forEach((leg, i) => {
+        const coords = decodePolyline(leg.legGeometry.points);
+        if (!coords.length) return;
+        allCoords.push(...coords);
+
+        const id = `leg-${i}`;
+        map.addSource(id, {
+          type: 'geojson',
+          data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} },
+        });
+
+        if (leg.mode === 'WALK') {
+          map.addLayer({ id: `${id}-line`, type: 'line', source: id,
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#9ca3af', 'line-width': 2, 'line-dasharray': [2, 3] } });
+        } else {
+          map.addLayer({ id: `${id}-bg`, type: 'line', source: id,
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#ffffff', 'line-width': 6 } });
+          map.addLayer({ id: `${id}-line`, type: 'line', source: id,
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': modeColor(leg.mode), 'line-width': 4 } });
+        }
+      });
+
+      const first = itinerary.legs[0];
+      const last = itinerary.legs[itinerary.legs.length - 1];
+      if (first) new maplibregl.Marker({ color: '#003571' }).setLngLat([first.from.lon, first.from.lat]).addTo(map);
+      if (last)  new maplibregl.Marker({ color: '#DC143C' }).setLngLat([last.to.lon, last.to.lat]).addTo(map);
+
+      if (allCoords.length) {
+        const lngs = allCoords.map(c => c[0]);
+        const lats = allCoords.map(c => c[1]);
+        map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 24, duration: 0 });
+      }
+    });
+
+    return () => { map.remove(); };
+  }, [itinerary]);
+
+  return <div ref={containerRef} className="w-full rounded-xl overflow-hidden" style={{ height: 180 }} />;
+};
+
+// â”€â”€â”€ itinerary card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+interface CardProps {
+  itinerary: PlanItinerary;
+  index: number;
+  expanded: boolean;
+  onToggle: () => void;
+  onViewOnMap: () => void;
+}
+
+const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onToggle, onViewOnMap }) => {
+  const leavesInMin = Math.round((itinerary.startTime - Date.now()) / 60000);
+  const label = index === 0 ? 'Fastest' : index === 1 ? 'Alternative' : 'Less walking';
+
+  return (
+    <div
+      className={cn(
+        'bg-surface-container-lowest rounded-[20px] shadow-sm border border-outline-variant/10 overflow-hidden transition-all cursor-pointer',
+        expanded && 'ring-2 ring-primary border-transparent'
+      )}
+      onClick={onToggle}
+    >
+      <div className="p-4">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <span className="text-4xl font-black font-headline tracking-tighter text-primary leading-none">
+              {fmtDuration(itinerary.duration)}
+            </span>
+            <p className="font-label text-[10px] uppercase tracking-widest text-secondary font-bold mt-0.5">
+              {label} Â· {itinerary.transfers === 0 ? 'Direct' : `${itinerary.transfers} transfer${itinerary.transfers > 1 ? 's' : ''}`}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-headline font-bold text-base text-on-surface">
+              {fmtTime(itinerary.startTime)} â€” {fmtTime(itinerary.endTime)}
+            </p>
+            <p className="font-label text-[10px] text-secondary mt-0.5">
+              {leavesInMin > 0 ? `Leaves in ${leavesInMin} min` : leavesInMin === 0 ? 'Leaving now' : 'Departed'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {itinerary.legs.map((leg, i) => (
+            <React.Fragment key={i}>
+              {leg.mode === 'WALK' ? (
+                <div className="flex items-center gap-1 text-secondary">
+                  <Footprints className="w-3 h-3" />
+                  <span className="font-label text-[9px] font-bold uppercase">{fmtDistance(leg.distance)}</span>
+                </div>
+              ) : (
+                <div
+                  className="h-6 px-2 rounded-full flex items-center gap-1 text-white text-[10px] font-label font-bold"
+                  style={{ backgroundColor: modeColor(leg.mode) }}
+                >
+                  <ModeIcon mode={leg.mode} className="w-3 h-3" />
+                  {leg.routeShortName}
+                </div>
+              )}
+              {i < itinerary.legs.length - 1 && <div className="w-2 h-px bg-outline-variant" />}
+            </React.Fragment>
+          ))}
+          {itinerary.walkDistance > 0 && (
+            <span className="ml-auto font-label text-[9px] text-secondary uppercase tracking-wide">
+              ðŸš¶ {fmtDistance(itinerary.walkDistance)} walk
+            </span>
+          )}
+        </div>
+      </div>
+
+      {expanded && (
+        <div
+          className="border-t border-outline-variant/10 animate-in fade-in slide-in-from-top-2 duration-200"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="px-4 pt-4">
+            <ItineraryMap itinerary={itinerary} />
+          </div>
+
+          <div className="px-4 pt-4 pb-2 space-y-0">
+            {itinerary.legs.map((leg, i) => (
+              <div key={i} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white"
+                    style={{ backgroundColor: modeColor(leg.mode) }}
+                  >
+                    <ModeIcon mode={leg.mode} className="w-4 h-4" />
+                  </div>
+                  {i < itinerary.legs.length - 1 && (
+                    <div className="w-px flex-1 bg-outline-variant/30 my-1" style={{ minHeight: 16 }} />
+                  )}
+                </div>
+                <div className="flex-1 pb-4">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wide">
+                      {fmtTime(leg.startTime)}
+                    </span>
+                    <span className="font-headline font-bold text-sm text-on-surface">
+                      {leg.from.name || 'Departure'}
+                    </span>
+                  </div>
+                  {leg.mode !== 'WALK' ? (
+                    <p className="text-xs text-secondary mt-0.5">
+                      {leg.mode === 'TRAM' ? 'Tram' : leg.mode === 'RAIL' ? 'Train' : 'Bus'} {leg.routeShortName}
+                      {leg.headsign ? ` â†’ ${leg.headsign}` : ''}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-secondary mt-0.5">
+                      Walk {fmtDistance(leg.distance)} Â· {Math.ceil(leg.duration / 60)} min
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+            {itinerary.legs.length > 0 && (
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-error flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 pb-4">
+                  <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-wide">
+                    {fmtTime(itinerary.endTime)}
+                  </span>
+                  <span className="font-headline font-bold text-sm text-on-surface ml-2">
+                    {itinerary.legs[itinerary.legs.length - 1].to.name || 'Destination'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="px-4 pb-4">
+            <button
+              onClick={onViewOnMap}
+              className="w-full py-3 rounded-[16px] bg-primary text-white font-headline font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+            >
+              <MapIcon className="w-4 h-4" />
+              View on Map
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-center pb-2 text-secondary pointer-events-none">
+        {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+      </div>
+    </div>
+  );
+};
+
+// â”€â”€â”€ main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const Planner = () => {
   const navigate = useNavigate();
   const [from, setFrom] = useState('Current Location');
-  const [to, setTo] = useState('Tallinn Airport (TLL)');
-  const [userCoords, setUserCoords] = useState(null as { lat: number; lng: number } | null);
+  const [to, setTo] = useState('');
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isSimulated, setIsSimulated] = useState(false);
-  const [stops, setStops] = useState([] as Stop[]);
-  const [suggestions, setSuggestions] = useState([] as Stop[]);
-  const [activeInput, setActiveInput] = useState(null as 'from' | 'to' | null);
+  const [stops, setStops] = useState<Stop[]>([]);
+  const [suggestions, setSuggestions] = useState<Stop[]>([]);
+  const [activeInput, setActiveInput] = useState<'from' | 'to' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [routes, setRoutes] = useState(MOCK_ROUTES);
-  const [showResults, setShowResults] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [itineraries, setItineraries] = useState<PlanItinerary[]>([]);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
-  const containerRef = useRef(null as HTMLDivElement | null);
-
-  const [expandedRoute, setExpandedRoute] = useState(null as string | null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     fetchStops().then(setStops);
-
-    const cleanup = watchLocation((location, simulated) => {
-      setUserCoords(location);
-      setIsSimulated(simulated);
-    });
-
+    const cleanup = watchLocation((loc, sim) => { setUserCoords(loc); setIsSimulated(sim); });
     return cleanup;
   }, []);
 
-  const handleGo = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const destinationStop = stops.find(s => s.name === to);
-    if (destinationStop) {
-      navigate(`/map?lat=${destinationStop.lat}&lng=${destinationStop.lng}&zoom=16`);
-    } else if (userCoords) {
-      navigate(`/map?lat=${userCoords.lat}&lng=${userCoords.lng}&zoom=16`);
-    } else {
-      navigate('/map');
-    }
-  };
-
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node))
         setActiveInput(null);
-      }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   const handleSearch = (query: string, type: 'from' | 'to') => {
     if (type === 'from') setFrom(query);
     else setTo(query);
-
     if (query.length > 1) {
-      const filtered = stops
-        .filter(s => s.name.toLowerCase().includes(query.toLowerCase()))
-        .slice(0, 5);
-      setSuggestions(filtered);
+      setSuggestions(stops.filter(s => s.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6));
       setActiveInput(type);
     } else {
       setSuggestions([]);
@@ -80,299 +304,195 @@ export const Planner = () => {
     setSuggestions([]);
   };
 
-  const swapLocations = () => {
-    const temp = from;
-    setFrom(to);
-    setTo(temp);
+  const swapLocations = () => { const t = from; setFrom(to); setTo(t); };
+
+  const resolveCoords = useCallback((name: string): { lat: number; lon: number } | null => {
+    if (name === 'Current Location') {
+      return userCoords ? { lat: userCoords.lat, lon: userCoords.lng } : null;
+    }
+    const stop = stops.find(s => s.name === name);
+    return stop ? { lat: stop.lat, lon: stop.lng } : null;
+  }, [stops, userCoords]);
+
+  const findRoutes = async () => {
+    setError(null);
+    const fromCoords = resolveCoords(from);
+    const toCoords = resolveCoords(to);
+    if (!fromCoords) { setError(from === 'Current Location' ? 'Waiting for GPS...' : `Stop not found: "${from}"`); return; }
+    if (!toCoords) { setError(`Stop not found: "${to}"`); return; }
+    if (fromCoords.lat === toCoords.lat && fromCoords.lon === toCoords.lon) { setError('Origin and destination are the same.'); return; }
+
+    setIsLoading(true);
+    setItineraries([]);
+    setExpandedIndex(null);
+    try {
+      const results = await planJourney(fromCoords.lat, fromCoords.lon, toCoords.lat, toCoords.lon);
+      if (!results.length) setError('No routes found between these stops.');
+      else { setItineraries(results); setExpandedIndex(0); }
+    } catch (e) {
+      console.error(e);
+      setError('Could not fetch routes. Check your connection.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const findRoutes = () => {
-    if (!from || !to) return;
-    
-    setIsLoading(true);
-    setShowResults(false);
-    
-    // Simulate API call with more "realistic" generated routes
-    setTimeout(() => {
-      setIsLoading(false);
-      setShowResults(true);
-      
-      const now = new Date();
-      const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      
-      const generatedRoutes = [
-        {
-          id: `r-${Date.now()}-1`,
-          duration: 15 + Math.floor(Math.random() * 10),
-          startTime: formatTime(new Date(now.getTime() + 2 * 60000)),
-          endTime: formatTime(new Date(now.getTime() + 22 * 60000)),
-          type: 'fastest' as const,
-          transfers: 0,
-          leavesIn: 2,
-          segments: [
-            { type: 'bus' as const, line: ['67', '68', '18', '5', '73'][Math.floor(Math.random() * 5)] },
-            { type: 'walk' as const, distance: 150 + Math.floor(Math.random() * 200) }
-          ]
-        },
-        {
-          id: `r-${Date.now()}-2`,
-          duration: 25 + Math.floor(Math.random() * 15),
-          startTime: formatTime(new Date(now.getTime() + 8 * 60000)),
-          endTime: formatTime(new Date(now.getTime() + 38 * 60000)),
-          type: 'direct' as const,
-          transfers: 1,
-          via: stops[Math.floor(Math.random() * stops.length)]?.name || 'Center',
-          segments: [
-            { type: 'tram' as const, line: ['1', '2', '3', '4'][Math.floor(Math.random() * 4)] },
-            { type: 'bus' as const, line: ['15', '2', '101'][Math.floor(Math.random() * 3)] }
-          ]
-        }
-      ];
-      
-      setRoutes(generatedRoutes);
-    }, 1200);
+  const handleViewOnMap = (itinerary: PlanItinerary) => {
+    const last = itinerary.legs[itinerary.legs.length - 1];
+    navigate(last ? `/map?lat=${last.to.lat}&lng=${last.to.lon}&zoom=14` : '/map');
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-6 pb-32 pt-4" ref={containerRef}>
-      {/* Search Input Section */}
-      <section className="relative bg-surface-container-low p-6 rounded-[20px] mb-8 shadow-sm">
+    <div className="max-w-2xl mx-auto px-4 pb-8 pt-4" ref={containerRef}>
+      <h1 className="font-headline font-black text-on-surface text-2xl mb-6 px-2">Plan a Journey</h1>
+
+      {/* Search inputs */}
+      <section className="relative bg-surface-container-low p-4 rounded-[20px] mb-6 shadow-sm">
         <div className="flex flex-col gap-3 relative">
+          {/* FROM */}
           <div className={cn(
-            "flex items-center gap-4 bg-surface-container-lowest p-4 rounded-[20px] shadow-sm transition-all border-2",
-            activeInput === 'from' ? "border-primary" : "border-transparent"
+            'flex items-center gap-3 bg-surface-container-lowest p-4 rounded-[16px] shadow-sm border-2 transition-all',
+            activeInput === 'from' ? 'border-primary' : 'border-transparent'
           )}>
-            <Navigation className={cn("w-5 h-5", from === 'Current Location' ? "text-blue-500 fill-blue-500" : "text-secondary")} />
-            <div className="flex-1">
-              <p className="text-[10px] font-label uppercase tracking-widest text-secondary mb-1">From</p>
-              <input 
-                className="w-full bg-transparent border-none p-0 focus:ring-0 font-headline font-semibold text-on-surface placeholder:text-outline-variant" 
+            <Navigation className={cn('w-5 h-5 shrink-0', from === 'Current Location' ? 'text-blue-500 fill-blue-500' : 'text-secondary')} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] font-label uppercase tracking-widest text-secondary mb-0.5">From</p>
+              <input
+                className="w-full bg-transparent border-none p-0 focus:ring-0 font-headline font-semibold text-on-surface placeholder:text-outline-variant text-sm"
                 value={from}
-                onChange={(e) => handleSearch(e.target.value, 'from')}
+                onChange={e => handleSearch(e.target.value, 'from')}
                 onFocus={() => {
                   setActiveInput('from');
-                  if (from === 'Current Location') {
-                    setFrom('');
-                    setSuggestions(stops.slice(0, 5));
-                  } else {
-                    handleSearch(from, 'from');
-                  }
+                  if (from === 'Current Location') { setFrom(''); setSuggestions(stops.slice(0, 6)); }
+                  else handleSearch(from, 'from');
                 }}
                 placeholder="Starting point..."
               />
             </div>
             {from !== 'Current Location' && from !== '' && (
-              <button onClick={() => setFrom('')} className="text-secondary hover:text-primary">
-                <X className="w-4 h-4" />
-              </button>
+              <button onClick={() => setFrom('')} className="text-secondary shrink-0"><X className="w-4 h-4" /></button>
             )}
           </div>
-          
-          <button 
+
+          {/* Swap */}
+          <button
             onClick={swapLocations}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-primary text-white p-3 rounded-full shadow-lg active:scale-90 transition-all hover:bg-primary/90"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-primary text-white p-2.5 rounded-full shadow-lg active:scale-90 transition-all"
           >
-            <ArrowUpDown className="w-5 h-5" />
+            <ArrowUpDown className="w-4 h-4" />
           </button>
 
+          {/* TO */}
           <div className={cn(
-            "flex items-center gap-4 bg-surface-container-lowest p-4 rounded-[20px] shadow-sm transition-all border-2",
-            activeInput === 'to' ? "border-primary" : "border-transparent"
+            'flex items-center gap-3 bg-surface-container-lowest p-4 rounded-[16px] shadow-sm border-2 transition-all',
+            activeInput === 'to' ? 'border-primary' : 'border-transparent'
           )}>
-            <MapPin className="text-error w-5 h-5" />
-            <div className="flex-1">
-              <p className="text-[10px] font-label uppercase tracking-widest text-secondary mb-1">To</p>
-              <input 
-                className="w-full bg-transparent border-none p-0 focus:ring-0 font-headline font-semibold text-on-surface placeholder:text-outline-variant" 
+            <MapPin className="text-error w-5 h-5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] font-label uppercase tracking-widest text-secondary mb-0.5">To</p>
+              <input
+                className="w-full bg-transparent border-none p-0 focus:ring-0 font-headline font-semibold text-on-surface placeholder:text-outline-variant text-sm"
                 value={to}
-                onChange={(e) => handleSearch(e.target.value, 'to')}
-                onFocus={() => handleSearch(to, 'to')}
+                onChange={e => handleSearch(e.target.value, 'to')}
+                onFocus={() => { setActiveInput('to'); handleSearch(to, 'to'); }}
                 placeholder="Where to?"
               />
             </div>
             {to !== '' && (
-              <button onClick={() => setTo('')} className="text-secondary hover:text-primary">
-                <X className="w-4 h-4" />
-              </button>
+              <button onClick={() => setTo('')} className="text-secondary shrink-0"><X className="w-4 h-4" /></button>
             )}
           </div>
 
-          {/* Autocomplete Suggestions */}
+          {/* Autocomplete dropdown */}
           {activeInput && (suggestions.length > 0 || activeInput === 'from') && (
-            <div className="absolute left-0 right-0 top-full mt-2 bg-surface-container-lowest rounded-[20px] shadow-xl border border-outline-variant/20 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="absolute left-0 right-0 top-full mt-2 bg-surface-container-lowest rounded-[16px] shadow-xl border border-outline-variant/20 z-50 overflow-hidden">
               {activeInput === 'from' && from !== 'Current Location' && (
                 <button
-                  onClick={() => { setFrom('Current Location'); setActiveInput(null); }}
-                  className="w-full flex items-center gap-4 px-6 py-4 hover:bg-surface-container-low transition-colors text-left border-b border-outline-variant/10"
+                  onClick={() => { setFrom('Current Location'); setActiveInput(null); setSuggestions([]); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left border-b border-outline-variant/10"
                 >
-                  <div className="bg-blue-50 p-2 rounded-full">
+                  <div className="bg-blue-50 p-2 rounded-full shrink-0">
                     <Navigation className="w-4 h-4 text-blue-500 fill-blue-500" />
                   </div>
                   <div>
-                    <p className="font-headline font-bold text-blue-600">{isSimulated ? 'Simulate My Location' : 'Use My Location'}</p>
-                    <p className="text-[10px] font-label uppercase tracking-wider text-blue-400">{isSimulated ? 'Tallinn Center' : 'Real-time GPS'}</p>
+                    <p className="font-headline font-bold text-blue-600 text-sm">
+                      {isSimulated ? 'Simulate My Location' : 'Use My Location'}
+                    </p>
+                    <p className="text-[9px] font-label uppercase tracking-wider text-blue-400">
+                      {isSimulated ? 'Tallinn Center' : 'Real-time GPS'}
+                    </p>
                   </div>
                 </button>
               )}
-              {suggestions.map((stop) => (
+              {suggestions.map(stop => (
                 <button
                   key={stop.id}
                   onClick={() => selectSuggestion(stop)}
-                  className="w-full flex items-center gap-4 px-6 py-4 hover:bg-surface-container-low transition-colors text-left border-b border-outline-variant/10 last:border-0"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left border-b border-outline-variant/10 last:border-0"
                 >
-                  <div className="bg-surface-container-high p-2 rounded-full">
+                  <div className="bg-surface-container-high p-2 rounded-full shrink-0">
                     <MapPin className="w-4 h-4 text-secondary" />
                   </div>
-                  <div>
-                    <p className="font-headline font-bold text-on-surface">{stop.name}</p>
-                    <p className="text-[10px] font-label uppercase tracking-wider text-secondary opacity-70">Stop ID: {stop.siriId || stop.id}</p>
-                  </div>
+                  <p className="font-headline font-bold text-on-surface text-sm truncate">{stop.name}</p>
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        <button 
+        <button
           onClick={findRoutes}
           disabled={isLoading || !from || !to}
-          className="w-full mt-6 bg-primary text-white py-4 rounded-[20px] font-headline font-black text-lg shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2"
+          className="w-full mt-4 bg-primary text-white py-4 rounded-[16px] font-headline font-black text-base shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isLoading ? (
-            <>
-              <Loader2 className="w-6 h-6 animate-spin" />
-              Planning...
-            </>
+            <><Loader2 className="w-5 h-5 animate-spin" />Planning route...</>
           ) : (
-            <>
-              <Search className="w-6 h-6" />
-              Find Routes
-            </>
+            <><Search className="w-5 h-5" />Find Routes</>
           )}
         </button>
       </section>
 
-      {/* Recent Searches */}
-      {!activeInput && (
-        <section className="mb-10">
-          <h2 className="font-headline font-black text-primary text-xs uppercase tracking-[0.2em] mb-4 ml-2">Recent Journeys</h2>
-          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-            {['Telliskivi', 'Old Town', 'Pirita Rand'].map((place, i) => (
-              <button 
-                key={place} 
-                onClick={() => { setTo(place); findRoutes(); }}
-                className="flex-shrink-0 bg-surface-container-low px-4 py-3 rounded-[20px] border-l-4 border-primary-container min-w-[140px] text-left hover:bg-surface-container-high transition-colors"
-              >
-                <History className="text-secondary w-4 h-4 mb-2" />
-                <p className="font-headline font-bold text-on-surface">{place}</p>
-                <p className="font-label text-[10px] text-secondary">
-                  {i === 0 ? 'Route 67, 68' : i === 1 ? 'Tram 3, 4' : 'Bus 1A, 8'}
-                </p>
-              </button>
-            ))}
+      {/* Error */}
+      {error && (
+        <div className="flex items-center gap-3 bg-error/10 border border-error/20 rounded-[16px] p-4 mb-6">
+          <AlertCircle className="w-5 h-5 text-error shrink-0" />
+          <p className="text-sm text-error font-headline font-semibold">{error}</p>
+        </div>
+      )}
+
+      {/* Itinerary results */}
+      {itineraries.length > 0 && (
+        <section className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center gap-2 px-1 mb-2">
+            <Clock className="w-4 h-4 text-secondary" />
+            <h2 className="font-label font-bold text-[10px] uppercase tracking-widest text-secondary">
+              {itineraries.length} route{itineraries.length > 1 ? 's' : ''} found
+            </h2>
           </div>
+          {itineraries.map((it, i) => (
+            <ItineraryCard
+              key={i}
+              itinerary={it}
+              index={i}
+              expanded={expandedIndex === i}
+              onToggle={() => setExpandedIndex(expandedIndex === i ? null : i)}
+              onViewOnMap={() => handleViewOnMap(it)}
+            />
+          ))}
         </section>
       )}
 
-      {/* Suggested Routes */}
-      {showResults && (
-        <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex justify-between items-end mb-2 px-2">
-            <h2 className="font-headline font-black text-primary text-xs uppercase tracking-[0.2em]">Suggested Routes</h2>
-            <button className="text-[10px] font-label font-bold text-primary flex items-center gap-1 hover:bg-primary/5 px-2 py-1 rounded-full transition-colors">
-              <Filter className="w-3 h-3" />
-              FILTERS
-            </button>
+      {/* Empty state */}
+      {!isLoading && itineraries.length === 0 && !error && (
+        <div className="flex flex-col items-center justify-center pt-10 text-center text-secondary gap-3">
+          <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center">
+            <Search className="w-8 h-8 opacity-40" />
           </div>
-
-          {routes.map((route) => (
-            <div 
-              key={route.id} 
-              onClick={() => setExpandedRoute(expandedRoute === route.id ? null : route.id)}
-              className={cn(
-                "bg-surface-container-lowest p-4 rounded-[20px] shadow-sm hover:shadow-md transition-all group cursor-pointer border border-outline-variant/10",
-                expandedRoute === route.id && "ring-2 ring-primary border-transparent"
-              )}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex flex-col">
-                  <p className="text-4xl font-black leading-none font-headline tracking-tighter text-primary group-hover:scale-105 transition-transform origin-left">
-                    {route.duration}<span className="text-base font-bold ml-1">min</span>
-                  </p>
-                  <p className="font-label text-[10px] uppercase tracking-widest text-secondary font-bold mt-1">
-                    {route.type.replace('-', ' ')} {route.via ? `• Via ${route.via}` : '• Direct'}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-headline font-bold text-base text-on-surface">{route.startTime} — {route.endTime}</p>
-                  <p className="font-label text-[10px] text-secondary mt-0.5">
-                    {route.leavesIn ? `Leaves in ${route.leavesIn} mins` : route.delay ? `Delay: ${route.delay}m` : 'On time'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {route.segments.map((segment, idx) => (
-                    <React.Fragment key={idx}>
-                      {segment.type === 'walk' ? (
-                        <div className="flex items-center gap-1">
-                          <Footprints className="text-secondary w-3.5 h-3.5" />
-                          <p className="font-label text-[9px] text-secondary font-bold uppercase">{segment.distance}m</p>
-                        </div>
-                      ) : (
-                        <div className={cn(
-                          "h-7 px-2.5 rounded-full flex items-center justify-center gap-1",
-                          getVehicleColorClass(segment.type)
-                        )}>
-                          {segment.type === 'walk' ? <Footprints className="w-3.5 h-3.5" /> : segment.type === 'bus' || segment.type === 'regional' ? <Bus className="w-3.5 h-3.5" /> : <Tram className="w-3.5 h-3.5" />}
-                          <span className="font-label font-bold text-[10px]">{segment.line}</span>
-                        </div>
-                      )}
-                      {idx < route.segments.length - 1 && <div className="w-3 h-[2px] bg-outline-variant" />}
-                    </React.Fragment>
-                  ))}
-                </div>
-                <button 
-                  onClick={handleGo}
-                  className="bg-primary-fixed text-on-primary-fixed-variant px-3 py-1.5 rounded-full font-label font-bold text-[9px] uppercase tracking-widest hover:bg-primary-fixed-dim transition-colors"
-                >
-                  {route.type === 'fastest' ? 'Go' : 'Details'}
-                </button>
-              </div>
-
-              {/* Expanded Details */}
-              {expandedRoute === route.id && (
-                <div className="mt-6 pt-6 border-t border-outline-variant/10 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="space-y-4">
-                    {route.segments.map((segment, idx) => (
-                      <div key={idx} className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center",
-                            segment.type === 'walk' ? "bg-surface-container-high" : 
-                            getVehicleColorClass(segment.type)
-                          )}>
-                            {segment.type === 'walk' ? <Footprints className="w-4 h-4" /> : segment.type === 'bus' || segment.type === 'regional' ? <Bus className="w-4 h-4" /> : <Tram className="w-4 h-4" />}
-                          </div>
-                          {idx < route.segments.length - 1 && <div className="w-0.5 h-full bg-outline-variant/30 my-1" />}
-                        </div>
-                        <div className="flex-1 pb-4">
-                          <p className="font-headline font-bold text-on-surface">
-                            {segment.type === 'walk' ? `Walk ${segment.distance}m` : `Take ${segment.type} ${segment.line}`}
-                          </p>
-                          <p className="text-xs text-secondary mt-1">
-                            {segment.type === 'walk' ? 'Approximately 3-5 minutes' : `Next departure at ${route.startTime}`}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </section>
+          <p className="font-label font-bold text-[10px] uppercase tracking-widest opacity-60">
+            Enter origin &amp; destination above
+          </p>
+        </div>
       )}
     </div>
   );

@@ -53,3 +53,36 @@ export interface RouteOption {
   leavesIn?: number;
   delay?: number;
 }
+
+export type LegMode = 'WALK' | 'BUS' | 'TRAM' | 'RAIL' | 'SUBWAY' | 'FERRY' | 'CABLE_CAR' | 'GONDOLA' | 'FUNICULAR';
+
+export interface PlanPlace {
+  name: string;
+  lat: number;
+  lon: number;
+  stopId?: string;
+}
+
+export interface PlanLeg {
+  startTime: number;        // ms epoch
+  endTime: number;          // ms epoch
+  mode: LegMode;
+  distance: number;         // metres
+  duration: number;         // seconds
+  from: PlanPlace;
+  to: PlanPlace;
+  routeShortName?: string;  // e.g. "18"
+  headsign?: string;
+  legGeometry: { points: string; length: number }; // encoded polyline
+  realTime?: boolean;
+}
+
+export interface PlanItinerary {
+  duration: number;         // seconds
+  startTime: number;        // ms epoch
+  endTime: number;          // ms epoch
+  walkTime: number;         // seconds
+  walkDistance: number;     // metres
+  transfers: number;
+  legs: PlanLeg[];
+}
