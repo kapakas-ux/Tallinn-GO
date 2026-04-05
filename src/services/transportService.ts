@@ -1472,7 +1472,6 @@ export async function planJourney(
           endTime
           walkTime
           walkDistance
-          transfers
           legs {
             startTime
             endTime
@@ -1480,10 +1479,9 @@ export async function planJourney(
             distance
             duration
             realTime
-            from { name lat lon stopId }
-            to   { name lat lon stopId }
+            from { name lat lon }
+            to   { name lat lon }
             route { shortName }
-            headsign
             legGeometry { points length }
           }
         }
@@ -1500,27 +1498,31 @@ export async function planJourney(
   if (!res.ok) throw new Error(`planJourney HTTP ${res.status}`);
 
   const json = await res.json();
-  const itineraries: PlanItinerary[] = (json?.data?.plan?.itineraries ?? []).map((it: any): PlanItinerary => ({
-    duration: it.duration,
-    startTime: it.startTime,
-    endTime: it.endTime,
-    walkTime: it.walkTime,
-    walkDistance: it.walkDistance,
-    transfers: it.transfers,
-    legs: (it.legs ?? []).map((leg: any) => ({
+  const itineraries: PlanItinerary[] = (json?.data?.plan?.itineraries ?? []).map((it: any): PlanItinerary => {
+    const legs = (it.legs ?? []).map((leg: any) => ({
       startTime: leg.startTime,
       endTime: leg.endTime,
       mode: leg.mode,
       distance: leg.distance,
       duration: leg.duration,
       realTime: leg.realTime ?? false,
-      from: { name: leg.from?.name ?? '', lat: leg.from?.lat, lon: leg.from?.lon, stopId: leg.from?.stopId },
-      to:   { name: leg.to?.name   ?? '', lat: leg.to?.lat,   lon: leg.to?.lon,   stopId: leg.to?.stopId   },
+      from: { name: leg.from?.name ?? '', lat: leg.from?.lat, lon: leg.from?.lon },
+      to:   { name: leg.to?.name   ?? '', lat: leg.to?.lat,   lon: leg.to?.lon   },
       routeShortName: leg.route?.shortName ?? undefined,
-      headsign: leg.headsign ?? undefined,
+      headsign: undefined,
       legGeometry: { points: leg.legGeometry?.points ?? '', length: leg.legGeometry?.length ?? 0 },
-    })),
-  }));
+    }));
+    const transitLegs = legs.filter((l: any) => l.mode !== 'WALK').length;
+    return {
+      duration: it.duration,
+      startTime: it.startTime,
+      endTime: it.endTime,
+      walkTime: it.walkTime,
+      walkDistance: it.walkDistance,
+      transfers: Math.max(0, transitLegs - 1),
+      legs,
+    };
+  });
 
   return itineraries;
 }

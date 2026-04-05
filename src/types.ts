@@ -60,7 +60,6 @@ export interface PlanPlace {
   name: string;
   lat: number;
   lon: number;
-  stopId?: string;
 }
 
 export interface PlanLeg {
