@@ -387,18 +387,15 @@
 [data-theme="havgra"] header,
 [data-theme="daylight"] header,
 [data-theme="latte"] header {
-  /* don't override position so sticky works */
   background: rgba(0, 0, 0, 0.28) !important;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-radius: 0 0 32px 32px !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: none !important;
-  transform: translate3d(0, 0, 0); /* Force hardware accel */
+  transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
-  /* Clip children cleanly to rounded radius so no bleeding edges */
-  overflow: hidden;
-  -webkit-mask-image: -webkit-radial-gradient(white, black);
+  -webkit-clip-path: inset(0 0 0 0 round 0 0 32px 32px);
+  clip-path: inset(0 0 0 0 round 0 0 32px 32px);
 }
 
 [data-theme="plum"] nav,
@@ -408,14 +405,12 @@
   background: rgba(0, 0, 0, 0.28) !important;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-radius: 32px 32px 0 0 !important;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: none !important;
-  transform: translate3d(0, 0, 0); /* Force hardware accel */
+  transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
-  /* Clip children cleanly to rounded radius so no bleeding edges */
-  overflow: hidden;
-  -webkit-mask-image: -webkit-radial-gradient(white, black);
+  -webkit-clip-path: inset(0 0 0 0 round 32px 32px 0 0);
+  clip-path: inset(0 0 0 0 round 32px 32px 0 0);
 }
 
 /* Give header and nav themed solid tints so they pop off lit map backgrounds */

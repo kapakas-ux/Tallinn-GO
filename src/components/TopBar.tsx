@@ -34,7 +34,7 @@ export const TopBar = () => {
 
   return (
     <>
-      <header className="w-full top-0 sticky z-50 pt-[env(safe-area-inset-top)] isolate overflow-hidden">
+      <header className="absolute w-full top-0 z-50 pt-[env(safe-area-inset-top)]">
         <div className="nav-orb-layer">
           <div className="nav-orb nav-orb-1" />
           <div className="nav-orb nav-orb-2" />
