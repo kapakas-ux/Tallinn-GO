@@ -388,76 +388,54 @@
 [data-theme="daylight"] header,
 [data-theme="latte"] header {
   /* don't override position so sticky works */
-  background: transparent !important;
-  border-radius: 0 0 32px 32px !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: none !important;
-}
-
-[data-theme="plum"] header::before,
-[data-theme="havgra"] header::before,
-[data-theme="daylight"] header::before,
-[data-theme="latte"] header::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
   background: rgba(0, 0, 0, 0.28) !important;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-bottom-left-radius: 32px;
-  border-bottom-right-radius: 32px;
-  pointer-events: none;
-  transform: translate3d(0, 0, 0);
+  border-radius: 0 0 32px 32px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none !important;
+  transform: translate3d(0, 0, 0); /* Force hardware accel */
   -webkit-transform: translate3d(0, 0, 0);
+  /* Clip children cleanly to rounded radius so no bleeding edges */
+  overflow: hidden;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 [data-theme="plum"] nav,
 [data-theme="havgra"] nav,
 [data-theme="daylight"] nav,
 [data-theme="latte"] nav {
-    background: transparent !important;
-      border-radius: 32px 32px 0 0 !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: none !important;
-  }
-
-[data-theme="plum"] nav::before,
-[data-theme="havgra"] nav::before,
-[data-theme="daylight"] nav::before,
-[data-theme="latte"] nav::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
   background: rgba(0, 0, 0, 0.28) !important;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-top-left-radius: 2rem; /* rounded-t-xl matches Tailwind's xl */
-  border-top-right-radius: 2rem;
-  pointer-events: none;
-  transform: translate3d(0, 0, 0);
+  border-radius: 32px 32px 0 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none !important;
+  transform: translate3d(0, 0, 0); /* Force hardware accel */
   -webkit-transform: translate3d(0, 0, 0);
+  /* Clip children cleanly to rounded radius so no bleeding edges */
+  overflow: hidden;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 /* Give header and nav themed solid tints so they pop off lit map backgrounds */
-[data-theme="plum"] header::before,
-[data-theme="plum"] nav::before {
+[data-theme="plum"] header,
+[data-theme="plum"] nav {
   background: rgba(22, 10, 38, 0.75) !important;
 }
 
-[data-theme="havgra"] header::before,
-[data-theme="havgra"] nav::before {
+[data-theme="havgra"] header,
+[data-theme="havgra"] nav {
   background: rgba(12, 18, 24, 0.75) !important;
 }
 
-[data-theme="daylight"] header::before,
-[data-theme="daylight"] nav::before {
+[data-theme="daylight"] header,
+[data-theme="daylight"] nav {
   background: rgba(240, 247, 252, 0.75) !important;
 }
 
-[data-theme="latte"] header::before,
-[data-theme="latte"] nav::before {
+[data-theme="latte"] header,
+[data-theme="latte"] nav {
   background: rgba(245, 237, 224, 0.75) !important;
 }
 
