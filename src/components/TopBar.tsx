@@ -54,30 +54,36 @@ export const TopBar = () => {
               />
             </Link>
           </div>
+        </div>
+      </header>
 
-          {/* Dropdown Menu */}
-          {isMenuOpen && (
-            <>
-              <div 
-                className="fixed inset-0 z-40" 
+      {/* Dropdown Menu */}
+      {isMenuOpen && (
+        <div className="fixed inset-0 z-[100] isolate">
+          <div 
+            className="absolute inset-0" 
+            onClick={() => setIsMenuOpen(false)}
+          />
+          <div 
+            ref={menuPanelRef} 
+            className="topbar-menu-panel absolute left-6 w-52 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/10 overflow-hidden"
+            style={{ top: 'calc(env(safe-area-inset-top) + 4rem)' }}
+          >
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-outline-variant/10">
+              <span className="font-label text-[10px] uppercase tracking-widest font-bold text-secondary">Menu</span>
+              <button
                 onClick={() => setIsMenuOpen(false)}
-              />
-              <div ref={menuPanelRef} className="topbar-menu-panel absolute top-full left-6 mt-2 w-52 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/10 overflow-hidden z-50">
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-outline-variant/10">
-                  <span className="font-label text-[10px] uppercase tracking-widest font-bold text-secondary">Menu</span>
-                  <button
-                    onClick={() => setIsMenuOpen(false)}
-                    className="p-1.5 rounded-full text-secondary hover:text-primary hover:bg-surface-container-low transition-colors"
-                    aria-label="Close menu"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsGettingStartedOpen(true);
-                    setIsMenuOpen(false);
-                  }}
+                className="p-1.5 rounded-full text-secondary hover:text-primary hover:bg-surface-container-low transition-colors"
+                aria-label="Close menu"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setIsGettingStartedOpen(true);
+                setIsMenuOpen(false);
+              }}
                   className="topbar-menu-item w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
                 >
                   🚀 Getting Started
@@ -119,10 +125,8 @@ export const TopBar = () => {
                   ☕ Buy me a coffee
                 </a>
               </div>
-            </>
-          )}
         </div>
-      </header>
+      )}
 
       {/* Getting Started Modal */}
       {isGettingStartedOpen && <GettingStartedModal onClose={() => setIsGettingStartedOpen(false)} />}
