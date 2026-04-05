@@ -64,15 +64,23 @@ export const TopBar = () => {
 
       {/* Dropdown Menu */}
       {isMenuOpen && (
-        <div className="fixed inset-0 z-[100] isolate">
+        <div className="fixed inset-0 z-[100]">
           <div 
             className="absolute inset-0" 
             onClick={() => setIsMenuOpen(false)}
           />
           <div 
             ref={menuPanelRef} 
-            className="topbar-menu-panel absolute left-6 w-52 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/10 overflow-hidden"
-            style={{ top: 'calc(env(safe-area-inset-top) + 4rem)' }}
+            className="topbar-menu-panel absolute left-6 w-52 rounded-xl shadow-lg border border-outline-variant/10 overflow-hidden"
+            style={{
+              top: 'calc(env(safe-area-inset-top) + 4rem)',
+              background: 'rgba(0, 0, 0, 0.55)',
+              WebkitBackdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(20px)',
+              WebkitTransform: 'translateZ(0)',
+              transform: 'translateZ(0)',
+              willChange: 'transform',
+            }}
           >
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-outline-variant/10">
               <span className="font-label text-[10px] uppercase tracking-widest font-bold text-secondary">Menu</span>
