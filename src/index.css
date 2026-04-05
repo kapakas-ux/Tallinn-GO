@@ -259,6 +259,8 @@
 [data-theme="havgra"] .bg-surface-container-highest {
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
 }
 
 /* Daylight & Latte: opaque cards, no glass needed */
@@ -345,24 +347,32 @@
   background: rgba(16, 12, 32, 0.85) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
   color: #ede9fe;
 }
 [data-theme="havgra"] .settings-panel {
   background: rgba(8, 14, 22, 0.85) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
   color: #cfd9e5;
 }
 [data-theme="daylight"] .settings-panel {
   background: rgba(240, 247, 252, 0.65) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
   color: #1a2a35;
 }
 [data-theme="latte"] .settings-panel {
   background: rgba(245, 237, 224, 0.65) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
   color: #3d2b14;
 }
 
@@ -398,6 +408,8 @@
   border-bottom-left-radius: 32px;
   border-bottom-right-radius: 32px;
   pointer-events: none;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
 }
 
 [data-theme="plum"] nav,
@@ -409,7 +421,6 @@
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: none !important;
   }
-
 
 [data-theme="plum"] nav::before,
 [data-theme="havgra"] nav::before,
@@ -425,6 +436,8 @@
   border-top-left-radius: 2rem; /* rounded-t-xl matches Tailwind's xl */
   border-top-right-radius: 2rem;
   pointer-events: none;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
 }
 
 /* Give header and nav themed solid tints so they pop off lit map backgrounds */
@@ -461,22 +474,30 @@
   background: rgba(22, 10, 38, 0.78) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
 }
 [data-theme="havgra"] .vehicle-popup {
   background: rgba(12, 18, 24, 0.78) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
 }
 /* Light themes: frosted glass effect */
 [data-theme="daylight"] .vehicle-popup {
   background: rgba(240, 247, 252, 0.88) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
 }
 [data-theme="latte"] .vehicle-popup {
   background: rgba(245, 237, 224, 0.88) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
 }
 
 /* ─── STOP POPUP (MapLibre) OVERRIDES ────────────────────────── */
@@ -484,6 +505,8 @@
   background: rgba(22, 10, 38, 0.78) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
   border: 1px solid rgba(168, 85, 247, 0.15);
   color: #e9d5ff;
 }
@@ -495,6 +518,8 @@
   background: rgba(12, 18, 24, 0.78) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
   border: 1px solid rgba(100, 160, 190, 0.15);
   color: #cbd5e1;
 }
@@ -506,6 +531,8 @@
   background: rgba(240, 247, 252, 0.78) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
   border: 1px solid rgba(26, 96, 128, 0.12);
   color: #1a2a35;
 }
@@ -517,6 +544,8 @@
   background: rgba(245, 237, 224, 0.78) !important;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
   border: 1px solid rgba(146, 64, 14, 0.12);
   color: #3d2b14;
 }
