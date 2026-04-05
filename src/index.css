@@ -276,6 +276,15 @@
   -webkit-backdrop-filter: none;
 }
 
+/* ─── DROPDOWN POPOVER ───────────────────────────────────────── */
+/* Dropdowns need a solid background — glass-only looks invisible */
+.dropdown-popover {
+  background: color-mix(in srgb, var(--theme-bg) 96%, transparent);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--color-outline-variant);
+}
+
 /* ─── ANIMATED ORB LAYER ─────────────────────────────────────── */
 .orb-layer {
   position: fixed;

@@ -268,6 +268,10 @@ export const Planner = () => {
   const [itineraries, setItineraries] = useState<PlanItinerary[]>([]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
+  // Track the exact selected stop objects to avoid ambiguity when names collide
+  const selectedFromStop = useRef<Stop | null>(null);
+  const selectedToStop = useRef<Stop | null>(null);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -286,8 +290,8 @@ export const Planner = () => {
   }, []);
 
   const handleSearch = (query: string, type: 'from' | 'to') => {
-    if (type === 'from') setFrom(query);
-    else setTo(query);
+    if (type === 'from') { setFrom(query); selectedFromStop.current = null; }
+    else { setTo(query); selectedToStop.current = null; }
     if (query.length > 1) {
       setSuggestions(stops.filter(s => s.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6));
       setActiveInput(type);
@@ -298,26 +302,30 @@ export const Planner = () => {
   };
 
   const selectSuggestion = (stop: Stop) => {
-    if (activeInput === 'from') setFrom(stop.name);
-    else setTo(stop.name);
+    if (activeInput === 'from') { setFrom(stop.name); selectedFromStop.current = stop; }
+    else { setTo(stop.name); selectedToStop.current = stop; }
     setActiveInput(null);
     setSuggestions([]);
   };
 
   const swapLocations = () => { const t = from; setFrom(to); setTo(t); };
 
-  const resolveCoords = useCallback((name: string): { lat: number; lon: number } | null => {
+  const resolveCoords = useCallback((name: string, type: 'from' | 'to'): { lat: number; lon: number } | null => {
     if (name === 'Current Location') {
       return userCoords ? { lat: userCoords.lat, lon: userCoords.lng } : null;
     }
+    // Use the exact stop that was selected from the dropdown first
+    const pinned = type === 'from' ? selectedFromStop.current : selectedToStop.current;
+    if (pinned) return { lat: pinned.lat, lon: pinned.lng };
+    // Fall back to first name match
     const stop = stops.find(s => s.name === name);
     return stop ? { lat: stop.lat, lon: stop.lng } : null;
   }, [stops, userCoords]);
 
   const findRoutes = async () => {
     setError(null);
-    const fromCoords = resolveCoords(from);
-    const toCoords = resolveCoords(to);
+    const fromCoords = resolveCoords(from, 'from');
+    const toCoords = resolveCoords(to, 'to');
     if (!fromCoords) { setError(from === 'Current Location' ? 'Waiting for GPS...' : `Stop not found: "${from}"`); return; }
     if (!toCoords) { setError(`Stop not found: "${to}"`); return; }
     if (fromCoords.lat === toCoords.lat && fromCoords.lon === toCoords.lon) { setError('Origin and destination are the same.'); return; }
@@ -338,8 +346,8 @@ export const Planner = () => {
   };
 
   const handleViewOnMap = (itinerary: PlanItinerary) => {
-    const last = itinerary.legs[itinerary.legs.length - 1];
-    navigate(last ? `/map?lat=${last.to.lat}&lng=${last.to.lon}&zoom=14` : '/map');
+    sessionStorage.setItem('planner_journey', JSON.stringify(itinerary));
+    navigate('/map?journey=1');
   };
 
   return (
@@ -405,20 +413,20 @@ export const Planner = () => {
 
           {/* Autocomplete dropdown */}
           {activeInput && (suggestions.length > 0 || activeInput === 'from') && (
-            <div className="absolute left-0 right-0 top-full mt-2 bg-surface-container-lowest rounded-[16px] shadow-xl border border-outline-variant/20 z-50 overflow-hidden">
+            <div className="dropdown-popover absolute left-0 right-0 top-full mt-2 rounded-[16px] shadow-2xl z-50 overflow-hidden">
               {activeInput === 'from' && from !== 'Current Location' && (
                 <button
-                  onClick={() => { setFrom('Current Location'); setActiveInput(null); setSuggestions([]); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left border-b border-outline-variant/10"
+                  onClick={() => { setFrom('Current Location'); selectedFromStop.current = null; setActiveInput(null); setSuggestions([]); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10"
                 >
-                  <div className="bg-blue-50 p-2 rounded-full shrink-0">
+                  <div className="bg-blue-500/10 p-2 rounded-full shrink-0">
                     <Navigation className="w-4 h-4 text-blue-500 fill-blue-500" />
                   </div>
                   <div>
-                    <p className="font-headline font-bold text-blue-600 text-sm">
+                    <p className="font-headline font-bold text-blue-400 text-sm">
                       {isSimulated ? 'Simulate My Location' : 'Use My Location'}
                     </p>
-                    <p className="text-[9px] font-label uppercase tracking-wider text-blue-400">
+                    <p className="text-[9px] font-label uppercase tracking-wider text-blue-500/60">
                       {isSimulated ? 'Tallinn Center' : 'Real-time GPS'}
                     </p>
                   </div>
@@ -428,12 +436,28 @@ export const Planner = () => {
                 <button
                   key={stop.id}
                   onClick={() => selectSuggestion(stop)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left border-b border-outline-variant/10 last:border-0"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10 last:border-0"
                 >
                   <div className="bg-surface-container-high p-2 rounded-full shrink-0">
                     <MapPin className="w-4 h-4 text-secondary" />
                   </div>
-                  <p className="font-headline font-bold text-on-surface text-sm truncate">{stop.name}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-headline font-bold text-on-surface text-sm truncate">{stop.name}</p>
+                    <p className="text-[9px] font-label text-secondary truncate mt-0.5">
+                      {[stop.desc, stop.siriId ? `#${stop.siriId}` : null]
+                        .filter(Boolean).join(' \u00b7 ') || 'Stop'}
+                    </p>
+                  </div>
+                  {stop.modes && stop.modes.length > 0 && (
+                    <div className="flex gap-1 shrink-0">
+                      {stop.modes.slice(0, 2).map(m => (
+                        <span key={m} className="text-[8px] font-label font-bold uppercase px-1.5 py-0.5 rounded-full"
+                          style={{ backgroundColor: m === 'tram' ? '#DC143C22' : '#00357122', color: m === 'tram' ? '#DC143C' : '#6BA3E0' }}>
+                          {m === 'regional' ? 'reg' : m}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

@@ -6,7 +6,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes } from '../services/transportService';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
 import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
-import { Stop, Arrival, Vehicle } from '../types';
+import { decodePolyline } from '../lib/geo';
+import { Stop, Arrival, Vehicle, PlanItinerary, LegMode } from '../types';
 import { Bus, Loader2, Navigation, Footprints, Bell, X } from 'lucide-react';
 import { getDistance } from '../lib/geo';
 import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
@@ -42,6 +43,8 @@ export const Map = () => {
   const userMarker = useRef(null as maplibregl.Marker | null);
   const pulsatingMarker = useRef(null as maplibregl.Marker | null);
   const currentPopup = useRef(null as maplibregl.Popup | null);
+  const journeyMarkers = useRef<maplibregl.Marker[]>([]);
+  const journeySourceIds = useRef<string[]>([]);
   const [loadingDepartures, setLoadingDepartures] = useState(false);
   const [userLocation, setUserLocation] = useState(null as [number, number] | null);
   const [isSimulated, setIsSimulated] = useState(false);
@@ -843,6 +846,7 @@ export const Map = () => {
   useEffect(() => {
     if (!map.current) return;
     const searchParams = new URLSearchParams(location.search);
+    if (searchParams.has('journey')) return; // handled by journey overlay effect
     const latParam = searchParams.get('lat');
     const lngParam = searchParams.get('lng');
     const zoomParam = searchParams.get('zoom');
@@ -855,6 +859,91 @@ export const Map = () => {
       }
     }
   }, [location.search]);
+
+  // Draw journey overlay when navigating here with ?journey=1
+  useEffect(() => {
+    const m = map.current;
+    if (!m || styleLoadCount === 0) return;
+
+    const clearOverlay = () => {
+      journeyMarkers.current.forEach(mk => mk.remove());
+      journeyMarkers.current = [];
+      journeySourceIds.current.forEach(id => {
+        if (m.getLayer(`${id}-bg`)) m.removeLayer(`${id}-bg`);
+        if (m.getLayer(`${id}-line`)) m.removeLayer(`${id}-line`);
+        if (m.getSource(id)) m.removeSource(id);
+      });
+      journeySourceIds.current = [];
+    };
+
+    const searchParams = new URLSearchParams(location.search);
+    if (!searchParams.has('journey')) { clearOverlay(); return; }
+
+    const raw = sessionStorage.getItem('planner_journey');
+    if (!raw) return;
+
+    let itinerary: PlanItinerary;
+    try { itinerary = JSON.parse(raw); } catch { return; }
+
+    clearOverlay();
+
+    const modeColor = (mode: LegMode) => {
+      if (mode === 'TRAM') return '#DC143C';
+      if (mode === 'RAIL') return '#f37021';
+      if (mode === 'BUS')  return '#003571';
+      return '#9ca3af';
+    };
+
+    const allCoords: [number, number][] = [];
+
+    itinerary.legs.forEach((leg, i) => {
+      const coords = decodePolyline(leg.legGeometry.points);
+      if (!coords.length) return;
+      allCoords.push(...coords);
+      const id = `journey-leg-${i}`;
+      journeySourceIds.current.push(id);
+      m.addSource(id, { type: 'geojson', data: {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: coords },
+        properties: {}
+      }});
+      if (leg.mode === 'WALK') {
+        m.addLayer({ id: `${id}-line`, type: 'line', source: id,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#9ca3af', 'line-width': 3, 'line-dasharray': [2, 3] }
+        });
+      } else {
+        m.addLayer({ id: `${id}-bg`, type: 'line', source: id,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#ffffff', 'line-width': 7 }
+        });
+        m.addLayer({ id: `${id}-line`, type: 'line', source: id,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': modeColor(leg.mode), 'line-width': 5 }
+        });
+      }
+    });
+
+    // Start / end markers
+    const first = itinerary.legs[0];
+    const last = itinerary.legs[itinerary.legs.length - 1];
+    if (first) journeyMarkers.current.push(
+      new maplibregl.Marker({ color: '#003571' }).setLngLat([first.from.lon, first.from.lat]).addTo(m)
+    );
+    if (last) journeyMarkers.current.push(
+      new maplibregl.Marker({ color: '#DC143C' }).setLngLat([last.to.lon, last.to.lat]).addTo(m)
+    );
+
+    // Fit bounds
+    if (allCoords.length) {
+      const lngs = allCoords.map(c => c[0]);
+      const lats = allCoords.map(c => c[1]);
+      m.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: 60, duration: 800 }
+      );
+    }
+  }, [styleLoadCount, location.search]);
 
   const handleLocateMe = () => {
     if (userLocation && map.current) {
