@@ -277,11 +277,11 @@
 }
 
 /* ─── DROPDOWN POPOVER ───────────────────────────────────────── */
-/* Dropdowns need a solid background — glass-only looks invisible */
+/* Dropdowns need a solid background — color-mix() is unreliable on older WebViews */
 .dropdown-popover {
-  background: color-mix(in srgb, var(--theme-bg) 96%, transparent);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background-color: var(--color-surface);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   border: 1px solid var(--color-outline-variant);
 }
 

@@ -366,7 +366,7 @@ export const Planner = () => {
             <div className="flex-1 min-w-0">
               <p className="text-[9px] font-label uppercase tracking-widest text-secondary mb-0.5">From</p>
               <input
-                className="w-full bg-transparent border-none p-0 focus:ring-0 font-headline font-semibold text-on-surface placeholder:text-outline-variant text-sm"
+                className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none font-headline font-semibold text-on-surface placeholder:text-outline-variant text-sm"
                 value={from}
                 onChange={e => handleSearch(e.target.value, 'from')}
                 onFocus={() => {
@@ -399,7 +399,7 @@ export const Planner = () => {
             <div className="flex-1 min-w-0">
               <p className="text-[9px] font-label uppercase tracking-widest text-secondary mb-0.5">To</p>
               <input
-                className="w-full bg-transparent border-none p-0 focus:ring-0 font-headline font-semibold text-on-surface placeholder:text-outline-variant text-sm"
+                className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none font-headline font-semibold text-on-surface placeholder:text-outline-variant text-sm"
                 value={to}
                 onChange={e => handleSearch(e.target.value, 'to')}
                 onFocus={() => { setActiveInput('to'); handleSearch(to, 'to'); }}

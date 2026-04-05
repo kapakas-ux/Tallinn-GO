@@ -863,16 +863,23 @@ export const Map = () => {
   // Draw journey overlay when navigating here with ?journey=1
   useEffect(() => {
     const m = map.current;
-    if (!m || styleLoadCount === 0) return;
+    if (!m) return;
 
     const clearOverlay = () => {
       journeyMarkers.current.forEach(mk => mk.remove());
       journeyMarkers.current = [];
-      journeySourceIds.current.forEach(id => {
-        if (m.getLayer(`${id}-bg`)) m.removeLayer(`${id}-bg`);
-        if (m.getLayer(`${id}-line`)) m.removeLayer(`${id}-line`);
-        if (m.getSource(id)) m.removeSource(id);
-      });
+      // Scan for any journey-* layers/sources (robust against missed ref tracking)
+      try {
+        if (m.isStyleLoaded()) {
+          const style = m.getStyle();
+          style.layers
+            ?.filter(l => l.id.startsWith('journey-'))
+            .forEach(l => { try { m.removeLayer(l.id); } catch {} });
+          Object.keys(style.sources ?? {})
+            .filter(s => s.startsWith('journey-'))
+            .forEach(s => { try { m.removeSource(s); } catch {} });
+        }
+      } catch {}
       journeySourceIds.current = [];
     };
 
@@ -885,8 +892,6 @@ export const Map = () => {
     let itinerary: PlanItinerary;
     try { itinerary = JSON.parse(raw); } catch { return; }
 
-    clearOverlay();
-
     const modeColor = (mode: LegMode) => {
       if (mode === 'TRAM') return '#DC143C';
       if (mode === 'RAIL') return '#f37021';
@@ -894,56 +899,71 @@ export const Map = () => {
       return '#9ca3af';
     };
 
-    const allCoords: [number, number][] = [];
+    const drawJourney = () => {
+      if (!m.isStyleLoaded()) return;
+      clearOverlay();
 
-    itinerary.legs.forEach((leg, i) => {
-      const coords = decodePolyline(leg.legGeometry.points);
-      if (!coords.length) return;
-      allCoords.push(...coords);
-      const id = `journey-leg-${i}`;
-      journeySourceIds.current.push(id);
-      m.addSource(id, { type: 'geojson', data: {
-        type: 'Feature',
-        geometry: { type: 'LineString', coordinates: coords },
-        properties: {}
-      }});
-      if (leg.mode === 'WALK') {
-        m.addLayer({ id: `${id}-line`, type: 'line', source: id,
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#9ca3af', 'line-width': 3, 'line-dasharray': [2, 3] }
-        });
-      } else {
-        m.addLayer({ id: `${id}-bg`, type: 'line', source: id,
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#ffffff', 'line-width': 7 }
-        });
-        m.addLayer({ id: `${id}-line`, type: 'line', source: id,
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': modeColor(leg.mode), 'line-width': 5 }
-        });
-      }
-    });
+      const allCoords: [number, number][] = [];
 
-    // Start / end markers
-    const first = itinerary.legs[0];
-    const last = itinerary.legs[itinerary.legs.length - 1];
-    if (first) journeyMarkers.current.push(
-      new maplibregl.Marker({ color: '#003571' }).setLngLat([first.from.lon, first.from.lat]).addTo(m)
-    );
-    if (last) journeyMarkers.current.push(
-      new maplibregl.Marker({ color: '#DC143C' }).setLngLat([last.to.lon, last.to.lat]).addTo(m)
-    );
+      itinerary.legs.forEach((leg, i) => {
+        const coords = decodePolyline(leg.legGeometry.points);
+        if (!coords.length) return;
+        allCoords.push(...coords);
+        const id = `journey-leg-${i}`;
+        journeySourceIds.current.push(id);
+        try {
+          m.addSource(id, {
+            type: 'geojson',
+            data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} },
+          });
+          if (leg.mode === 'WALK') {
+            m.addLayer({ id: `${id}-line`, type: 'line', source: id,
+              layout: { 'line-cap': 'round', 'line-join': 'round' },
+              paint: { 'line-color': '#9ca3af', 'line-width': 3, 'line-dasharray': [2, 3] },
+            });
+          } else {
+            m.addLayer({ id: `${id}-bg`, type: 'line', source: id,
+              layout: { 'line-cap': 'round', 'line-join': 'round' },
+              paint: { 'line-color': '#ffffff', 'line-width': 7 },
+            });
+            m.addLayer({ id: `${id}-line`, type: 'line', source: id,
+              layout: { 'line-cap': 'round', 'line-join': 'round' },
+              paint: { 'line-color': modeColor(leg.mode), 'line-width': 5 },
+            });
+          }
+        } catch (err) {
+          console.error(`journey: error adding leg ${i} (${leg.mode}):`, err);
+        }
+      });
 
-    // Fit bounds
-    if (allCoords.length) {
-      const lngs = allCoords.map(c => c[0]);
-      const lats = allCoords.map(c => c[1]);
-      m.fitBounds(
-        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-        { padding: 60, duration: 800 }
+      // Start / end markers
+      const first = itinerary.legs[0];
+      const last = itinerary.legs[itinerary.legs.length - 1];
+      if (first) journeyMarkers.current.push(
+        new maplibregl.Marker({ color: '#003571' }).setLngLat([first.from.lon, first.from.lat]).addTo(m)
       );
+      if (last) journeyMarkers.current.push(
+        new maplibregl.Marker({ color: '#DC143C' }).setLngLat([last.to.lon, last.to.lat]).addTo(m)
+      );
+
+      // Fit bounds
+      if (allCoords.length) {
+        const lngs = allCoords.map(c => c[0]);
+        const lats = allCoords.map(c => c[1]);
+        m.fitBounds(
+          [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+          { padding: 60, duration: 800 }
+        );
+      }
+    };
+
+    if (m.isStyleLoaded()) {
+      drawJourney();
+    } else {
+      m.once('load', drawJourney);
+      return () => { m.off('load', drawJourney as any); };
     }
-  }, [styleLoadCount, location.search]);
+  }, [location.search, styleLoadCount]);
 
   const handleLocateMe = () => {
     if (userLocation && map.current) {
