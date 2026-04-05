@@ -466,10 +466,10 @@
 [data-theme="havgra"] .topbar-dialog-panel,
 [data-theme="plum"] .topbar-dialog-footer,
 [data-theme="havgra"] .topbar-dialog-footer {
-  background: rgba(16, 18, 24, 0.70) !important;
+  background: rgba(16, 18, 24, 0.80) !important;
   border-color: rgba(255, 255, 255, 0.14) !important;
-  backdrop-filter: blur(28px) saturate(120%);
-  -webkit-backdrop-filter: blur(28px) saturate(120%);
+  backdrop-filter: blur(32px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(120%) !important;
 }
 
 [data-theme="daylight"] .topbar-menu-panel,
@@ -478,10 +478,10 @@
 [data-theme="latte"] .topbar-menu-panel,
 [data-theme="latte"] .topbar-dialog-panel,
 [data-theme="latte"] .topbar-dialog-footer {
-  background: rgba(248, 251, 253, 0.70) !important;
+  background: rgba(248, 251, 253, 0.80) !important;
   border-color: rgba(26, 96, 128, 0.16) !important;
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  backdrop-filter: blur(32px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(120%) !important;
 }
 
 [data-theme="plum"] .topbar-menu-item:hover,
