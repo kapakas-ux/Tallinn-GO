@@ -300,11 +300,11 @@ export const Stops = () => {
       {/* Search Section */}
       <section className="px-6 pt-8 pb-10">
         <div className="relative group">
-          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-            <Search className="text-secondary w-5 h-5" />
+          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none z-10">
+            <Search className="text-on-surface/50 w-5 h-5" />
           </div>
           <input
-            className="w-full bg-surface-container-highest border-none h-16 pl-14 pr-6 rounded-full font-headline font-semibold text-on-surface focus:ring-2 focus:ring-primary-fixed transition-all placeholder:text-on-surface-variant/50"
+            className="w-full bg-surface-container-highest border-none h-16 pl-14 pr-6 rounded-full font-headline font-semibold text-on-surface focus:ring-2 focus:ring-primary-fixed transition-all placeholder:text-on-surface/40"
             placeholder="Search stops..."
             type="text"
             value={searchQuery}
