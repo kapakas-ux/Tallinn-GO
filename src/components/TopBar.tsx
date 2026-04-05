@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
@@ -10,15 +10,37 @@ export const TopBar = () => {
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isGettingStartedOpen, setIsGettingStartedOpen] = useState(false);
+  const menuPanelRef = useRef<HTMLDivElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const onPointerDownCapture = (event: PointerEvent) => {
+      const target = event.target as Node;
+      const insidePanel = !!menuPanelRef.current?.contains(target);
+      const insideButton = !!menuButtonRef.current?.contains(target);
+
+      if (!insidePanel && !insideButton) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', onPointerDownCapture, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDownCapture, true);
+    };
+  }, [isMenuOpen]);
 
   return (
     <>
-      <header className="w-full top-0 sticky z-50 bg-primary dark:bg-slate-950 shadow-md pt-[env(safe-area-inset-top)]">
+      <header className="w-full top-0 sticky z-50 bg-primary shadow-md pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between px-6 py-4 w-full relative">
           <div className="flex items-center gap-4">
             <button 
+              ref={menuButtonRef}
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-white dark:text-blue-400 active:scale-95 transition-transform"
+              className="text-primary active:scale-95 transition-transform"
             >
               <Menu className="w-6 h-6" />
             </button>
@@ -38,13 +60,23 @@ export const TopBar = () => {
                 className="fixed inset-0 z-40" 
                 onClick={() => setIsMenuOpen(false)}
               />
-              <div className="absolute top-full left-6 mt-2 w-48 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 overflow-hidden z-50">
+              <div ref={menuPanelRef} className="topbar-menu-panel absolute top-full left-6 mt-2 w-52 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/10 overflow-hidden z-50">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-outline-variant/10">
+                  <span className="font-label text-[10px] uppercase tracking-widest font-bold text-secondary">Menu</span>
+                  <button
+                    onClick={() => setIsMenuOpen(false)}
+                    className="p-1.5 rounded-full text-secondary hover:text-primary hover:bg-surface-container-low transition-colors"
+                    aria-label="Close menu"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
                 <button
                   onClick={() => {
                     setIsGettingStartedOpen(true);
                     setIsMenuOpen(false);
                   }}
-                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
+                  className="topbar-menu-item w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors"
                 >
                   🚀 Getting Started
                 </button>
@@ -53,7 +85,7 @@ export const TopBar = () => {
                     setIsSettingsOpen(true);
                     setIsMenuOpen(false);
                   }}
-                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                  className="topbar-menu-item w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
                 >
                   ⚙️ Settings
                 </button>
@@ -62,7 +94,7 @@ export const TopBar = () => {
                     setIsTermsOpen(true);
                     setIsMenuOpen(false);
                   }}
-                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                  className="topbar-menu-item w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
                 >
                   Terms & Conditions
                 </button>
@@ -71,7 +103,7 @@ export const TopBar = () => {
                     setIsPrivacyOpen(true);
                     setIsMenuOpen(false);
                   }}
-                  className="w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                  className="topbar-menu-item w-full text-left px-4 py-3 text-sm font-headline font-bold text-primary hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
                 >
                   Privacy Policy
                 </button>
@@ -80,7 +112,7 @@ export const TopBar = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setIsMenuOpen(false)}
-                  className="block w-full text-left px-4 py-3 text-sm font-headline font-bold text-amber-500 hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                  className="topbar-menu-item block w-full text-left px-4 py-3 text-sm font-headline font-bold text-amber-500 hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
                 >
                   ☕ Buy me a coffee
                 </a>

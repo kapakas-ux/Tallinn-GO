@@ -17,9 +17,18 @@ import { VehicleMap } from '../components/VehicleMap';
 import { AnimatePresence, motion } from 'motion/react';
 
 const TALLINN_CENTER: [number, number] = [TALLINN_CENTER_COORD.lng, TALLINN_CENTER_COORD.lat]; // [lng, lat]
+const VEHICLE_VISIBILITY_MIN_ZOOM = 13;
 
 const isValidLngLat = (lng: number, lat: number) => {
   return !isNaN(lng) && !isNaN(lat) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+};
+
+const vehicleColorByType = (type: Vehicle['type']): string => {
+  if (type === 'tram') return '#dc143c';
+  if (type === 'trolley') return '#003571';
+  if (type === 'train') return '#f37021';
+  if (type === 'regional') return '#059669';
+  return '#1d4ed8';
 };
 
 export const Map = () => {
@@ -43,6 +52,7 @@ export const Map = () => {
 
   const [stops, setStops] = useState([] as Stop[]);
   const [vehicles, setVehicles] = useState([] as Vehicle[]);
+  const [vehicleError, setVehicleError] = useState<string | null>(null);
   const [styleLoadCount, setStyleLoadCount] = useState(0);
 
   useEffect(() => {
@@ -59,9 +69,11 @@ export const Map = () => {
 
     const loadVehicles = () => {
       fetchVehicles().then(data => {
+        setVehicleError(null);
         setVehicles(data);
       }).catch(err => {
         console.error('Error fetching vehicles:', err);
+        setVehicleError(err?.message || 'Vehicle fetch failed');
       });
     };
 
@@ -209,7 +221,7 @@ export const Map = () => {
 
       map.current.on('zoom', () => {
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= 13;
+        const visible = currentZoom >= VEHICLE_VISIBILITY_MIN_ZOOM;
         Object.values(vehicleMarkers.current).forEach((marker: maplibregl.Marker) => {
           marker.getElement().style.display = visible ? 'block' : 'none';
         });
@@ -217,7 +229,7 @@ export const Map = () => {
 
       map.current.on('move', () => {
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= 13;
+        const visible = currentZoom >= VEHICLE_VISIBILITY_MIN_ZOOM;
         Object.values(vehicleMarkers.current).forEach((marker: maplibregl.Marker) => {
           marker.getElement().style.display = visible ? 'block' : 'none';
         });
@@ -269,7 +281,7 @@ export const Map = () => {
         const el = vehicleMarkers.current[vehicle.id].getElement();
         
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= 13;
+        const visible = currentZoom >= VEHICLE_VISIBILITY_MIN_ZOOM;
         el.style.display = visible ? 'block' : 'none';
 
         const icon = el.querySelector('.vehicle-icon') as HTMLElement;
@@ -290,7 +302,7 @@ export const Map = () => {
 
         el.innerHTML = `
           <div class="relative w-5 h-5 flex items-center justify-center transition-transform group-hover:scale-110">
-            <div class="vehicle-label absolute bottom-full mb-1 text-[8px] font-bold text-white ${bgColor} opacity-80 px-1 py-0.5 rounded-sm shadow-sm whitespace-nowrap">
+            <div class="vehicle-label absolute bottom-full mb-1 text-[8px] font-bold text-white ${bgColor} opacity-80 px-1 py-px rounded-sm shadow-sm whitespace-nowrap leading-tight">
               ${labelText}
             </div>
             <div class="vehicle-icon w-5 h-5 ${bgColor} rounded-full flex items-center justify-center shadow-sm border border-white" style="transform: rotate(${vehicle.bearing - 45}deg)">
@@ -312,7 +324,7 @@ export const Map = () => {
           .addTo(map.current!);
           
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= 13;
+        const visible = currentZoom >= VEHICLE_VISIBILITY_MIN_ZOOM;
         el.style.display = visible ? 'block' : 'none';
           
         vehicleInterpolation.current[vehicle.id] = {
@@ -324,6 +336,63 @@ export const Map = () => {
         vehicleMarkers.current[vehicle.id] = marker;
       }
     });
+  }, [vehicles, styleLoadCount]);
+
+  // Robust vehicle layer fallback: rendered directly by MapLibre.
+  useEffect(() => {
+    if (!map.current || styleLoadCount === 0) return;
+
+    const m = map.current;
+    const validVehicles = vehicles.filter(v => isValidLngLat(v.lng, v.lat));
+    const vehicleGeoJson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+      type: 'FeatureCollection',
+      features: validVehicles.map(v => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [v.lng, v.lat]
+        },
+        properties: {
+          id: v.id,
+          line: v.line,
+          destination: v.destination || '',
+          type: v.type,
+          color: vehicleColorByType(v.type)
+        }
+      }))
+    };
+
+    const existingSource = m.getSource('vehicles-live') as maplibregl.GeoJSONSource | undefined;
+    if (existingSource) {
+      existingSource.setData(vehicleGeoJson as any);
+    } else {
+      m.addSource('vehicles-live', {
+        type: 'geojson',
+        data: vehicleGeoJson as any
+      });
+
+      m.addLayer({
+        id: 'vehicles-live-circles',
+        type: 'circle',
+        source: 'vehicles-live',
+        minzoom: VEHICLE_VISIBILITY_MIN_ZOOM,
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            VEHICLE_VISIBILITY_MIN_ZOOM, 3,
+            14, 6
+          ],
+          'circle-color': ['get', 'color'],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.5,
+          'circle-opacity': 0.95
+        }
+      });
+
+
+    }
   }, [vehicles, styleLoadCount]);
 
   // Handle pulsating stop marker
@@ -795,6 +864,8 @@ export const Map = () => {
         OpenFreeMap, OSM & Transpordiamet
       </div>
 
+
+
       <button 
         onClick={handleLocateMe}
         className="absolute bottom-4 right-4 z-10 bg-white p-3 rounded-full shadow-lg border border-surface-container-high hover:bg-surface-container-low transition-colors group"
@@ -821,7 +892,7 @@ export const Map = () => {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="absolute bottom-0 left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col max-h-[calc(100%-3rem)]"
+            className="vehicle-popup absolute bottom-0 left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col max-h-[calc(100%-3rem)]"
           >
             <div className="w-full flex justify-center pt-3 pb-2" onClick={() => setSelectedVehicle(null)}>
               <div className="w-12 h-1.5 bg-outline-variant/30 rounded-full" />
@@ -836,7 +907,7 @@ export const Map = () => {
                   {selectedVehicle.vehicle.line}
                 </div>
                 <div>
-                  <h3 className="font-headline font-bold text-xl text-primary leading-tight">
+                  <h3 className="font-headline font-bold text-xl gradient-text leading-tight">
                     {selectedVehicle.vehicle.destination || 'Unknown Destination'}
                   </h3>
                   <p className="font-label text-xs text-secondary font-bold uppercase tracking-widest mt-0.5">
@@ -853,12 +924,12 @@ export const Map = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-              <div className="h-48 rounded-xl overflow-hidden bg-surface-container relative shrink-0">
+              <div className="h-48 rounded-xl overflow-hidden bg-surface-container-high relative shrink-0">
                 <VehicleMap routeStops={selectedVehicle.routeStops} targetStop={selectedVehicle.routeStops[0]} vehicle={selectedVehicle.vehicle} />
               </div>
               
               <div className="flex flex-col gap-2">
-                <h4 className="font-label text-xs font-bold text-secondary uppercase tracking-widest px-2">Route Stops</h4>
+                <h4 className="font-label text-xs font-bold text-secondary uppercase tracking-widest px-2 gradient-text">Route Stops</h4>
                 {selectedVehicle.routeStops.length === 0 ? (
                   <p className="text-sm text-secondary px-2">Route data not available</p>
                 ) : (

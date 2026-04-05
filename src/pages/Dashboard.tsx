@@ -281,7 +281,7 @@ export const Dashboard = () => {
     nearbyStops.length > 0 && (
       <section className="mb-12 space-y-4">
         <div className="flex items-baseline justify-between">
-          <h3 className="font-headline font-bold text-2xl text-primary">Nearby Stops</h3>
+          <h3 className="font-headline font-bold text-2xl gradient-text">Nearby Stops</h3>
         </div>
         <div className="grid grid-cols-1 gap-3">
           {nearbyStops.map((stop) => (
@@ -426,7 +426,7 @@ export const Dashboard = () => {
   const renderFavorites = () => (
     <section className="space-y-4 mb-12">
       <div className="flex items-baseline justify-between">
-        <h3 className="font-headline font-bold text-2xl text-primary">Favorites</h3>
+        <h3 className="font-headline font-bold text-2xl gradient-text">Favorites</h3>
         {favorites.length > 0 && (
           <button 
             onClick={() => setIsEditingFavs(!isEditingFavs)}
@@ -739,7 +739,7 @@ export const Dashboard = () => {
       {/* Real-Time Arrivals Section */}
       <section className="mb-12 space-y-6">
         <div className="flex items-baseline justify-between">
-          <h3 className="font-headline font-bold text-2xl text-primary">Live Arrivals</h3>
+          <h3 className="font-headline font-bold text-2xl gradient-text">Live Arrivals</h3>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-error rounded-full animate-pulse"></div>
             <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">

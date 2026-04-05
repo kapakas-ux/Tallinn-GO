@@ -35,7 +35,7 @@ export const BottomNav = () => {
   ];
 
   return (
-    <nav className="w-full flex justify-around items-center px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-surface dark:bg-slate-950 z-50 rounded-t-xl shadow-[0_-4px_24px_rgba(28,28,26,0.06)]">
+    <nav className="w-full flex justify-around items-center px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-surface z-50 rounded-t-xl shadow-[0_-4px_24px_rgba(28,28,26,0.06)]">
       {navItems.map((item) => (
         <NavLink
           key={item.to}
@@ -44,8 +44,8 @@ export const BottomNav = () => {
             cn(
               "flex flex-col items-center justify-center px-5 py-2 transition-all duration-200 active:scale-90",
               isActive 
-                ? "bg-primary-fixed dark:bg-blue-900/40 text-primary dark:text-blue-200 rounded-xl" 
-                : "text-secondary dark:text-slate-500 hover:text-primary dark:hover:text-blue-300"
+                ? "bg-primary-fixed text-primary rounded-xl" 
+                : "text-secondary hover:text-primary"
             )
           }
         >

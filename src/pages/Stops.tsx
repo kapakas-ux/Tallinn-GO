@@ -321,7 +321,7 @@ export const Stops = () => {
       {searchQuery.trim() ? (
         /* Search Results Section */
         <section className="px-6 mb-12">
-          <h2 className="font-headline text-2xl font-extrabold tracking-tight mb-6">Search Results</h2>
+          <h2 className="font-headline text-2xl font-extrabold tracking-tight mb-6 gradient-text">Search Results</h2>
           {filteredStops.length > 0 ? (
             <div className="space-y-3">
               {filteredStops.map((stop) => (
@@ -380,7 +380,7 @@ export const Stops = () => {
                 <span className="font-label text-xs uppercase tracking-widest text-secondary mb-1 block">
                   Live Coverage
                 </span>
-                <h2 className="font-headline text-3xl font-extrabold tracking-tight">Nearby Stops</h2>
+                <h2 className="font-headline text-3xl font-extrabold tracking-tight gradient-text">Nearby Stops</h2>
               </div>
               {isSimulated && (
                 <div className="flex items-center gap-1.5 px-2 py-1 bg-error/10 text-error rounded-full text-[10px] font-bold uppercase tracking-widest border border-error/20">
@@ -531,7 +531,7 @@ export const Stops = () => {
                 <span className="font-label text-xs uppercase tracking-widest text-secondary mb-1 block">
                   Quick Access
                 </span>
-                <h2 className="font-headline text-3xl font-extrabold tracking-tight">Favorites</h2>
+                <h2 className="font-headline text-3xl font-extrabold tracking-tight gradient-text">Favorites</h2>
               </div>
               {favorites.length > 0 && (
                 <button 

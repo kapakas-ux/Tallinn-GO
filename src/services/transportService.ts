@@ -12,19 +12,16 @@ const getApiBaseUrl = () => {
     return envUrl;
   }
   
-  // 2. Check if we are running in a native (Capacitor) environment
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const isNative = origin.includes('localhost') || origin.includes('capacitor://');
-  
-  if (isNative) {
-    // Using the public Shared App URL. 
-    // This avoids all local Windows Firewall and emulator networking issues.
+  // 2. Only use the shared URL for actual Capacitor native platforms (Android/iOS),
+  //    NOT for localhost in a browser (which is the dev server).
+  if (Capacitor.isNativePlatform()) {
     const sharedUrl = 'https://ais-pre-4xsfvezpxu44gxul2ipqsy-662742466451.europe-west2.run.app';
-    console.log('Native environment detected, using Shared App URL:', sharedUrl);
+    console.log('Native platform detected, using Shared App URL:', sharedUrl);
     return sharedUrl;
   }
   
-  // 3. Web environment (relative paths work fine)
+  // 3. Web environment (relative paths work fine — hits the local dev server)
+  console.log('Web environment detected, using relative API paths');
   return '';
 };
 
@@ -504,60 +501,141 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
   if (Object.keys(routesMap).length === 0) {
     await fetchRoutes();
   }
-  
-  const url = Capacitor.isNativePlatform()
+
+  const gpsUrl = Capacitor.isNativePlatform()
+    ? 'https://transport.tallinn.ee/gps.txt'
+    : `${API_BASE}/api/transport/gps`;
+
+  // Primary source: Tallinn gps.txt (city buses + trams)
+  let cityVehicles: Vehicle[] = [];
+  try {
+    const gpsText = await universalFetch(gpsUrl);
+    cityVehicles = parseVehiclesFromGpsText(gpsText);
+    console.log(`fetchVehicles: parsed ${cityVehicles.length} city vehicles from gps.txt`);
+  } catch (error) {
+    console.warn('fetchVehicles: gps.txt source failed', error);
+  }
+
+  // Secondary source: gis.ee GeoJSON — always fetch to get trains (type 10),
+  // regional buses (type 20), and trolleybuses (type 1) that gps.txt doesn't include
+  const vehiclesUrl = Capacitor.isNativePlatform()
     ? 'https://gis.ee/tallinn/gps.php'
     : `${API_BASE}/api/transport/vehicles`;
-    
-  const responseText = await universalFetch(url);
-  const data = JSON.parse(responseText);
-  const features = data?.features || [];
+
+  try {
+    const responseText = await universalFetch(vehiclesUrl);
+    const data = JSON.parse(responseText);
+    const features = data?.features || [];
+
+    const extraVehicles: Vehicle[] = [];
+
+    for (const feature of features) {
+      const props = feature.properties;
+      const coords = feature.geometry?.coordinates;
+
+      if (!coords || coords.length < 2) continue;
+
+      // Only pick up vehicle types not covered by gps.txt (type 2=bus, type 3=tram)
+      if (props.type === 2 || props.type === 3) continue;
+
+      let type: Vehicle['type'] = 'bus';
+      if (props.type === 1) type = 'trolley';
+      else if (props.type === 7) type = 'bus';     // nightbus
+      else if (props.type === 10) type = 'train';
+      else if (props.type === 20) type = 'regional';
+
+      const line = props.line?.toString() || '';
+      let destination = props.destination || '';
+
+      if (!destination && line && routesMap[line]) {
+        const routeName = routesMap[line];
+        destination = routeName.includes(' - ') ? routeName.split(' - ')[1] : routeName;
+      }
+
+      extraVehicles.push({
+        id: props.id?.toString() || `${props.type}-${line}-${coords[0]}-${coords[1]}`,
+        type,
+        line,
+        lng: coords[0],
+        lat: coords[1],
+        bearing: props.direction || 0,
+        speed: typeof props.speed === 'number' ? props.speed : 0,
+        destination
+      });
+    }
+
+    if (extraVehicles.length > 0) {
+      console.log(`fetchVehicles: added ${extraVehicles.length} extra vehicles from gis.ee (trains, regional, trolley)`);
+      return [...cityVehicles, ...extraVehicles];
+    }
+  } catch (error) {
+    console.warn('fetchVehicles: gis.ee extra vehicle fetch failed', error);
+  }
+
+  // If gis.ee failed or had no regional data, return city vehicles alone
+  if (cityVehicles.length > 0) {
+    return cityVehicles;
+  }
+
+  // Both sources failed — return fallback empty from gis.ee full parse
+  console.warn('fetchVehicles: both sources returned no data');
+  return [];
+}
+
+function parseVehiclesFromGpsText(text: string): Vehicle[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(Boolean);
 
   const vehicles: Vehicle[] = [];
-  
-  for (const feature of features) {
-    const props = feature.properties;
-    const coords = feature.geometry?.coordinates;
-    
-    if (!coords || coords.length < 2) continue;
 
-    let type: 'bus' | 'tram' | 'trolley' | 'train' | 'regional' = 'bus';
-    
-    if (props.type === 1) type = 'trolley';
-    else if (props.type === 2) type = 'bus';
-    else if (props.type === 3) type = 'tram';
-    else if (props.type === 7) type = 'bus'; // nightbus
-    else if (props.type === 10) type = 'train';
-    else if (props.type === 20) type = 'regional';
+  for (const line of lines) {
+    const parts = line.split(',');
+    if (parts.length < 10) continue;
 
-    const jitter = (Math.random() - 0.5) * 0.000001;
-    
-    const line = props.line?.toString() || '';
-    let destination = props.destination || '';
-    
-    // Fallback for missing destination (common for night buses)
-    if (!destination && line && routesMap[line]) {
-      const routeName = routesMap[line];
-      if (routeName.includes(' - ')) {
-        destination = routeName.split(' - ')[1];
-      } else {
-        destination = routeName;
-      }
+    const typeNum = parseInt(parts[0], 10);
+    const lineNum = (parts[1] || '').trim();
+    const rawLng = parseFloat(parts[2]);
+    const rawLat = parseFloat(parts[3]);
+    const rawBearing = parseFloat(parts[5]);
+    const vehicleId = (parts[6] || '').trim();
+    const rawSpeed = parseFloat(parts[8]);
+    const destination = (parts[9] || '').trim();
+
+    if (!lineNum || !isFinite(rawLng) || !isFinite(rawLat)) continue;
+
+    // gps.txt often stores WGS84 coords multiplied by 1,000,000.
+    const lng = Math.abs(rawLng) > 180 ? rawLng / 1_000_000 : rawLng;
+    const lat = Math.abs(rawLat) > 90 ? rawLat / 1_000_000 : rawLat;
+    if (!isFinite(lng) || !isFinite(lat) || Math.abs(lng) > 180 || Math.abs(lat) > 90) continue;
+
+    let type: Vehicle['type'] = 'bus';
+    if (typeNum === 1) type = 'trolley';
+    else if (typeNum === 2) type = 'bus';
+    else if (typeNum === 3) type = 'tram';
+    else if (typeNum === 7) type = 'bus';
+    else if (typeNum === 10) type = 'train';
+    else if (typeNum === 20) type = 'regional';
+
+    let resolvedDestination = destination;
+    if (!resolvedDestination && lineNum && routesMap[lineNum]) {
+      const routeName = routesMap[lineNum];
+      resolvedDestination = routeName.includes(' - ') ? routeName.split(' - ')[1] : routeName;
     }
-    
+
     vehicles.push({
-      id: props.id?.toString() || Math.random().toString(),
+      id: vehicleId || `${typeNum}-${lineNum}-${lng.toFixed(6)}-${lat.toFixed(6)}`,
       type,
-      line,
-      lng: coords[0] + jitter,
-      lat: coords[1] + jitter,
-      bearing: props.direction || 0,
-      speed: 0,
-      destination
+      line: lineNum,
+      lng,
+      lat,
+      bearing: isFinite(rawBearing) ? rawBearing : 0,
+      speed: isFinite(rawSpeed) ? rawSpeed : 0,
+      destination: resolvedDestination
     });
   }
-  
-  console.log(`fetchVehicles: parsed ${vehicles.length} vehicles successfully from gis.ee`);
+
   return vehicles;
 }
 

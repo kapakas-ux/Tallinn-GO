@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -9,10 +9,33 @@ import { BottomNav } from './components/BottomNav';
 import { Dashboard } from './pages/Dashboard';
 import { Stops } from './pages/Stops';
 import { Map } from './pages/Map';
+import { getSettings } from './services/settingsService';
+import type { AppTheme } from './services/settingsService';
+
+function OrbLayer() {
+  return (
+    <div className="orb-layer" aria-hidden="true">
+      <div className="orb orb-1" />
+      <div className="orb orb-2" />
+      <div className="orb orb-3" />
+    </div>
+  );
+}
 
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [theme, setTheme] = useState<AppTheme>(getSettings().theme);
+
+  useEffect(() => {
+    const onSettings = () => setTheme(getSettings().theme);
+    window.addEventListener('settings_changed', onSettings);
+    return () => window.removeEventListener('settings_changed', onSettings);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -51,21 +74,29 @@ function AppContent() {
   }, [navigate, location]);
 
   return (
-    <div className="h-full bg-surface flex flex-col overflow-hidden">
-      <TopBar />
-      <main className="flex-1 overflow-y-auto no-scrollbar overscroll-none">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/stops" element={<Stops />} />
-          <Route path="/map" element={<Map />} />
-        </Routes>
-      </main>
-      <BottomNav />
-    </div>
+    <>
+      <OrbLayer />
+      <div className="themed-root h-full flex flex-col overflow-hidden">
+        <TopBar />
+        <main className="flex-1 overflow-y-auto no-scrollbar overscroll-none">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/stops" element={<Stops />} />
+            <Route path="/map" element={<Map />} />
+          </Routes>
+        </main>
+        <BottomNav />
+      </div>
+    </>
   );
 }
 
 export default function App() {
+  // Apply saved theme immediately on mount
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', getSettings().theme);
+  }, []);
+
   return (
     <Router>
       <AppContent />

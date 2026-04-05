@@ -102,3 +102,353 @@
   border-top-color: #ffffff !important;
   border-bottom-color: #ffffff !important;
 }
+
+/* ─── COLOUR THEMES ──────────────────────────────────────────── */
+
+/* Plum (default dark purple) */
+[data-theme="plum"] {
+  --theme-bg: #0c0718;
+  --theme-orb1: #6d28d9;
+  --theme-orb2: #a21caf;
+  --theme-orb3: #4338ca;
+  --theme-gradient: linear-gradient(135deg, #c084fc 0%, #818cf8 50%, #e879f9 100%);
+
+  --color-surface: #120d22;
+  --color-on-surface: #ede9fe;
+  --color-primary: #c084fc;
+  --color-primary-container: #7c3aed;
+  --color-on-primary-container: #e9d5ff;
+  --color-secondary: #a78bfa;
+  --color-surface-container-low: rgba(255, 255, 255, 0.07);
+  --color-surface-container-lowest: rgba(255, 255, 255, 0.05);
+  --color-surface-container-high: rgba(255, 255, 255, 0.11);
+  --color-surface-container-highest: rgba(255, 255, 255, 0.15);
+  --color-outline-variant: rgba(167, 139, 250, 0.22);
+  --color-tertiary: #c4b5fd;
+  --color-on-tertiary: #1e0050;
+  --color-primary-fixed: rgba(124, 58, 237, 0.18);
+  --color-on-primary-fixed-variant: #c084fc;
+}
+
+/* Havgrå (Norwegian sea gray) */
+[data-theme="havgra"] {
+  --theme-bg: #060e18;
+  --theme-orb1: #1a3f6b;
+  --theme-orb2: #0d4f4f;
+  --theme-orb3: #1e3550;
+  --theme-gradient: linear-gradient(135deg, #7ec8e3 0%, #94a3b8 50%, #38bdf8 100%);
+
+  --color-surface: #0a1522;
+  --color-on-surface: #cfd9e5;
+  --color-primary: #7ec8e3;
+  --color-primary-container: #1a4a6b;
+  --color-on-primary-container: #b0d4e5;
+  --color-secondary: #8faabb;
+  --color-surface-container-low: rgba(255, 255, 255, 0.06);
+  --color-surface-container-lowest: rgba(255, 255, 255, 0.04);
+  --color-surface-container-high: rgba(255, 255, 255, 0.10);
+  --color-surface-container-highest: rgba(255, 255, 255, 0.14);
+  --color-outline-variant: rgba(100, 160, 190, 0.20);
+  --color-tertiary: #93c5db;
+  --color-on-tertiary: #00293c;
+  --color-primary-fixed: rgba(30, 70, 110, 0.22);
+  --color-on-primary-fixed-variant: #7ec8e3;
+}
+
+/* Daylight (light theme, havgrå accent) */
+[data-theme="daylight"] {
+  --theme-bg: #eef3f7;
+  --theme-orb1: #b8d4e8;
+  --theme-orb2: #c9dce8;
+  --theme-orb3: #a8c8d8;
+  --theme-gradient: linear-gradient(135deg, #2a7fa8 0%, #1a6080 50%, #38a0c0 100%);
+
+  --color-surface: #f5f8fb;
+  --color-on-surface: #1a2a35;
+  --color-primary: #1a6080;
+  --color-primary-container: #cce3ef;
+  --color-on-primary-container: #0d3d52;
+  --color-secondary: #4a7a90;
+  --color-surface-container-low: rgba(255, 255, 255, 0.75);
+  --color-surface-container-lowest: rgba(255, 255, 255, 0.92);
+  --color-surface-container-high: rgba(200, 220, 235, 0.65);
+  --color-surface-container-highest: rgba(180, 205, 220, 0.70);
+  --color-outline-variant: rgba(26, 96, 128, 0.18);
+  --color-tertiary: #1a6080;
+  --color-on-tertiary: #ffffff;
+  --color-primary-fixed: rgba(180, 215, 235, 0.55);
+  --color-on-primary-fixed-variant: #1a6080;
+}
+
+/* Latte (sand / caramel) */
+[data-theme="latte"] {
+  --theme-bg: #f5ede0;
+  --theme-orb1: #dbc4a0;
+  --theme-orb2: #d4b896;
+  --theme-orb3: #e0cba8;
+  --theme-gradient: linear-gradient(135deg, #92400e 0%, #b45309 45%, #d97706 100%);
+
+  --color-surface: #faf6ef;
+  --color-on-surface: #3d2b14;
+  --color-primary: #92400e;
+  --color-primary-container: #f3e4d0;
+  --color-on-primary-container: #5c3310;
+  --color-secondary: #8b6b3e;
+  --color-surface-container-low: rgba(255, 252, 245, 0.75);
+  --color-surface-container-lowest: rgba(255, 253, 248, 0.92);
+  --color-surface-container-high: rgba(235, 220, 195, 0.65);
+  --color-surface-container-highest: rgba(220, 200, 175, 0.70);
+  --color-outline-variant: rgba(146, 64, 14, 0.18);
+  --color-tertiary: #92400e;
+  --color-on-tertiary: #ffffff;
+  --color-primary-fixed: rgba(220, 195, 160, 0.55);
+  --color-on-primary-fixed-variant: #92400e;
+}
+
+/* ─── GLOBAL DARK BACKGROUND (themed) ───────────────────────── */
+[data-theme] {
+  background-color: var(--theme-bg);
+}
+
+[data-theme] body,
+[data-theme] #root > div {
+  background-color: transparent;
+}
+
+/* ─── GLASSMORPHISM FOR CARDS ────────────────────────────────── */
+/* Dark themes: glass blur over orbs */
+[data-theme="plum"] .bg-surface-container-lowest,
+[data-theme="plum"] .bg-surface-container-low,
+[data-theme="plum"] .bg-surface-container-high,
+[data-theme="plum"] .bg-surface-container-highest,
+[data-theme="havgra"] .bg-surface-container-lowest,
+[data-theme="havgra"] .bg-surface-container-low,
+[data-theme="havgra"] .bg-surface-container-high,
+[data-theme="havgra"] .bg-surface-container-highest {
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+/* Daylight & Latte: opaque cards, no glass needed */
+[data-theme="daylight"] .bg-surface-container-lowest,
+[data-theme="daylight"] .bg-surface-container-low,
+[data-theme="daylight"] .bg-surface-container-high,
+[data-theme="daylight"] .bg-surface-container-highest,
+[data-theme="latte"] .bg-surface-container-lowest,
+[data-theme="latte"] .bg-surface-container-low,
+[data-theme="latte"] .bg-surface-container-high,
+[data-theme="latte"] .bg-surface-container-highest {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ─── ANIMATED ORB LAYER ─────────────────────────────────────── */
+.orb-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.55;
+}
+
+.orb-1 {
+  width: 70vw;
+  height: 70vw;
+  background: radial-gradient(circle, var(--theme-orb1), transparent 70%);
+  top: -25%;
+  left: -15%;
+  animation: orb-drift-1 20s ease-in-out infinite alternate;
+}
+
+.orb-2 {
+  width: 55vw;
+  height: 55vw;
+  background: radial-gradient(circle, var(--theme-orb2), transparent 70%);
+  bottom: -15%;
+  right: -10%;
+  animation: orb-drift-2 25s ease-in-out infinite alternate;
+}
+
+.orb-3 {
+  width: 45vw;
+  height: 45vw;
+  background: radial-gradient(circle, var(--theme-orb3), transparent 70%);
+  top: 45%;
+  left: 45%;
+  animation: orb-drift-3 30s ease-in-out infinite alternate;
+}
+
+@keyframes orb-drift-1 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(18vw, 22vh) scale(1.2); }
+}
+
+@keyframes orb-drift-2 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-22vw, -18vh) scale(0.9); }
+}
+
+@keyframes orb-drift-3 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-28vw, 18vh) scale(1.15); }
+}
+
+/* ─── GRADIENT TEXT ──────────────────────────────────────────── */
+.gradient-text {
+  background-image: var(--theme-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ─── APP ROOT STACKING ──────────────────────────────────────── */
+.themed-root {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── GLASS TOPBAR & BOTTOM NAV ──────────────────────────────── */
+[data-theme="plum"] header,
+[data-theme="havgra"] header,
+[data-theme="daylight"] header,
+[data-theme="latte"] header {
+  background: rgba(0, 0, 0, 0.28) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none !important;
+}
+
+[data-theme="plum"] nav,
+[data-theme="havgra"] nav,
+[data-theme="daylight"] nav,
+[data-theme="latte"] nav {
+  background: rgba(0, 0, 0, 0.28) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none !important;
+}
+
+/* Orbs on daylight/latte — more visible */
+[data-theme="daylight"] .orb,
+[data-theme="latte"] .orb {
+  opacity: 0.8;
+  filter: blur(70px);
+}
+
+/* ─── VEHICLE POPUP OVERRIDES ────────────────────────────────── */
+/* Dark themes: dark frosted glass */
+[data-theme="plum"] .vehicle-popup {
+  background: rgba(22, 10, 38, 0.78) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+}
+[data-theme="havgra"] .vehicle-popup {
+  background: rgba(12, 18, 24, 0.78) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+}
+/* Light themes: frosted glass effect */
+[data-theme="daylight"] .vehicle-popup {
+  background: rgba(240, 247, 252, 0.88) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+}
+[data-theme="latte"] .vehicle-popup {
+  background: rgba(245, 237, 224, 0.88) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+}
+
+/* ─── STOP POPUP (MapLibre) OVERRIDES ────────────────────────── */
+[data-theme="plum"] .maplibregl-popup-content {
+  background: rgba(22, 10, 38, 0.78) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  color: #e9d5ff;
+}
+[data-theme="plum"] .maplibregl-popup-tip {
+  border-top-color: rgba(22, 10, 38, 0.78) !important;
+  border-bottom-color: rgba(22, 10, 38, 0.78) !important;
+}
+[data-theme="havgra"] .maplibregl-popup-content {
+  background: rgba(12, 18, 24, 0.78) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(100, 160, 190, 0.15);
+  color: #cbd5e1;
+}
+[data-theme="havgra"] .maplibregl-popup-tip {
+  border-top-color: rgba(12, 18, 24, 0.78) !important;
+  border-bottom-color: rgba(12, 18, 24, 0.78) !important;
+}
+[data-theme="daylight"] .maplibregl-popup-content {
+  background: rgba(240, 247, 252, 0.78) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(26, 96, 128, 0.12);
+  color: #1a2a35;
+}
+[data-theme="daylight"] .maplibregl-popup-tip {
+  border-top-color: rgba(240, 247, 252, 0.78) !important;
+  border-bottom-color: rgba(240, 247, 252, 0.78) !important;
+}
+[data-theme="latte"] .maplibregl-popup-content {
+  background: rgba(245, 237, 224, 0.78) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(146, 64, 14, 0.12);
+  color: #3d2b14;
+}
+[data-theme="latte"] .maplibregl-popup-tip {
+  border-top-color: rgba(245, 237, 224, 0.78) !important;
+  border-bottom-color: rgba(245, 237, 224, 0.78) !important;
+}
+.maplibregl-popup-content {
+  border-radius: 20px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ─── TOP BAR MENU OPACITY OVERRIDES ─────────────────────────── */
+[data-theme="plum"] .topbar-menu-panel,
+[data-theme="havgra"] .topbar-menu-panel,
+[data-theme="plum"] .topbar-dialog-panel,
+[data-theme="havgra"] .topbar-dialog-panel,
+[data-theme="plum"] .topbar-dialog-footer,
+[data-theme="havgra"] .topbar-dialog-footer {
+  background: rgba(16, 18, 24, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+}
+
+[data-theme="daylight"] .topbar-menu-panel,
+[data-theme="daylight"] .topbar-dialog-panel,
+[data-theme="daylight"] .topbar-dialog-footer,
+[data-theme="latte"] .topbar-menu-panel,
+[data-theme="latte"] .topbar-dialog-panel,
+[data-theme="latte"] .topbar-dialog-footer {
+  background: rgba(248, 251, 253, 0.97) !important;
+  border-color: rgba(26, 96, 128, 0.16) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+[data-theme="plum"] .topbar-menu-item:hover,
+[data-theme="havgra"] .topbar-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="daylight"] .topbar-menu-item:hover,
+[data-theme="latte"] .topbar-menu-item:hover {
+  background: rgba(26, 96, 128, 0.08) !important;
+}
