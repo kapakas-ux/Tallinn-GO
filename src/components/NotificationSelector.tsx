@@ -39,13 +39,19 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      className="absolute right-0 top-0 mt-12 z-[100] bg-surface-container-lowest editorial-shadow rounded-2xl p-4 w-48 border border-outline-variant/20"
-      onClick={(e) => e.stopPropagation()}
-    >
+    <>
+      {/* Invisible overlay to catch outside clicks */}
+      <div 
+        className="fixed inset-0 z-[99]"
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        className="absolute right-0 top-0 mt-12 z-[100] bg-surface-container-lowest editorial-shadow rounded-2xl p-4 w-48 border border-outline-variant/20 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
       <div className="flex items-center justify-between mb-3">
         <h4 className="font-headline font-bold text-xs text-primary uppercase tracking-widest">Set Alert</h4>
         <button onClick={onClose} className="text-secondary hover:text-primary">
@@ -69,6 +75,7 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
           <Bell className="w-3 h-3" /> 10 Minutes Before
         </button>
       </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 };

@@ -34,8 +34,13 @@ export const TopBar = () => {
 
   return (
     <>
-      <header className="w-full top-0 sticky z-50 bg-primary shadow-md pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between px-6 py-4 w-full relative">
+      <header className="w-full top-0 sticky z-50 bg-primary shadow-md pt-[env(safe-area-inset-top)] isolate">
+        <div className="nav-orb-layer">
+          <div className="nav-orb nav-orb-1" />
+          <div className="nav-orb nav-orb-2" />
+          <div className="nav-orb nav-orb-3" />
+        </div>
+        <div className="flex items-center justify-between px-6 py-4 w-full relative z-10">
           <div className="flex items-center gap-4">
             <button 
               ref={menuButtonRef}

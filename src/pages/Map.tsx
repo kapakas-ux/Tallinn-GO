@@ -609,7 +609,7 @@ export const Map = () => {
       const coordinates = feature.geometry ? (feature.geometry as any).coordinates.slice() : [feature.lng, feature.lat];
       
       const popupContent = document.createElement('div');
-      popupContent.className = 'p-4 pb-8 min-w-[240px] max-h-[50vh] overflow-y-auto overflow-x-hidden font-body no-scrollbar';
+      popupContent.className = 'relative p-4 pb-8 min-w-[240px] max-h-[50vh] overflow-y-auto overflow-x-hidden font-body no-scrollbar';
       
       let intervalId: any;
 
@@ -731,7 +731,7 @@ export const Map = () => {
 
             // Create a temporary overlay for selection
             const overlay = document.createElement('div');
-            overlay.className = 'absolute inset-0 bg-surface-container-lowest/95 z-50 flex flex-col items-center justify-center p-4 text-center rounded-[20px]';
+              overlay.className = 'absolute inset-0 backdrop-blur-md bg-surface/90 z-[100] flex flex-col items-center justify-center p-4 text-center rounded-[16px] overflow-hidden min-h-full';
             overlay.innerHTML = `
               <h4 class="font-headline font-bold text-xs text-primary uppercase tracking-widest mb-2">Set Alert</h4>
               <p class="text-[10px] text-secondary mb-4 leading-tight">Notify me before ${line} to ${dest} departs.</p>
@@ -868,7 +868,7 @@ export const Map = () => {
 
       <button 
         onClick={handleLocateMe}
-        className="absolute bottom-4 right-4 z-10 bg-white p-3 rounded-full shadow-lg border border-surface-container-high hover:bg-surface-container-low transition-colors group"
+        className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-10 bg-white p-3 rounded-full shadow-lg border border-surface-container-high hover:bg-surface-container-low transition-colors group"
         title="Locate me"
       >
         <Navigation className={`w-5 h-5 ${userLocation ? 'text-blue-600 fill-blue-600' : 'text-primary'}`} />
@@ -892,7 +892,7 @@ export const Map = () => {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="vehicle-popup absolute bottom-0 left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col max-h-[calc(100%-3rem)]"
+            className="vehicle-popup absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col max-h-[calc(100%-3rem)]"
           >
             <div className="w-full flex justify-center pt-3 pb-2" onClick={() => setSelectedVehicle(null)}>
               <div className="w-12 h-1.5 bg-outline-variant/30 rounded-full" />

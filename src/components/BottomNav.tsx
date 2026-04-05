@@ -35,14 +35,19 @@ export const BottomNav = () => {
   ];
 
   return (
-    <nav className="w-full flex justify-around items-center px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-surface z-50 rounded-t-xl shadow-[0_-4px_24px_rgba(28,28,26,0.06)]">
+    <nav className="absolute bottom-0 left-0 right-0 w-full flex justify-around items-center px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-surface z-50 rounded-t-xl shadow-[0_-4px_24px_rgba(28,28,26,0.06)] isolate overflow-hidden">
+      <div className="nav-orb-layer">
+        <div className="nav-orb nav-orb-1" />
+        <div className="nav-orb nav-orb-2" />
+        <div className="nav-orb nav-orb-3" />
+      </div>
       {navItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
           className={({ isActive }) =>
             cn(
-              "flex flex-col items-center justify-center px-5 py-2 transition-all duration-200 active:scale-90",
+              "flex flex-col items-center justify-center px-5 py-2 transition-all duration-200 active:scale-90 relative z-10",
               isActive 
                 ? "bg-primary-fixed text-primary rounded-xl" 
                 : "text-secondary hover:text-primary"

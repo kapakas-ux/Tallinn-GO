@@ -79,31 +79,30 @@
 
 /* MapLibre Popup Custom Styling */
 .maplibregl-popup-close-button {
-  font-size: 28px !important;
-  color: #ba1a1a !important;
-  font-weight: 900 !important;
-  padding: 8px !important;
-  right: 2px !important;
-  top: 2px !important;
+  font-size: 24px !important;
+  color: var(--secondary) !important;
+  font-weight: 500 !important;
+  padding: 0 !important;
+  right: 12px !important;
+  top: 12px !important;
   transition: all 0.2s ease;
-  border-radius: 8px !important;
+  border-radius: 9999px !important;
   line-height: 1 !important;
-  width: 40px !important;
-  height: 40px !important;
+  width: 32px !important;
+  height: 32px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background: transparent !important;
+  background: var(--surface-container-high) !important;
   border: none !important;
   cursor: pointer !important;
   outline: none !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
 }
 
 .maplibregl-popup-close-button:hover {
-  background-color: rgba(186, 26, 26, 0.15) !important;
+  background-color: var(--surface-container-highest) !important;
+  color: var(--primary) !important;
   transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(186, 26, 26, 0.2) !important;
 }
 
 .maplibregl-popup-content {
@@ -111,6 +110,12 @@
   padding: 0 !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
   border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left,
+.maplibregl-ctrl-bottom-center {
+  bottom: calc(5rem + env(safe-area-inset-bottom)) !important;
 }
 
 .maplibregl-popup-tip {
@@ -126,6 +131,9 @@
   --theme-orb1: #6d28d9;
   --theme-orb2: #a21caf;
   --theme-orb3: #4338ca;
+    --nav-orb1: #b288e8;
+    --nav-orb2: #a872cc;
+    --nav-orb3: #d197e8;
   --theme-gradient: linear-gradient(135deg, #c084fc 0%, #818cf8 50%, #e879f9 100%);
 
   --color-surface: #120d22;
@@ -151,6 +159,9 @@
   --theme-orb1: #1a3f6b;
   --theme-orb2: #0d4f4f;
   --theme-orb3: #1e3550;
+    --nav-orb1: #6db1d1;
+    --nav-orb2: #65b8b8;
+    --nav-orb3: #6e8fa8;
   --theme-gradient: linear-gradient(135deg, #7ec8e3 0%, #94a3b8 50%, #38bdf8 100%);
 
   --color-surface: #0a1522;
