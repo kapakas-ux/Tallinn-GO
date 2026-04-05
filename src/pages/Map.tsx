@@ -858,7 +858,7 @@ export const Map = () => {
 
   return (
     <div className="h-full w-full relative overflow-hidden bg-surface-container-high">
-      <div className="absolute top-4 left-4 z-10 bg-surface-container-lowest/60 backdrop-blur-md px-2 py-1 rounded-full text-[8px] font-label font-bold text-secondary uppercase tracking-wider pointer-events-none shadow-sm border border-outline-variant/20">
+      <div className="absolute left-4 z-10 bg-surface-container-lowest/60 backdrop-blur-md px-2 py-1 rounded-full text-[8px] font-label font-bold text-secondary uppercase tracking-wider pointer-events-none shadow-sm border border-outline-variant/20" style={{ top: 'calc(4.5rem + env(safe-area-inset-top))' }}>
         OpenFreeMap, OSM & Transpordiamet
       </div>
 

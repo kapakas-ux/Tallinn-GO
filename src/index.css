@@ -388,12 +388,13 @@
 [data-theme="daylight"] header,
 [data-theme="latte"] header {
   background: rgba(0, 0, 0, 0.28) !important;
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: none !important;
-  transform: translate3d(0, 0, 0);
-  -webkit-transform: translate3d(0, 0, 0);
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
   -webkit-clip-path: inset(0 0 0 0 round 0 0 32px 32px);
   clip-path: inset(0 0 0 0 round 0 0 32px 32px);
 }
@@ -403,12 +404,13 @@
 [data-theme="daylight"] nav,
 [data-theme="latte"] nav {
   background: rgba(0, 0, 0, 0.28) !important;
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: none !important;
-  transform: translate3d(0, 0, 0);
-  -webkit-transform: translate3d(0, 0, 0);
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
   -webkit-clip-path: inset(0 0 0 0 round 32px 32px 0 0);
   clip-path: inset(0 0 0 0 round 32px 32px 0 0);
 }
