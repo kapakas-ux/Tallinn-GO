@@ -44,8 +44,14 @@ export const TopBar = () => {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <Link to="/" className="flex items-center active:scale-95 transition-transform">
-              <div className="logo-gradient-mask" />
+            <Link to="/" className="flex items-center active:scale-95 transition-transform group relative">
+              <div className="absolute -inset-2 bg-black/20 blur-md rounded-full opacity-60" />
+              <div className="absolute -inset-3 bg-primary/30 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <img 
+                src="/logo.png" 
+                alt="GO NOW" 
+                className="h-7 object-contain relative z-10 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+              />
             </Link>
           </div>
 
