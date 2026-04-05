@@ -118,6 +118,12 @@
   bottom: calc(5rem + env(safe-area-inset-bottom)) !important;
 }
 
+.maplibregl-ctrl-top-right,
+.maplibregl-ctrl-top-left,
+.maplibregl-ctrl-top-center {
+  top: calc(4.5rem + env(safe-area-inset-top)) !important;
+}
+
 .maplibregl-popup-tip {
   border-top-color: #ffffff !important;
   border-bottom-color: #ffffff !important;
