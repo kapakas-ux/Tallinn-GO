@@ -373,7 +373,7 @@
 [data-theme="latte"] header {
   /* don't override position so sticky works */
   background: transparent !important;
-      border-radius: 32px 32px 0 0 !important;
+  border-radius: 0 0 32px 32px !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: none !important;
 }
@@ -389,6 +389,8 @@
   background: rgba(0, 0, 0, 0.28) !important;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom-left-radius: 32px;
+  border-bottom-right-radius: 32px;
   pointer-events: none;
 }
 
