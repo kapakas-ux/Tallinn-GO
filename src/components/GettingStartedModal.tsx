@@ -12,7 +12,7 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
       onClick={onClose}
     >
       <div 
-        className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+        className="settings-panel w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">

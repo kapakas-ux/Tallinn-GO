@@ -35,7 +35,7 @@ export const SettingsModal = ({ onClose }: Props) => {
       onClick={handleClose}
     >
       <div
-        className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] border border-outline-variant/10"
+        className="settings-panel w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] border border-outline-variant/10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

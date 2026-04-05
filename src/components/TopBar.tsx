@@ -45,11 +45,7 @@ export const TopBar = () => {
               <Menu className="w-6 h-6" />
             </button>
             <Link to="/" className="flex items-center active:scale-95 transition-transform">
-              <img 
-                src="/logo.png" 
-                alt="GO NOW" 
-                className="h-7 object-contain"
-              />
+              <div className="logo-gradient-mask" />
             </Link>
           </div>
 
@@ -135,7 +131,7 @@ export const TopBar = () => {
           onClick={() => setIsTermsOpen(false)}
         >
           <div 
-            className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            className="settings-panel w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
@@ -213,7 +209,7 @@ export const TopBar = () => {
           onClick={() => setIsPrivacyOpen(false)}
         >
           <div 
-            className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            className="settings-panel w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
