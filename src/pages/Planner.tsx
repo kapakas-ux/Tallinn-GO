@@ -130,12 +130,12 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
               {fmtDuration(itinerary.duration)}
             </span>
             <p className="font-label text-[10px] uppercase tracking-widest text-secondary font-bold mt-0.5">
-              {label} Â· {itinerary.transfers === 0 ? 'Direct' : `${itinerary.transfers} transfer${itinerary.transfers > 1 ? 's' : ''}`}
+              {label} &middot; {itinerary.transfers === 0 ? 'Direct' : `${itinerary.transfers} transfer${itinerary.transfers > 1 ? 's' : ''}`}
             </p>
           </div>
           <div className="text-right">
             <p className="font-headline font-bold text-base text-on-surface">
-              {fmtTime(itinerary.startTime)} â€” {fmtTime(itinerary.endTime)}
+              {fmtTime(itinerary.startTime)} &ndash; {fmtTime(itinerary.endTime)}
             </p>
             <p className="font-label text-[10px] text-secondary mt-0.5">
               {leavesInMin > 0 ? `Leaves in ${leavesInMin} min` : leavesInMin === 0 ? 'Leaving now' : 'Departed'}
@@ -165,7 +165,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
           ))}
           {itinerary.walkDistance > 0 && (
             <span className="ml-auto font-label text-[9px] text-secondary uppercase tracking-wide">
-              ðŸš¶ {fmtDistance(itinerary.walkDistance)} walk
+              {fmtDistance(itinerary.walkDistance)} walk total
             </span>
           )}
         </div>
@@ -210,7 +210,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
                     </p>
                   ) : (
                     <p className="text-xs text-secondary mt-0.5">
-                      Walk {fmtDistance(leg.distance)} Â· {Math.ceil(leg.duration / 60)} min
+                      Walk {fmtDistance(leg.distance)} &middot; {Math.ceil(leg.duration / 60)} min
                     </p>
                   )}
                 </div>

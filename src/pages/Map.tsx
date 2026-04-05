@@ -839,6 +839,23 @@ export const Map = () => {
     };
   }, [styleLoadCount, stops]);
 
+  // Fly to coords when navigating here from Planner with ?lat=&lng=&zoom=
+  useEffect(() => {
+    if (!map.current) return;
+    const searchParams = new URLSearchParams(location.search);
+    const latParam = searchParams.get('lat');
+    const lngParam = searchParams.get('lng');
+    const zoomParam = searchParams.get('zoom');
+    if (latParam && lngParam) {
+      const lat = parseFloat(latParam);
+      const lng = parseFloat(lngParam);
+      const zoom = zoomParam ? parseFloat(zoomParam) : 14;
+      if (isValidLngLat(lng, lat)) {
+        map.current.flyTo({ center: [lng, lat], zoom, essential: true });
+      }
+    }
+  }, [location.search]);
+
   const handleLocateMe = () => {
     if (userLocation && map.current) {
       // Don't fly to 0,0
