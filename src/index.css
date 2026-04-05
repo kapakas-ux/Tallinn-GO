@@ -190,9 +190,9 @@
 /* Daylight (light theme, havgrå accent) */
 [data-theme="daylight"] {
   --theme-bg: #eef3f7;
-  --theme-orb1: #b8d4e8;
-  --theme-orb2: #c9dce8;
-  --theme-orb3: #a8c8d8;
+  --theme-orb1: #6bafd4;
+  --theme-orb2: #5ec0c0;
+  --theme-orb3: #7a9cc8;
   --theme-gradient: linear-gradient(135deg, #2a7fa8 0%, #1a6080 50%, #38a0c0 100%);
 
   --color-surface: #f5f8fb;
@@ -215,9 +215,9 @@
 /* Latte (sand / caramel) */
 [data-theme="latte"] {
   --theme-bg: #f5ede0;
-  --theme-orb1: #dbc4a0;
-  --theme-orb2: #d4b896;
-  --theme-orb3: #e0cba8;
+  --theme-orb1: #c89850;
+  --theme-orb2: #d4a050;
+  --theme-orb3: #b88040;
   --theme-gradient: linear-gradient(135deg, #92400e 0%, #b45309 45%, #d97706 100%);
 
   --color-surface: #faf6ef;
@@ -439,8 +439,18 @@
 /* Orbs on daylight/latte — more visible */
 [data-theme="daylight"] .orb,
 [data-theme="latte"] .orb {
-  opacity: 0.8;
-  filter: blur(70px);
+  opacity: 0.9;
+  filter: blur(60px);
+}
+
+/* ─── LOGO SHADOW (adapts to theme) ──────────────────────────── */
+.logo-shadow {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+}
+
+[data-theme="daylight"] .logo-shadow,
+[data-theme="latte"] .logo-shadow {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
 }
 
 /* ─── VEHICLE POPUP OVERRIDES ────────────────────────────────── */
