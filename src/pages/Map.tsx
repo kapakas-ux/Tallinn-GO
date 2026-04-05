@@ -737,8 +737,7 @@ export const Map = () => {
               <p class="text-[10px] text-secondary mb-4 leading-tight">Notify me before ${line} to ${dest} departs.</p>
               <div class="flex flex-col gap-2 w-full">
                 <button id="alert-5" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">5 Mins Before</button>
-                <button id="alert-10" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">10 Mins Before</button>
-                <button id="alert-cancel" class="py-1 text-[10px] text-secondary hover:text-primary mt-1 uppercase font-bold tracking-widest">Cancel</button>
+                <button id="alert-10" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">10 Mins Before</button>                  <button id="alert-15" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">15 Mins Before</button>                <button id="alert-cancel" class="py-1 text-[10px] text-secondary hover:text-primary mt-1 uppercase font-bold tracking-widest">Cancel</button>
               </div>
             `;
             popupContent.appendChild(overlay);
@@ -763,8 +762,7 @@ export const Map = () => {
             };
 
             overlay.querySelector('#alert-5')?.addEventListener('click', () => handleChoice(5));
-            overlay.querySelector('#alert-10')?.addEventListener('click', () => handleChoice(10));
-            overlay.querySelector('#alert-cancel')?.addEventListener('click', () => overlay.remove());
+            overlay.querySelector('#alert-10')?.addEventListener('click', () => handleChoice(10));              overlay.querySelector('#alert-15')?.addEventListener('click', () => handleChoice(15));            overlay.querySelector('#alert-cancel')?.addEventListener('click', () => overlay.remove());
           });
         });
 

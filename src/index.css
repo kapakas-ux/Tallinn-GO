@@ -373,6 +373,7 @@
 [data-theme="latte"] header {
   /* don't override position so sticky works */
   background: transparent !important;
+      border-radius: 32px 32px 0 0 !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: none !important;
 }
@@ -395,11 +396,12 @@
 [data-theme="havgra"] nav,
 [data-theme="daylight"] nav,
 [data-theme="latte"] nav {
-  position: relative;
-  background: transparent !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: none !important;
-}
+    background: transparent !important;
+      border-radius: 32px 32px 0 0 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: none !important;
+  }
+
 
 [data-theme="plum"] nav::before,
 [data-theme="havgra"] nav::before,
@@ -412,9 +414,30 @@
   background: rgba(0, 0, 0, 0.28) !important;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-top-left-radius: 0.75rem; /* rounded-t-xl matches Tailwind's xl */
-  border-top-right-radius: 0.75rem;
+  border-top-left-radius: 2rem; /* rounded-t-xl matches Tailwind's xl */
+  border-top-right-radius: 2rem;
   pointer-events: none;
+}
+
+/* Give header and nav themed solid tints so they pop off lit map backgrounds */
+[data-theme="plum"] header::before,
+[data-theme="plum"] nav::before {
+  background: rgba(22, 10, 38, 0.75) !important;
+}
+
+[data-theme="havgra"] header::before,
+[data-theme="havgra"] nav::before {
+  background: rgba(12, 18, 24, 0.75) !important;
+}
+
+[data-theme="daylight"] header::before,
+[data-theme="daylight"] nav::before {
+  background: rgba(240, 247, 252, 0.75) !important;
+}
+
+[data-theme="latte"] header::before,
+[data-theme="latte"] nav::before {
+  background: rgba(245, 237, 224, 0.75) !important;
 }
 
 /* Orbs on daylight/latte — more visible */

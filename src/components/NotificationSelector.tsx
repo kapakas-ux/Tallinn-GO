@@ -62,17 +62,23 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
         Notify me before {arrival.line} to {arrival.destination} departs from {stop.name}.
       </p>
       <div className="space-y-2">
-        <button 
+        <button
           onClick={() => handleSchedule(5)}
           className="w-full py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
         >
           <Bell className="w-3 h-3" /> 5 Minutes Before
         </button>
-        <button 
+        <button
           onClick={() => handleSchedule(10)}
           className="w-full py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
         >
           <Bell className="w-3 h-3" /> 10 Minutes Before
+        </button>
+        <button
+          onClick={() => handleSchedule(15)}
+          className="w-full py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
+        >
+          <Bell className="w-3 h-3" /> 15 Minutes Before
         </button>
       </div>
       </motion.div>

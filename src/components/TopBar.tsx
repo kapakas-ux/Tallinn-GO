@@ -237,7 +237,7 @@ export const TopBar = () => {
               </button>
             </div>
             <div className="p-6 overflow-y-auto font-sans text-sm text-on-surface-variant space-y-4">
-              <p>Tallinn GO ("we," "our," or "us") respects your privacy. This Privacy Policy explains how we handle your information when you use our app.</p>
+              <p>GO NOW ("we," "our," or "us") respects your privacy. This Privacy Policy explains how we handle your information when you use our app.</p>
               
               <div>
                 <h3 className="font-bold text-primary mb-1">Information We Collect</h3>

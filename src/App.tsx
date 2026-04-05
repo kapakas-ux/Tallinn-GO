@@ -79,7 +79,7 @@ function AppContent() {
         <div className="themed-root h-full flex flex-col overflow-hidden relative">
         <TopBar />
         <main className={`flex-1 overflow-y-auto no-scrollbar overscroll-none ${
-          location.pathname === '/map' ? '' : 'pb-[calc(5rem+env(safe-area-inset-bottom))]'
+          location.pathname.startsWith('/map') ? '' : 'pb-[calc(5rem+env(safe-area-inset-bottom))]'
         }`}>
           <Routes>
             <Route path="/" element={<Dashboard />} />

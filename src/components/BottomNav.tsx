@@ -35,7 +35,7 @@ export const BottomNav = () => {
   ];
 
   return (
-    <nav className="absolute bottom-0 left-0 right-0 w-full flex justify-around items-center px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-surface z-50 rounded-t-xl shadow-[0_-4px_24px_rgba(28,28,26,0.06)] isolate overflow-hidden">
+    <nav className="absolute bottom-0 left-0 right-0 w-full flex justify-around items-center px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-50 rounded-t-[32px] shadow-[0_-4px_24px_rgba(28,28,26,0.06)] isolate overflow-hidden">
       <div className="nav-orb-layer">
         <div className="nav-orb nav-orb-1" />
         <div className="nav-orb nav-orb-2" />
