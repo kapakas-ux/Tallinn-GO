@@ -512,6 +512,24 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
 }
 
+/* ─── NOTIFICATION SELECTOR POPUP ────────────────────────────── */
+.notification-selector-popup {
+  background: #ffffff;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+[data-theme="plum"] .notification-selector-popup {
+  background: #1e1030;
+}
+[data-theme="havgra"] .notification-selector-popup {
+  background: #111820;
+}
+[data-theme="daylight"] .notification-selector-popup {
+  background: #f0f7fc;
+}
+[data-theme="latte"] .notification-selector-popup {
+  background: #f5ede0;
+}
+
 /* ─── VEHICLE POPUP OVERRIDES ────────────────────────────────── */
 .vehicle-popup {
   background: rgba(255, 255, 255, 0.96) !important;

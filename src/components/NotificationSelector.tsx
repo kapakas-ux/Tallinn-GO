@@ -1,6 +1,5 @@
-import React, { useRef, useState, useLayoutEffect } from 'react';
+import React, { useRef } from 'react';
 import { Bell, X } from 'lucide-react';
-import { motion } from 'motion/react';
 import { Stop, Arrival } from '../types';
 import { scheduleDepartureNotification } from '../services/notificationService';
 import { addActiveAlert } from '../services/alertService';
@@ -14,17 +13,6 @@ interface NotificationSelectorProps {
 
 export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: NotificationSelectorProps) => {
   const popupRef = useRef<HTMLDivElement>(null);
-  const [openAbove, setOpenAbove] = useState(false);
-
-  useLayoutEffect(() => {
-    const el = popupRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    // If popup bottom would go below the viewport minus navbar height (~5rem = 80px)
-    if (rect.bottom > window.innerHeight - 90) {
-      setOpenAbove(true);
-    }
-  }, []);
   const handleSchedule = async (minutesBefore: number) => {
     const success = await scheduleDepartureNotification(
       stop.name,
@@ -54,15 +42,12 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
     <>
       {/* Invisible overlay to catch outside clicks */}
       <div 
-        className="fixed inset-0 z-[99]"
+        className="fixed inset-0 z-[99] bg-black/40"
         onClick={(e) => { e.stopPropagation(); onClose(); }}
       />
-      <motion.div
+      <div
         ref={popupRef}
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        className={`absolute right-0 z-[100] bg-surface-container-lowest editorial-shadow rounded-2xl p-4 w-48 border border-outline-variant/20 shadow-2xl ${openAbove ? 'bottom-full mb-2' : 'top-0 mt-12'}`}
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] rounded-2xl p-5 w-56 border border-outline-variant/20 shadow-2xl notification-selector-popup"
         onClick={(e) => e.stopPropagation()}
       >
       <div className="flex items-center justify-between mb-3">
@@ -94,7 +79,7 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
           <Bell className="w-3 h-3" /> 15 Minutes Before
         </button>
       </div>
-      </motion.div>
+      </div>
     </>
   );
 };
