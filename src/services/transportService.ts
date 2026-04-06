@@ -106,6 +106,52 @@ let routesPromise: Promise<void> | null = null;
 let stopsByIdMap: Map<string, Stop> | null = null;
 let stopsByBaseIdMap: Map<string, Stop> | null = null;
 
+const STOPS_CACHE_KEY = 'tallinngo_stops_v1';
+
+function getCachedStops(): Stop[] | null {
+  try {
+    const raw = localStorage.getItem(STOPS_CACHE_KEY);
+    if (!raw) return null;
+    const { stops } = JSON.parse(raw);
+    if (!Array.isArray(stops) || stops.length === 0) return null;
+    return stops;
+  } catch {
+    return null;
+  }
+}
+
+function cacheStops(stops: Stop[]): void {
+  try {
+    localStorage.setItem(STOPS_CACHE_KEY, JSON.stringify({ stops }));
+  } catch (e) {
+    console.warn('Failed to cache stops:', e);
+  }
+}
+
+function populateStopLookups(stops: Stop[]): void {
+  stopsByIdMap = new Map();
+  stopsByBaseIdMap = new Map();
+  for (const stop of stops) {
+    stopsByIdMap.set(stop.id, stop);
+    const baseId = stop.id.split('-')[0];
+    if (!stopsByBaseIdMap.has(baseId)) {
+      stopsByBaseIdMap.set(baseId, stop);
+    }
+    // Populate stopsMap for vehicle destination resolution
+    const normId = stop.id.replace(/^0+/, '');
+    const normBaseId = baseId.replace(/^0+/, '');
+    [stop.id, normId, baseId, normBaseId].forEach(key => {
+      if (key && !stopsMap[key]) stopsMap[key] = stop.name;
+    });
+    if (stop.siriId) {
+      const normSiri = stop.siriId.replace(/^0+/, '');
+      [stop.siriId, normSiri].forEach(key => {
+        if (key && !stopsMap[key]) stopsMap[key] = stop.name;
+      });
+    }
+  }
+}
+
 /**
  * Robust coordinate parser that handles both integers (multiplied) and floats
  */
@@ -239,7 +285,36 @@ export async function fetchRoutes(): Promise<void> {
 export async function fetchStops(): Promise<Stop[]> {
   if (stopsPromise) return stopsPromise;
   
-  stopsPromise = (async () => {
+  // Return cached stops instantly, refresh in background
+  const cached = getCachedStops();
+  if (cached) {
+    console.log(`fetchStops: returning ${cached.length} cached stops instantly`);
+    populateStopLookups(cached);
+    stopsPromise = Promise.resolve(cached);
+    // Background refresh: fetch fresh data and update cache for next launch
+    fetchStopsFresh().then(fresh => {
+      if (fresh.length > 0) {
+        cacheStops(fresh);
+        populateStopLookups(fresh);
+        console.log(`fetchStops: background refresh cached ${fresh.length} stops`);
+      }
+    }).catch(e => console.warn('Background stops refresh failed:', e));
+    return stopsPromise;
+  }
+
+  stopsPromise = fetchStopsFresh().then(stops => {
+    if (stops.length > 0) cacheStops(stops);
+    return stops;
+  }).catch(error => {
+    console.error('Error fetching stops:', error);
+    stopsPromise = null;
+    return [];
+  });
+
+  return stopsPromise;
+}
+
+async function fetchStopsFresh(): Promise<Stop[]> {
     if (Object.keys(routesMap).length === 0) {
       await fetchRoutes();
     }
@@ -417,25 +492,13 @@ export async function fetchStops(): Promise<Stop[]> {
       
       console.log(`Successfully parsed ${stops.length} stops from peatus.ee.`);
       
-      stopsByIdMap = new Map();
-      stopsByBaseIdMap = new Map();
-      for (const stop of stops) {
-        stopsByIdMap.set(stop.id, stop);
-        const baseId = stop.id.split('-')[0];
-        if (!stopsByBaseIdMap.has(baseId)) {
-          stopsByBaseIdMap.set(baseId, stop);
-        }
-      }
+      populateStopLookups(stops);
       
       return stops;
     } catch (error) {
       console.error('Error fetching/parsing stops from peatus.ee:', error);
-      stopsPromise = null;
       return [];
     }
-  })();
-  
-  return stopsPromise;
 }
 
 let cachedVehicles: Vehicle[] = [];
