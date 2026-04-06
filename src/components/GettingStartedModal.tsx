@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Star, Bell, MapPin, Navigation, Clock } from 'lucide-react';
+import { X, Star, Bell, MapPin, Navigation, Clock, Route, History } from 'lucide-react';
 
 interface GettingStartedModalProps {
   onClose: () => void;
@@ -85,6 +85,30 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
                 <h3 className="font-bold text-primary text-base mb-1">Live Location</h3>
                 <p>
                   Enable GPS to automatically see the closest stop and its live departures right when you open the app.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center shrink-0 mt-1">
+                <Route className="w-5 h-5 text-indigo-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-primary text-base mb-1">Journey Planner</h3>
+                <p>
+                  Plan your trip from A to B! Choose "Leave now", "Leave at", or "Arrive by" and pick a date and time to find the best routes with step-by-step directions.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="w-10 h-10 rounded-full bg-teal-500/10 flex items-center justify-center shrink-0 mt-1">
+                <History className="w-5 h-5 text-teal-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-primary text-base mb-1">Recent Searches</h3>
+                <p>
+                  Your last 6 journey searches are saved on the planner page so you can quickly re-plan a frequent route with a single tap.
                 </p>
               </div>
             </div>
