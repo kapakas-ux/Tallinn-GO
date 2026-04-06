@@ -1123,8 +1123,8 @@ export const Map = () => {
 
   return (
     <div className="h-full w-full relative overflow-hidden bg-surface-container-high">
-      <div className="absolute left-4 z-10 bg-surface-container-lowest/60 backdrop-blur-md px-2 py-1 rounded-full text-[8px] font-label font-bold text-secondary uppercase tracking-wider pointer-events-none shadow-sm border border-outline-variant/20" style={{ top: 'calc(4.5rem + env(safe-area-inset-top))' }}>
-        OpenFreeMap, OSM & Transpordiamet
+      <div className="absolute left-4 z-10 bg-surface-container-lowest/60 backdrop-blur-md px-2 py-1 rounded-full text-[8px] font-label font-bold text-secondary uppercase tracking-wider shadow-sm border border-outline-variant/20" style={{ top: 'calc(4.5rem + env(safe-area-inset-top))' }}>
+        <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer" className="no-underline text-inherit">OpenFreeMap</a>, <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="no-underline text-inherit">OSM</a>, <a href="https://www.opentripplanner.org" target="_blank" rel="noopener noreferrer" className="no-underline text-inherit">OTP</a> & <a href="https://transpordiamet.ee" target="_blank" rel="noopener noreferrer" className="no-underline text-inherit">Transpordiamet</a>
       </div>
 
 
@@ -1155,7 +1155,7 @@ export const Map = () => {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="vehicle-popup absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col"
+            className="vehicle-popup absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-0 right-0 z-50 rounded-t-[32px] editorial-shadow flex flex-col"
             style={{ maxHeight: 'calc(60vh)' }}
           >
             <div className="w-full flex justify-center pt-3 pb-2" onClick={() => setSelectedVehicle(null)}>
