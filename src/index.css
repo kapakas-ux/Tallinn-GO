@@ -159,23 +159,6 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
   border: 1px solid rgba(0, 0, 0, 0.05) !important;
   background: rgba(255, 255, 255, 0.96) !important;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-}
-.maplibregl-popup-content::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  z-index: -1;
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .maplibregl-popup-content {
-    background: transparent !important;
-  }
 }
 
 .maplibregl-ctrl-bottom-right,
@@ -530,45 +513,13 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 
 /* ─── VEHICLE POPUP OVERRIDES ────────────────────────────────── */
-/* Use ::before pseudo-element for blur because transform on motion.div breaks backdrop-filter on Android WebView */
 .vehicle-popup {
   background: rgba(255, 255, 255, 0.96) !important;
-  position: relative;
-  isolation: isolate;
 }
-.vehicle-popup::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  z-index: -1;
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .vehicle-popup {
-    background: transparent !important;
-  }
-}
-/* Dark themes */
 [data-theme="plum"] .vehicle-popup { background: rgba(22, 10, 38, 0.96) !important; }
-[data-theme="plum"] .vehicle-popup::before { background: rgba(22, 10, 38, 0.92); }
 [data-theme="havgra"] .vehicle-popup { background: rgba(12, 18, 24, 0.96) !important; }
-[data-theme="havgra"] .vehicle-popup::before { background: rgba(12, 18, 24, 0.92); }
-/* Light themes */
 [data-theme="daylight"] .vehicle-popup { background: rgba(240, 247, 252, 0.96) !important; }
-[data-theme="daylight"] .vehicle-popup::before { background: rgba(240, 247, 252, 0.94); }
 [data-theme="latte"] .vehicle-popup { background: rgba(245, 237, 224, 0.96) !important; }
-[data-theme="latte"] .vehicle-popup::before { background: rgba(245, 237, 224, 0.94); }
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  [data-theme="plum"] .vehicle-popup,
-  [data-theme="havgra"] .vehicle-popup,
-  [data-theme="daylight"] .vehicle-popup,
-  [data-theme="latte"] .vehicle-popup {
-    background: transparent !important;
-  }
-}
 
 /* ─── STOP POPUP (MapLibre) OVERRIDES ────────────────────────── */
 [data-theme="plum"] .maplibregl-popup-content {
@@ -576,91 +527,41 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   border: 1px solid rgba(168, 85, 247, 0.15);
   color: #e9d5ff;
 }
-[data-theme="plum"] .maplibregl-popup-content::before {
-  background: rgba(22, 10, 38, 0.92);
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  [data-theme="plum"] .maplibregl-popup-content {
-    background: transparent !important;
-  }
-}
 [data-theme="plum"] .maplibregl-popup-tip {
-  border-top-color: rgba(22, 10, 38, 0.92) !important;
-  border-bottom-color: rgba(22, 10, 38, 0.92) !important;
+  border-top-color: rgba(22, 10, 38, 0.96) !important;
+  border-bottom-color: rgba(22, 10, 38, 0.96) !important;
 }
 [data-theme="havgra"] .maplibregl-popup-content {
   background: rgba(12, 18, 24, 0.96) !important;
   border: 1px solid rgba(100, 160, 190, 0.15);
   color: #cbd5e1;
 }
-[data-theme="havgra"] .maplibregl-popup-content::before {
-  background: rgba(12, 18, 24, 0.92);
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  [data-theme="havgra"] .maplibregl-popup-content {
-    background: transparent !important;
-  }
-}
 [data-theme="havgra"] .maplibregl-popup-tip {
-  border-top-color: rgba(12, 18, 24, 0.92) !important;
-  border-bottom-color: rgba(12, 18, 24, 0.92) !important;
+  border-top-color: rgba(12, 18, 24, 0.96) !important;
+  border-bottom-color: rgba(12, 18, 24, 0.96) !important;
 }
 [data-theme="daylight"] .maplibregl-popup-content {
   background: rgba(240, 247, 252, 0.96) !important;
   border: 1px solid rgba(26, 96, 128, 0.12);
   color: #1a2a35;
 }
-[data-theme="daylight"] .maplibregl-popup-content::before {
-  background: rgba(240, 247, 252, 0.92);
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  [data-theme="daylight"] .maplibregl-popup-content {
-    background: transparent !important;
-  }
-}
 [data-theme="daylight"] .maplibregl-popup-tip {
-  border-top-color: rgba(240, 247, 252, 0.92) !important;
-  border-bottom-color: rgba(240, 247, 252, 0.92) !important;
+  border-top-color: rgba(240, 247, 252, 0.96) !important;
+  border-bottom-color: rgba(240, 247, 252, 0.96) !important;
 }
 [data-theme="latte"] .maplibregl-popup-content {
   background: rgba(245, 237, 224, 0.96) !important;
   border: 1px solid rgba(146, 64, 14, 0.12);
   color: #3d2b14;
 }
-[data-theme="latte"] .maplibregl-popup-content::before {
-  background: rgba(245, 237, 224, 0.92);
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  [data-theme="latte"] .maplibregl-popup-content {
-    background: transparent !important;
-  }
-}
 [data-theme="latte"] .maplibregl-popup-tip {
-  border-top-color: rgba(245, 237, 224, 0.92) !important;
-  border-bottom-color: rgba(245, 237, 224, 0.92) !important;
+  border-top-color: rgba(245, 237, 224, 0.96) !important;
+  border-bottom-color: rgba(245, 237, 224, 0.96) !important;
 }
 .maplibregl-popup-content {
   border-radius: 20px !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
   background: rgba(255, 255, 255, 0.96) !important;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-}
-.maplibregl-popup-content::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  z-index: -1;
-}
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .maplibregl-popup-content {
-    background: transparent !important;
-  }
 }
 
 /* ─── TOP BAR MENU OPACITY OVERRIDES ─────────────────────────── */
