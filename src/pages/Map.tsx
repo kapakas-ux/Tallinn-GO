@@ -965,60 +965,72 @@ export const Map = () => {
           console.error(`journey: error adding leg ${i} (${leg.mode}):`, err);
         }
 
-        // Add informational marker at the start of each leg
-        const el = document.createElement('div');
-        el.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
+        // Add informational markers — skip if this leg's start overlaps with the next leg's start
+        // (to avoid double-stacking at transfer points)
+        const isFirstLeg = i === 0;
+        const isLastLeg = i === itinerary.legs.length - 1;
 
+        // Skip walk markers that start at the same place as start/end — those get dedicated markers
+        const isAtStart = isFirstLeg;
+        const isAtEnd = isLastLeg;
+
+        // For walk legs, place the label at the midpoint of the walk to avoid overlap with adjacent transit markers
         if (leg.mode === 'WALK') {
-          // Walk marker: show walk icon + duration + distance
           const walkMins = Math.round(leg.duration / 60);
           const walkDist = leg.distance < 1000 ? `${Math.round(leg.distance)}m` : `${(leg.distance / 1000).toFixed(1)}km`;
-          el.innerHTML = `
-            <div style="background: white; border: 2px solid #9ca3af; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 16px;">
-              🚶
-            </div>
-            <div style="background: white; color: #374151; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 8px; margin-top: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); white-space: nowrap; text-align: center; line-height: 1.3;">
-              ${walkMins} min · ${walkDist}
-            </div>
-          `;
+          if (walkMins > 0 && coords.length >= 2) {
+            const midIdx = Math.floor(coords.length / 2);
+            const midCoord = coords[midIdx];
+            const walkEl = document.createElement('div');
+            walkEl.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
+            walkEl.innerHTML = `
+              <div style="background: white; border: 2px solid #9ca3af; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 14px;">
+                🚶
+              </div>
+              <div style="background: white; color: #374151; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); white-space: nowrap; text-align: center;">
+                ${walkMins} min · ${walkDist}
+              </div>
+            `;
+            journeyMarkers.current.push(
+              new maplibregl.Marker({ element: walkEl, anchor: 'center' }).setLngLat(midCoord).addTo(m)
+            );
+          }
         } else {
-          // Transit marker: show mode icon + route number + stop name + time
+          // Transit marker: place at boarding stop
           const color = modeColor(leg.mode);
           const routeLabel = leg.routeShortName || leg.mode;
+          const el = document.createElement('div');
+          el.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
           el.innerHTML = `
-            <div style="background: ${color}; color: white; border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-              <span style="font-size: 14px;">${modeEmoji(leg.mode)}</span>
+            <div style="background: ${color}; color: white; border-radius: 12px; padding: 3px 8px; font-size: 11px; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 3px; white-space: nowrap;">
+              <span style="font-size: 12px;">${modeEmoji(leg.mode)}</span>
               ${routeLabel}
             </div>
-            <div style="background: white; color: #374151; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 8px; margin-top: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); white-space: nowrap; text-align: center; max-width: 140px; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;">
-              ${leg.from.name || 'Board here'}<br/>
-              <span style="color: #6b7280; font-size: 9px;">${fmtTime(leg.startTime)}</span>
+            <div style="background: white; color: #374151; font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); white-space: nowrap; text-align: center; max-width: 130px; overflow: hidden; text-overflow: ellipsis;">
+              ${leg.from.name || 'Board'} · ${fmtTime(leg.startTime)}
             </div>
           `;
-        }
+          // Offset transit markers slightly above the point so they don't overlap with start/end
+          journeyMarkers.current.push(
+            new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([leg.from.lon, leg.from.lat]).addTo(m)
+          );
 
-        const marker = new maplibregl.Marker({ element: el, anchor: 'top' })
-          .setLngLat([leg.from.lon, leg.from.lat])
-          .addTo(m);
-        journeyMarkers.current.push(marker);
-
-        // For transit legs, add an "alight" marker at the end if it's a transfer point (not the final destination)
-        if (leg.mode !== 'WALK' && i < itinerary.legs.length - 1) {
-          const legColor = modeColor(leg.mode);
-          const alightEl = document.createElement('div');
-          alightEl.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
-          alightEl.innerHTML = `
-            <div style="background: white; border: 2px solid ${legColor}; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.12);">
-              <div style="width: 10px; height: 10px; border-radius: 50%; background: ${legColor};"></div>
-            </div>
-            <div style="background: white; color: #374151; font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">
-              ${leg.to.name || 'Alight'} · ${fmtTime(leg.endTime)}
-            </div>
-          `;
-          const alightMarker = new maplibregl.Marker({ element: alightEl, anchor: 'top' })
-            .setLngLat([leg.to.lon, leg.to.lat])
-            .addTo(m);
-          journeyMarkers.current.push(alightMarker);
+          // Alight marker — only if this is NOT the last leg (final destination gets its own marker)
+          if (!isLastLeg) {
+            const alightEl = document.createElement('div');
+            alightEl.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
+            alightEl.innerHTML = `
+              <div style="background: white; border: 2px solid ${color}; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1);">
+                <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color};"></div>
+              </div>
+              <div style="background: white; color: #6b7280; font-size: 8px; font-weight: 600; padding: 1px 4px; border-radius: 4px; margin-top: 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap; max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
+                ${leg.to.name || 'Alight'} · ${fmtTime(leg.endTime)}
+              </div>
+            `;
+            journeyMarkers.current.push(
+              new maplibregl.Marker({ element: alightEl, anchor: 'top' }).setLngLat([leg.to.lon, leg.to.lat]).addTo(m)
+            );
+          }
         }
       });
 

@@ -36,7 +36,7 @@ export const BottomNav = () => {
   ];
 
   return (
-    <nav className="absolute bottom-0 left-0 right-0 w-full flex justify-around items-center px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-50 rounded-t-[32px] shadow-[0_-4px_24px_rgba(28,28,26,0.06)]">
+    <nav className="absolute bottom-0 left-0 right-0 w-full flex justify-evenly items-center px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-50 rounded-t-[32px] shadow-[0_-4px_24px_rgba(28,28,26,0.06)]">
       <div className="nav-orb-layer">
         <div className="nav-orb nav-orb-1" />
         <div className="nav-orb nav-orb-2" />
@@ -48,7 +48,7 @@ export const BottomNav = () => {
           to={item.to}
           className={({ isActive }) =>
             cn(
-              "flex flex-col items-center justify-center px-5 py-2 transition-all duration-200 active:scale-90 relative z-10",
+              "flex flex-col items-center justify-center w-[72px] py-2 transition-all duration-200 active:scale-90 relative z-10",
               isActive 
                 ? "bg-primary-fixed text-primary rounded-xl" 
                 : "text-secondary hover:text-primary"

@@ -3,13 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import {
   MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram,
-  Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon
+  Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon, Route as RouteIcon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { fetchStops, planJourney } from '../services/transportService';
 import { watchLocation } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
 import type { Stop, PlanItinerary, LegMode } from '../types';
+
+// ─── search history ─────────────────────────────────────────────
+interface SearchEntry { from: string; to: string; timestamp: number }
+const HISTORY_KEY = 'planner_search_history';
+const MAX_HISTORY = 5;
+
+function getSearchHistory(): SearchEntry[] {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+}
+function saveSearch(from: string, to: string) {
+  const history = getSearchHistory().filter(h => !(h.from === from && h.to === to));
+  history.unshift({ from, to, timestamp: Date.now() });
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
+}
 
 // â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -267,6 +281,7 @@ export const Planner = () => {
   const [error, setError] = useState<string | null>(null);
   const [itineraries, setItineraries] = useState<PlanItinerary[]>([]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [searchHistory, setSearchHistory] = useState<SearchEntry[]>(() => getSearchHistory());
 
   // Track the exact selected stop objects to avoid ambiguity when names collide
   const selectedFromStop = useRef<Stop | null>(null);
@@ -336,7 +351,7 @@ export const Planner = () => {
     try {
       const results = await planJourney(fromCoords.lat, fromCoords.lon, toCoords.lat, toCoords.lon);
       if (!results.length) setError('No routes found between these stops.');
-      else { setItineraries(results); setExpandedIndex(0); }
+      else { setItineraries(results); setExpandedIndex(0); saveSearch(from, to); setSearchHistory(getSearchHistory()); }
     } catch (e) {
       console.error(e);
       setError('Could not fetch routes. Check your connection.');
@@ -352,7 +367,7 @@ export const Planner = () => {
 
   return (
     <div className="max-w-2xl mx-auto px-4 pb-8 pt-4" ref={containerRef}>
-      <h1 className="font-headline font-black text-on-surface text-2xl mb-6 px-2">Plan a Journey</h1>
+      <h1 className="font-headline font-black text-2xl mb-6 px-2 gradient-text">Plan a Journey</h1>
 
       {/* Search inputs */}
       <section className="relative bg-surface-container-low p-4 rounded-[20px] mb-6 shadow-sm">
@@ -476,6 +491,46 @@ export const Planner = () => {
           )}
         </button>
       </section>
+
+      {/* Recent searches */}
+      {searchHistory.length > 0 && itineraries.length === 0 && !isLoading && (
+        <section className="mb-6">
+          <div className="flex items-center justify-between px-2 mb-2">
+            <div className="flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-secondary" />
+              <h2 className="font-label font-bold text-[10px] uppercase tracking-widest text-secondary">Recent</h2>
+            </div>
+            <button
+              onClick={() => { localStorage.removeItem(HISTORY_KEY); setSearchHistory([]); }}
+              className="text-[9px] font-label text-secondary/50 uppercase tracking-wider hover:text-primary transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {searchHistory.map((entry, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setFrom(entry.from);
+                  setTo(entry.to);
+                  selectedFromStop.current = null;
+                  selectedToStop.current = null;
+                }}
+                className="flex items-center gap-3 bg-surface-container-lowest p-3 rounded-[14px] shadow-sm hover:bg-surface-container-low transition-all text-left active:scale-[0.98]"
+              >
+                <div className="bg-surface-container-high p-2 rounded-full shrink-0">
+                  <RouteIcon className="w-4 h-4 text-secondary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-headline font-bold text-sm text-on-surface truncate">{entry.from === 'Current Location' ? '📍 Current Location' : entry.from}</p>
+                  <p className="text-[10px] text-secondary truncate">→ {entry.to}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Error */}
       {error && (
