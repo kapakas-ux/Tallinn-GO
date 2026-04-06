@@ -116,18 +116,18 @@ export const MiniMap = ({ userLocation, stops, onStopClick }: MiniMapProps) => {
       // Highlight the first (closest) stop with a larger marker or different style
       const isClosest = idx === 0;
       el.className = `relative flex items-center justify-center rounded-full border-2 border-white shadow-md cursor-pointer ${
-        isClosest ? 'w-8 h-8 bg-primary z-10' : 'w-6 h-6 bg-secondary'
+        isClosest ? 'w-5 h-5 bg-primary z-10' : 'w-3.5 h-3.5 bg-secondary'
       }`;
       
       // Add a small dot or icon inside
       if (isClosest) {
         el.innerHTML = `
           <div class="absolute w-full h-full bg-primary rounded-full opacity-40 animate-ping"></div>
-          <div class="relative w-2 h-2 bg-white rounded-full"></div>
+          <div class="relative w-1.5 h-1.5 bg-white rounded-full"></div>
         `;
       } else {
         el.innerHTML = `
-          <div class="w-1.5 h-1.5 bg-white rounded-full"></div>
+          <div class="w-1 h-1 bg-white rounded-full"></div>
         `;
       }
       

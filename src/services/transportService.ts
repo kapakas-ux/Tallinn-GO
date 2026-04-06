@@ -712,6 +712,112 @@ export async function fetchTripStoptimes(tripId: string): Promise<TripStoptime[]
   }
 }
 
+/**
+ * Fetch scheduled stoptimes for a vehicle's current trip.
+ * 1. Look up the OTP route by line name
+ * 2. Match the pattern by destination/headsign
+ * 3. Use fuzzyTrip to find the closest active trip
+ * 4. Return stoptimes
+ */
+export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripStoptime[]> {
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  const timeSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+  // Step 1: Find the route and its patterns
+  const routeQuery = `{
+    routes(name: "${vehicle.line}") {
+      gtfsId
+      shortName
+      patterns {
+        directionId
+        headsign
+      }
+    }
+  }`;
+
+  try {
+    const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+
+    const fetchGql = async (q: string) => {
+      let text = '';
+      if (Capacitor.isNativePlatform()) {
+        const response = await CapacitorHttp.post({
+          url,
+          headers: { 'Content-Type': 'application/json' },
+          data: { query: q }
+        });
+        text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+      } else {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q })
+        });
+        text = await response.text();
+      }
+      return JSON.parse(text);
+    };
+
+    const routeData = await fetchGql(routeQuery);
+    const routes = routeData?.data?.routes;
+    if (!routes || routes.length === 0) return [];
+
+    // Find the route matching the line number
+    const normLine = vehicle.line.replace(/^0+/, '');
+    const route = routes.find((r: any) => (r.shortName || '').replace(/^0+/, '') === normLine) || routes[0];
+    if (!route?.gtfsId) return [];
+
+    // Match direction by destination
+    const vDest = (vehicle.destination || '').toLowerCase();
+    let direction = 0;
+    if (route.patterns && route.patterns.length > 1) {
+      const match = route.patterns.find((p: any) => {
+        const h = (p.headsign || '').toLowerCase();
+        return h.includes(vDest) || vDest.includes(h);
+      });
+      if (match) direction = match.directionId ?? 0;
+    }
+
+    // Step 2: fuzzyTrip to get the current trip's stoptimes
+    const tripQuery = `{
+      fuzzyTrip(route: "${route.gtfsId}", direction: ${direction}, date: "${dateStr}", time: ${timeSeconds}) {
+        gtfsId
+        stoptimes {
+          stop { gtfsId name }
+          scheduledArrival
+          scheduledDeparture
+        }
+      }
+    }`;
+
+    const tripData = await fetchGql(tripQuery);
+    const stoptimes = tripData?.data?.fuzzyTrip?.stoptimes;
+    if (!stoptimes || !Array.isArray(stoptimes)) return [];
+
+    return stoptimes.map((st: any) => {
+      const arrSec = st.scheduledArrival ?? 0;
+      const depSec = st.scheduledDeparture ?? 0;
+      const fmtTime = (s: number) => {
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      };
+      return {
+        stopName: st.stop?.name ?? '',
+        stopId: (st.stop?.gtfsId ?? '').replace('estonia:', ''),
+        scheduledArrival: arrSec,
+        scheduledDeparture: depSec,
+        arrivalTime: fmtTime(arrSec),
+        departureTime: fmtTime(depSec),
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching vehicle trip stoptimes:', error);
+    return [];
+  }
+}
+
 export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]> {
   if (Object.keys(routeStopsMap).length === 0) {
     await fetchRoutes();

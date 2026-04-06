@@ -677,12 +677,12 @@ export const Stops = () => {
 
       {/* Departures Modal */}
       {selectedStop && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div 
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setSelectedStop(null)}
           />
-          <div className="relative w-full max-w-lg bg-surface rounded-t-[32px] sm:rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
+          <div className="relative w-full max-w-lg bg-surface rounded-t-[32px] sm:rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] pb-[calc(4.5rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom duration-300">
             <div className="p-6 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container-lowest">
               <div className="flex items-center gap-4">
                 <button 
@@ -697,7 +697,7 @@ export const Stops = () => {
                   <Star className={cn("w-6 h-6", isFavorite(selectedStop.id) && "fill-current")} />
                 </button>
                 <div>
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <h3 className="font-headline text-2xl font-black text-primary tracking-tight leading-tight">{selectedStop.name}</h3>
                     {selectedStop.desc && (
                       <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest bg-surface-container-high px-1.5 py-0.5 rounded-md">
@@ -788,14 +788,7 @@ export const Stops = () => {
               )}
             </div>
             
-            <div className="p-6 bg-surface-container-lowest border-t border-outline-variant/10">
-              <button 
-                onClick={() => setSelectedStop(null)}
-                className="w-full py-4 bg-primary text-on-primary rounded-full font-headline font-bold text-lg shadow-lg active:scale-95 transition-all"
-              >
-                Close Schedule
-              </button>
-            </div>
+
           </div>
         </div>
       )}

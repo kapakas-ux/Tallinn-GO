@@ -13,7 +13,8 @@ import { getDistance } from '../lib/geo';
 import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
 import { scheduleDepartureNotification } from '../services/notificationService';
 import { addActiveAlert, getActiveAlerts, isAlertActive } from '../services/alertService';
-import { getRouteStopsForVehicle } from '../services/transportService';
+import { getRouteStopsForVehicle, fetchVehicleTripStoptimes } from '../services/transportService';
+import type { TripStoptime } from '../services/transportService';
 import { VehicleMap } from '../components/VehicleMap';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -52,6 +53,7 @@ export const Map = () => {
   const [pulsatingStopId, setPulsatingStopId] = useState(null as string | null);
   const [scheduledAlerts, setScheduledAlerts] = useState<any[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<{ vehicle: Vehicle, routeStops: Stop[] } | null>(null);
+  const [tripStoptimes, setTripStoptimes] = useState<TripStoptime[]>([]);
 
   const [stops, setStops] = useState([] as Stop[]);
   const [vehicles, setVehicles] = useState([] as Vehicle[]);
@@ -320,6 +322,8 @@ export const Map = () => {
           e.stopPropagation();
           const routeStops = await getRouteStopsForVehicle(vehicle);
           setSelectedVehicle({ vehicle, routeStops });
+          setTripStoptimes([]);
+          fetchVehicleTripStoptimes(vehicle).then(st => setTripStoptimes(st));
         });
 
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
@@ -1155,8 +1159,8 @@ export const Map = () => {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="vehicle-popup absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-0 right-0 z-50 rounded-t-[32px] editorial-shadow flex flex-col"
-            style={{ maxHeight: 'calc(60vh)' }}
+            className="vehicle-popup absolute bottom-0 left-0 right-0 z-50 rounded-t-[32px] editorial-shadow flex flex-col"
+            style={{ maxHeight: 'calc(100vh - 4.5rem - env(safe-area-inset-top))', paddingBottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
           >
             <div className="w-full flex justify-center pt-3 pb-2" onClick={() => setSelectedVehicle(null)}>
               <div className="w-12 h-1.5 bg-outline-variant/30 rounded-full" />
@@ -1197,7 +1201,9 @@ export const Map = () => {
                 {selectedVehicle.routeStops.length === 0 ? (
                   <p className="text-sm text-secondary px-2">Route data not available</p>
                 ) : (
-                  selectedVehicle.routeStops.map((stop, idx) => (
+                  selectedVehicle.routeStops.map((stop, idx) => {
+                    const st = tripStoptimes.find(t => t.stopName === stop.name);
+                    return (
                     <div key={idx} className="flex items-center gap-3 px-2 py-1">
                       <div className="flex flex-col items-center self-stretch">
                         <div className={cn(
@@ -1208,16 +1214,20 @@ export const Map = () => {
                           <div className="w-0.5 h-full bg-outline-variant/30 my-1" />
                         )}
                       </div>
-                      <div className="pb-2">
+                      <div className="pb-2 flex-1 flex items-center justify-between">
                         <span className={cn(
                           "font-headline font-bold text-sm",
                           idx === 0 ? "text-primary" : "text-secondary"
                         )}>
                           {stop.name}
                         </span>
+                        {st && (
+                          <span className="font-label text-xs text-secondary tabular-nums">{st.departureTime}</span>
+                        )}
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
