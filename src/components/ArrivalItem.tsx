@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Arrival, Stop } from '../types';
-import { getRouteStopsForArrival } from '../services/transportService';
+import { getRouteStopsForArrival, fetchTripStoptimes, TripStoptime } from '../services/transportService';
 import { cn, getVehicleColorClass } from '../lib/utils';
 import { CheckCircle2, ChevronDown, ChevronUp, MapPin, Bell } from 'lucide-react';
 import { VehicleMap } from './VehicleMap';
@@ -26,6 +26,7 @@ export function getLiveMinutes(arrival: Arrival): number {
 export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive, expandable = true }: ArrivalItemProps) {
   const [expanded, setExpanded] = useState(false);
   const [routeStops, setRouteStops] = useState<Stop[]>([]);
+  const [tripStoptimes, setTripStoptimes] = useState<TripStoptime[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [liveMinutes, setLiveMinutes] = useState(() => getLiveMinutes(arrival));
@@ -41,6 +42,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
   useEffect(() => {
     setExpanded(false);
     setRouteStops([]);
+    setTripStoptimes([]);
     setHasFetched(false);
   }, [arrival.type, arrival.line, arrival.destination, arrival.vehicleIndex]);
 
@@ -52,9 +54,13 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
     const fetchData = async () => {
       try {
         setLoading(true);
-        const stops = await getRouteStopsForArrival(arrival);
+        const [stops, stoptimes] = await Promise.all([
+          getRouteStopsForArrival(arrival),
+          arrival.tripId ? fetchTripStoptimes(arrival.tripId) : Promise.resolve([]),
+        ]);
         if (!isMounted) return;
         setRouteStops(stops);
+        setTripStoptimes(stoptimes);
       } catch (error) {
         console.error("Error fetching route:", error);
       } finally {
@@ -173,27 +179,57 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                 }}
               >
                 <div className="text-xs font-bold text-secondary uppercase tracking-wider mb-1 sticky top-0 bg-surface-container-lowest z-10 py-1">Route Stops</div>
-                {routeStops.map((routeStop, i) => {
-                  const isTarget = stop && (
-                    routeStop.id === stop.id || 
-                    routeStop.id.startsWith(stop.id.split('-')[0] + '-') ||
-                    routeStop.name.toLowerCase() === stop.name.toLowerCase()
-                  );
-                  return (
-                    <div 
-                      key={i} 
-                      data-target={isTarget ? "true" : "false"}
-                      className={cn("flex items-center gap-3 text-sm", isTarget ? "font-bold text-primary" : "text-secondary")}
-                    >
-                      <div className={cn("w-2 h-2 rounded-full relative", isTarget ? "bg-primary animate-pulse" : "bg-primary/20")}>
-                        {i !== routeStops.length - 1 && (
-                          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-primary/10" />
-                        )}
+                {tripStoptimes.length > 0 ? (
+                  /* Use trip stoptimes (has schedule times) */
+                  tripStoptimes.map((st, i) => {
+                    const isTarget = stop && (
+                      st.stopId === stop.id ||
+                      st.stopId === stop.gtfsId ||
+                      st.stopId.startsWith(stop.id.split('-')[0]) ||
+                      st.stopName.toLowerCase() === stop.name.toLowerCase()
+                    );
+                    return (
+                      <div 
+                        key={i} 
+                        data-target={isTarget ? "true" : "false"}
+                        className={cn("flex items-center gap-3 text-sm", isTarget ? "font-bold text-primary" : "text-secondary")}
+                      >
+                        <div className={cn("w-2 h-2 rounded-full relative shrink-0", isTarget ? "bg-primary animate-pulse" : "bg-primary/20")}>
+                          {i !== tripStoptimes.length - 1 && (
+                            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-primary/10" />
+                          )}
+                        </div>
+                        <span className="truncate flex-1">{st.stopName}</span>
+                        <span className={cn("font-label text-[11px] tabular-nums shrink-0", isTarget ? "text-primary font-bold" : "text-secondary/70")}>
+                          {st.departureTime}
+                        </span>
                       </div>
-                      <span className="truncate">{routeStop.name}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                ) : (
+                  /* Fallback: route stops without times */
+                  routeStops.map((routeStop, i) => {
+                    const isTarget = stop && (
+                      routeStop.id === stop.id || 
+                      routeStop.id.startsWith(stop.id.split('-')[0] + '-') ||
+                      routeStop.name.toLowerCase() === stop.name.toLowerCase()
+                    );
+                    return (
+                      <div 
+                        key={i} 
+                        data-target={isTarget ? "true" : "false"}
+                        className={cn("flex items-center gap-3 text-sm", isTarget ? "font-bold text-primary" : "text-secondary")}
+                      >
+                        <div className={cn("w-2 h-2 rounded-full relative shrink-0", isTarget ? "bg-primary animate-pulse" : "bg-primary/20")}>
+                          {i !== routeStops.length - 1 && (
+                            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-primary/10" />
+                          )}
+                        </div>
+                        <span className="truncate">{routeStop.name}</span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}

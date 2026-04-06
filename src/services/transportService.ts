@@ -639,6 +639,79 @@ function parseVehiclesFromGpsText(text: string): Vehicle[] {
   return vehicles;
 }
 
+export interface TripStoptime {
+  stopName: string;
+  stopId: string;
+  scheduledArrival: number;   // seconds from midnight
+  scheduledDeparture: number; // seconds from midnight
+  arrivalTime: string;        // "HH:MM"
+  departureTime: string;      // "HH:MM"
+}
+
+/**
+ * Fetch per-stop schedule times for a specific trip (by tripId from peatus.ee).
+ * Returns an ordered list of stops with their scheduled arrival/departure times.
+ */
+export async function fetchTripStoptimes(tripId: string): Promise<TripStoptime[]> {
+  if (!tripId) return [];
+
+  const query = `{
+    trip(id: "${tripId}") {
+      stoptimes {
+        stop { gtfsId name }
+        scheduledArrival
+        scheduledDeparture
+      }
+    }
+  }`;
+
+  try {
+    const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+    let text = '';
+
+    if (Capacitor.isNativePlatform()) {
+      const response = await CapacitorHttp.post({
+        url,
+        headers: { 'Content-Type': 'application/json' },
+        data: { query }
+      });
+      text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    } else {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      text = await response.text();
+    }
+
+    const data = JSON.parse(text);
+    const stoptimes = data?.data?.trip?.stoptimes;
+    if (!stoptimes || !Array.isArray(stoptimes)) return [];
+
+    return stoptimes.map((st: any) => {
+      const arrSec = st.scheduledArrival ?? 0;
+      const depSec = st.scheduledDeparture ?? 0;
+      const fmtTime = (s: number) => {
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      };
+      return {
+        stopName: st.stop?.name ?? '',
+        stopId: (st.stop?.gtfsId ?? '').replace('estonia:', ''),
+        scheduledArrival: arrSec,
+        scheduledDeparture: depSec,
+        arrivalTime: fmtTime(arrSec),
+        departureTime: fmtTime(depSec),
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching trip stoptimes:', error);
+    return [];
+  }
+}
+
 export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]> {
   if (Object.keys(routeStopsMap).length === 0) {
     await fetchRoutes();
@@ -1126,6 +1199,7 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
             headsign
             serviceDay
             trip {
+              gtfsId
               route {
                 shortName
                 mode
@@ -1234,7 +1308,8 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
         departureTimeSeconds,
         time: timeStr,
         status,
-        isRealtime: isRealTime
+        isRealtime: isRealTime,
+        tripId: st.trip?.gtfsId || undefined
       });
     }
 
