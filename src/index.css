@@ -550,6 +550,10 @@
 .maplibregl-popup-content {
   border-radius: 20px !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
 }
 
 /* ─── TOP BAR MENU OPACITY OVERRIDES ─────────────────────────── */

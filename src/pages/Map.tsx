@@ -911,6 +911,22 @@ export const Map = () => {
 
       const allCoords: [number, number][] = [];
 
+      const fmtTime = (ms: number) =>
+        new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const fmtDur = (sec: number) => {
+        const h = Math.floor(sec / 3600);
+        const mn = Math.floor((sec % 3600) / 60);
+        return h > 0 ? `${h}h ${mn}m` : `${mn} min`;
+      };
+
+      const modeEmoji = (mode: LegMode) => {
+        if (mode === 'WALK') return '🚶';
+        if (mode === 'TRAM') return '🚊';
+        if (mode === 'RAIL') return '🚆';
+        return '🚌';
+      };
+
       itinerary.legs.forEach((leg, i) => {
         const coords = decodePolyline(leg.legGeometry.points);
         console.log(`journey: leg ${i} (${leg.mode}): ${coords.length} coords`);
@@ -948,17 +964,104 @@ export const Map = () => {
         } catch (err) {
           console.error(`journey: error adding leg ${i} (${leg.mode}):`, err);
         }
+
+        // Add informational marker at the start of each leg
+        const el = document.createElement('div');
+        el.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
+
+        if (leg.mode === 'WALK') {
+          // Walk marker: show walk icon + duration + distance
+          const walkMins = Math.round(leg.duration / 60);
+          const walkDist = leg.distance < 1000 ? `${Math.round(leg.distance)}m` : `${(leg.distance / 1000).toFixed(1)}km`;
+          el.innerHTML = `
+            <div style="background: white; border: 2px solid #9ca3af; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 16px;">
+              🚶
+            </div>
+            <div style="background: white; color: #374151; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 8px; margin-top: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); white-space: nowrap; text-align: center; line-height: 1.3;">
+              ${walkMins} min · ${walkDist}
+            </div>
+          `;
+        } else {
+          // Transit marker: show mode icon + route number + stop name + time
+          const color = modeColor(leg.mode);
+          const routeLabel = leg.routeShortName || leg.mode;
+          el.innerHTML = `
+            <div style="background: ${color}; color: white; border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+              <span style="font-size: 14px;">${modeEmoji(leg.mode)}</span>
+              ${routeLabel}
+            </div>
+            <div style="background: white; color: #374151; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 8px; margin-top: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); white-space: nowrap; text-align: center; max-width: 140px; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;">
+              ${leg.from.name || 'Board here'}<br/>
+              <span style="color: #6b7280; font-size: 9px;">${fmtTime(leg.startTime)}</span>
+            </div>
+          `;
+        }
+
+        const marker = new maplibregl.Marker({ element: el, anchor: 'top' })
+          .setLngLat([leg.from.lon, leg.from.lat])
+          .addTo(m);
+        journeyMarkers.current.push(marker);
+
+        // For transit legs, add an "alight" marker at the end if it's a transfer point (not the final destination)
+        if (leg.mode !== 'WALK' && i < itinerary.legs.length - 1) {
+          const legColor = modeColor(leg.mode);
+          const alightEl = document.createElement('div');
+          alightEl.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
+          alightEl.innerHTML = `
+            <div style="background: white; border: 2px solid ${legColor}; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.12);">
+              <div style="width: 10px; height: 10px; border-radius: 50%; background: ${legColor};"></div>
+            </div>
+            <div style="background: white; color: #374151; font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">
+              ${leg.to.name || 'Alight'} · ${fmtTime(leg.endTime)}
+            </div>
+          `;
+          const alightMarker = new maplibregl.Marker({ element: alightEl, anchor: 'top' })
+            .setLngLat([leg.to.lon, leg.to.lat])
+            .addTo(m);
+          journeyMarkers.current.push(alightMarker);
+        }
       });
 
-      // Start / end markers
+      // Start marker (origin)
       const first = itinerary.legs[0];
       const last = itinerary.legs[itinerary.legs.length - 1];
-      if (first) journeyMarkers.current.push(
-        new maplibregl.Marker({ color: '#003571' }).setLngLat([first.from.lon, first.from.lat]).addTo(m)
-      );
-      if (last) journeyMarkers.current.push(
-        new maplibregl.Marker({ color: '#DC143C' }).setLngLat([last.to.lon, last.to.lat]).addTo(m)
-      );
+
+      if (first) {
+        const startEl = document.createElement('div');
+        startEl.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
+        startEl.innerHTML = `
+          <div style="background: #003571; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,53,113,0.4); font-size: 18px; border: 3px solid white;">
+            📍
+          </div>
+          <div style="background: #003571; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-top: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">
+            Start · ${fmtTime(itinerary.startTime)}
+          </div>
+        `;
+        journeyMarkers.current.push(
+          new maplibregl.Marker({ element: startEl, anchor: 'bottom' })
+            .setLngLat([first.from.lon, first.from.lat])
+            .addTo(m)
+        );
+      }
+
+      // End marker (destination)
+      if (last) {
+        const endEl = document.createElement('div');
+        endEl.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
+        endEl.innerHTML = `
+          <div style="background: #DC143C; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(220,20,60,0.4); font-size: 18px; border: 3px solid white;">
+            🏁
+          </div>
+          <div style="background: #DC143C; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-top: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">
+            ${last.to.name || 'Arrive'} · ${fmtTime(itinerary.endTime)}
+          </div>
+        `;
+        journeyMarkers.current.push(
+          new maplibregl.Marker({ element: endEl, anchor: 'bottom' })
+            .setLngLat([last.to.lon, last.to.lat])
+            .addTo(m)
+        );
+      }
 
       // Fit bounds
       if (allCoords.length) {
@@ -967,7 +1070,7 @@ export const Map = () => {
         console.log('journey: fitting bounds, total coords:', allCoords.length);
         m.fitBounds(
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-          { padding: 60, duration: 800 }
+          { padding: 80, duration: 800 }
         );
       }
     };
@@ -1040,7 +1143,8 @@ export const Map = () => {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="vehicle-popup absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col max-h-[calc(100%-3rem)]"
+            className="vehicle-popup absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-0 right-0 z-50 bg-surface-container-lowest rounded-t-[32px] editorial-shadow flex flex-col"
+            style={{ maxHeight: 'calc(60vh)' }}
           >
             <div className="w-full flex justify-center pt-3 pb-2" onClick={() => setSelectedVehicle(null)}>
               <div className="w-12 h-1.5 bg-outline-variant/30 rounded-full" />
