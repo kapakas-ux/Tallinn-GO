@@ -1437,32 +1437,27 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       console.error('Error fetching SIRI departures:', e);
     }
     
-    // Fetch regional/train departures from peatus.ee
-    const peatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, false);
-    arrivals = [...arrivals, ...peatusArrivals];
+    // Fetch ALL modes from peatus.ee to get tripIds and fill gaps
+    const allPeatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, true);
     
-    // If next departure is far away (> 15 mins) or we have very few departures,
-    // try Peatus for ALL modes to catch night buses or early morning gaps.
-    const nextDepartureMins = arrivals.length > 0 ? Math.min(...arrivals.map(a => a.minutes)) : Infinity;
-    
-    if (arrivals.length < 5 || nextDepartureMins > 15) {
-      console.log(`fetchDepartures: SIRI data sparse (next: ${nextDepartureMins}m, count: ${arrivals.length}), fetching all modes from Peatus for ${stopId}`);
-      const allPeatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, true);
+    // Merge peatus arrivals: enrich matching SIRI arrivals with tripId, add non-duplicates
+    allPeatusArrivals.forEach(pa => {
+      const matchIndex = arrivals.findIndex(a => 
+        a.line === pa.line && 
+        Math.abs(a.minutes - pa.minutes) < 3 &&
+        (a.destination.toLowerCase().includes(pa.destination.toLowerCase()) || 
+         pa.destination.toLowerCase().includes(a.destination.toLowerCase()))
+      );
       
-      // Merge allPeatusArrivals into arrivals, avoiding duplicates
-      allPeatusArrivals.forEach(pa => {
-        const isDuplicate = arrivals.some(a => 
-          a.line === pa.line && 
-          Math.abs(a.minutes - pa.minutes) < 3 &&
-          (a.destination.toLowerCase().includes(pa.destination.toLowerCase()) || 
-           pa.destination.toLowerCase().includes(a.destination.toLowerCase()))
-        );
-        
-        if (!isDuplicate) {
-          arrivals.push(pa);
+      if (matchIndex !== -1) {
+        // Enrich existing SIRI arrival with tripId
+        if (!arrivals[matchIndex].tripId && pa.tripId) {
+          arrivals[matchIndex].tripId = pa.tripId;
         }
-      });
-    }
+      } else {
+        arrivals.push(pa);
+      }
+    });
     
     // Sort by minutes ascending
     arrivals.sort((a, b) => a.minutes - b.minutes);
