@@ -25,14 +25,6 @@ const isValidLngLat = (lng: number, lat: number) => {
   return !isNaN(lng) && !isNaN(lat) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 };
 
-const vehicleColorByType = (type: Vehicle['type']): string => {
-  if (type === 'tram') return '#dc143c';
-  if (type === 'trolley') return '#003571';
-  if (type === 'train') return '#f37021';
-  if (type === 'regional') return '#059669';
-  return '#1d4ed8';
-};
-
 export const Map = () => {
   console.log('Map component rendering');
   const location = useLocation();
@@ -343,63 +335,6 @@ export const Map = () => {
         vehicleMarkers.current[vehicle.id] = marker;
       }
     });
-  }, [vehicles, styleLoadCount]);
-
-  // Robust vehicle layer fallback: rendered directly by MapLibre.
-  useEffect(() => {
-    if (!map.current || styleLoadCount === 0) return;
-
-    const m = map.current;
-    const validVehicles = vehicles.filter(v => isValidLngLat(v.lng, v.lat));
-    const vehicleGeoJson: GeoJSON.FeatureCollection<GeoJSON.Point> = {
-      type: 'FeatureCollection',
-      features: validVehicles.map(v => ({
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [v.lng, v.lat]
-        },
-        properties: {
-          id: v.id,
-          line: v.line,
-          destination: v.destination || '',
-          type: v.type,
-          color: vehicleColorByType(v.type)
-        }
-      }))
-    };
-
-    const existingSource = m.getSource('vehicles-live') as maplibregl.GeoJSONSource | undefined;
-    if (existingSource) {
-      existingSource.setData(vehicleGeoJson as any);
-    } else {
-      m.addSource('vehicles-live', {
-        type: 'geojson',
-        data: vehicleGeoJson as any
-      });
-
-      m.addLayer({
-        id: 'vehicles-live-circles',
-        type: 'circle',
-        source: 'vehicles-live',
-        minzoom: VEHICLE_VISIBILITY_MIN_ZOOM,
-        paint: {
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            VEHICLE_VISIBILITY_MIN_ZOOM, 3,
-            14, 6
-          ],
-          'circle-color': ['get', 'color'],
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 1.5,
-          'circle-opacity': 0.95
-        }
-      });
-
-
-    }
   }, [vehicles, styleLoadCount]);
 
   // Handle pulsating stop marker

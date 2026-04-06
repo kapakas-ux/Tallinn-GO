@@ -158,12 +158,17 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   padding: 0 !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
   border: 1px solid rgba(0, 0, 0, 0.05) !important;
-  background: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(255, 255, 255, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   will-change: transform;
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .maplibregl-popup-content {
+    background: rgba(255, 255, 255, 0.82) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
 }
 
 .maplibregl-ctrl-bottom-right,
@@ -519,92 +524,137 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* ─── VEHICLE POPUP OVERRIDES ────────────────────────────────── */
 /* Base (default theme): frosted glass */
 .vehicle-popup {
-  background: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(255, 255, 255, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   will-change: transform;
 }
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .vehicle-popup {
+    background: rgba(255, 255, 255, 0.82) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
+}
 /* Dark themes: dark frosted glass */
 [data-theme="plum"] .vehicle-popup {
-  background: rgba(22, 10, 38, 0.78) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(22, 10, 38, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
 }
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [data-theme="plum"] .vehicle-popup {
+    background: rgba(22, 10, 38, 0.78) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
+}
 [data-theme="havgra"] .vehicle-popup {
-  background: rgba(12, 18, 24, 0.78) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(12, 18, 24, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [data-theme="havgra"] .vehicle-popup {
+    background: rgba(12, 18, 24, 0.78) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
 }
 /* Light themes: frosted glass effect */
 [data-theme="daylight"] .vehicle-popup {
-  background: rgba(240, 247, 252, 0.88) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(240, 247, 252, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
 }
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [data-theme="daylight"] .vehicle-popup {
+    background: rgba(240, 247, 252, 0.88) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
+}
 [data-theme="latte"] .vehicle-popup {
-  background: rgba(245, 237, 224, 0.88) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(245, 237, 224, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [data-theme="latte"] .vehicle-popup {
+    background: rgba(245, 237, 224, 0.88) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
 }
 
 /* ─── STOP POPUP (MapLibre) OVERRIDES ────────────────────────── */
 [data-theme="plum"] .maplibregl-popup-content {
-  background: rgba(22, 10, 38, 0.78) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(22, 10, 38, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   border: 1px solid rgba(168, 85, 247, 0.15);
   color: #e9d5ff;
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [data-theme="plum"] .maplibregl-popup-content {
+    background: rgba(22, 10, 38, 0.78) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
 }
 [data-theme="plum"] .maplibregl-popup-tip {
   border-top-color: rgba(22, 10, 38, 0.78) !important;
   border-bottom-color: rgba(22, 10, 38, 0.78) !important;
 }
 [data-theme="havgra"] .maplibregl-popup-content {
-  background: rgba(12, 18, 24, 0.78) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(12, 18, 24, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   border: 1px solid rgba(100, 160, 190, 0.15);
   color: #cbd5e1;
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [data-theme="havgra"] .maplibregl-popup-content {
+    background: rgba(12, 18, 24, 0.78) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
 }
 [data-theme="havgra"] .maplibregl-popup-tip {
   border-top-color: rgba(12, 18, 24, 0.78) !important;
   border-bottom-color: rgba(12, 18, 24, 0.78) !important;
 }
 [data-theme="daylight"] .maplibregl-popup-content {
-  background: rgba(240, 247, 252, 0.78) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(240, 247, 252, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   border: 1px solid rgba(26, 96, 128, 0.12);
   color: #1a2a35;
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [data-theme="daylight"] .maplibregl-popup-content {
+    background: rgba(240, 247, 252, 0.78) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
 }
 [data-theme="daylight"] .maplibregl-popup-tip {
   border-top-color: rgba(240, 247, 252, 0.78) !important;
   border-bottom-color: rgba(240, 247, 252, 0.78) !important;
 }
 [data-theme="latte"] .maplibregl-popup-content {
-  background: rgba(245, 237, 224, 0.78) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(245, 237, 224, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   border: 1px solid rgba(146, 64, 14, 0.12);
   color: #3d2b14;
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [data-theme="latte"] .maplibregl-popup-content {
+    background: rgba(245, 237, 224, 0.78) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
 }
 [data-theme="latte"] .maplibregl-popup-tip {
   border-top-color: rgba(245, 237, 224, 0.78) !important;
@@ -613,12 +663,17 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .maplibregl-popup-content {
   border-radius: 20px !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
-  background: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  background: rgba(255, 255, 255, 0.96) !important;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   will-change: transform;
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .maplibregl-popup-content {
+    background: rgba(255, 255, 255, 0.82) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
 }
 
 /* ─── TOP BAR MENU OPACITY OVERRIDES ─────────────────────────── */
