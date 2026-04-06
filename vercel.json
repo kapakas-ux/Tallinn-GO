@@ -1,9 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/api/health", "destination": "/api/health" },
-    { "source": "/api/transport/stops", "destination": "/api/transport/stops" },
-    { "source": "/api/transport/routes", "destination": "/api/transport/routes" },
-    { "source": "/api/transport/departures", "destination": "/api/transport/departures" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
