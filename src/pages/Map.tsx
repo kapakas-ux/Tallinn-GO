@@ -868,13 +868,12 @@ export const Map = () => {
     const clearOverlay = () => {
       journeyMarkers.current.forEach(mk => mk.remove());
       journeyMarkers.current = [];
-      // Scan for any journey-* layers/sources (robust against missed ref tracking)
       try {
-        if (m.isStyleLoaded()) {
-          const style = m.getStyle();
-          style.layers
-            ?.filter(l => l.id.startsWith('journey-'))
-            .forEach(l => { try { m.removeLayer(l.id); } catch {} });
+        const style = m.getStyle?.();
+        if (style) {
+          (style.layers ?? [])
+            .filter((l: any) => l.id.startsWith('journey-'))
+            .forEach((l: any) => { try { m.removeLayer(l.id); } catch {} });
           Object.keys(style.sources ?? {})
             .filter(s => s.startsWith('journey-'))
             .forEach(s => { try { m.removeSource(s); } catch {} });
@@ -887,10 +886,12 @@ export const Map = () => {
     if (!searchParams.has('journey')) { clearOverlay(); return; }
 
     const raw = sessionStorage.getItem('planner_journey');
-    if (!raw) return;
+    if (!raw) { console.warn('journey: no planner_journey in sessionStorage'); return; }
 
     let itinerary: PlanItinerary;
-    try { itinerary = JSON.parse(raw); } catch { return; }
+    try { itinerary = JSON.parse(raw); } catch { console.error('journey: failed to parse planner_journey'); return; }
+
+    console.log('journey: itinerary loaded, legs:', itinerary.legs.length);
 
     const modeColor = (mode: LegMode) => {
       if (mode === 'TRAM') return '#DC143C';
@@ -899,18 +900,30 @@ export const Map = () => {
       return '#9ca3af';
     };
 
+    let drawn = false;
+
     const drawJourney = () => {
-      if (!m.isStyleLoaded()) return;
+      if (drawn) return;
+      if (!m.isStyleLoaded()) { console.warn('journey: style not loaded yet, skipping draw'); return; }
+      drawn = true;
       clearOverlay();
+      console.log('journey: drawing', itinerary.legs.length, 'legs');
 
       const allCoords: [number, number][] = [];
 
       itinerary.legs.forEach((leg, i) => {
         const coords = decodePolyline(leg.legGeometry.points);
+        console.log(`journey: leg ${i} (${leg.mode}): ${coords.length} coords`);
         if (!coords.length) return;
         allCoords.push(...coords);
         const id = `journey-leg-${i}`;
         journeySourceIds.current.push(id);
+
+        // Remove existing source/layers for this id before adding (idempotent)
+        try { m.removeLayer(`${id}-line`); } catch {}
+        try { m.removeLayer(`${id}-bg`); } catch {}
+        try { m.removeSource(id); } catch {}
+
         try {
           m.addSource(id, {
             type: 'geojson',
@@ -931,6 +944,7 @@ export const Map = () => {
               paint: { 'line-color': modeColor(leg.mode), 'line-width': 5 },
             });
           }
+          console.log(`journey: leg ${i} added successfully`);
         } catch (err) {
           console.error(`journey: error adding leg ${i} (${leg.mode}):`, err);
         }
@@ -950,6 +964,7 @@ export const Map = () => {
       if (allCoords.length) {
         const lngs = allCoords.map(c => c[0]);
         const lats = allCoords.map(c => c[1]);
+        console.log('journey: fitting bounds, total coords:', allCoords.length);
         m.fitBounds(
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
           { padding: 60, duration: 800 }
@@ -957,12 +972,21 @@ export const Map = () => {
       }
     };
 
+    // Try drawing immediately, on style load, and on idle — whichever fires first
+    const onLoad = () => drawJourney();
+    const onIdle = () => drawJourney();
+
     if (m.isStyleLoaded()) {
+      console.log('journey: style already loaded, drawing');
       drawJourney();
-    } else {
-      m.once('load', drawJourney);
-      return () => { m.off('load', drawJourney as any); };
     }
+    m.once('load', onLoad);
+    m.once('idle', onIdle);
+
+    return () => {
+      m.off('load', onLoad);
+      m.off('idle', onIdle);
+    };
   }, [location.search, styleLoadCount]);
 
   const handleLocateMe = () => {
