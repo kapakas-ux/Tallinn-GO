@@ -15,6 +15,7 @@ import { getDistance } from '../lib/geo';
 import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
 import { fetchDarkMapStyle } from '../lib/mapStyles';
 import { scheduleDepartureNotification } from '../services/notificationService';
+import { getSettings, AppTheme } from '../services/settingsService';
 import { addActiveAlert, getActiveAlerts, isAlertActive } from '../services/alertService';
 import { getRouteStopsForVehicle, fetchVehicleTripStoptimes } from '../services/transportService';
 import type { TripStoptime } from '../services/transportService';
@@ -23,6 +24,8 @@ import { AnimatePresence, motion } from 'motion/react';
 
 const TALLINN_CENTER: [number, number] = [TALLINN_CENTER_COORD.lng, TALLINN_CENTER_COORD.lat]; // [lng, lat]
 const VEHICLE_VISIBILITY_MIN_ZOOM = 13;
+
+const isDarkTheme = (theme: AppTheme) => theme === 'plum' || theme === 'havgra';
 
 const isValidLngLat = (lng: number, lat: number) => {
   return !isNaN(lng) && !isNaN(lat) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
@@ -57,7 +60,34 @@ export const Map = () => {
   const [styleLoadCount, setStyleLoadCount] = useState(0);
   const [serviceAlerts, setServiceAlerts] = useState<ServiceAlert[]>([]);
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
-  const [isDarkMap, setIsDarkMap] = useState(true);
+  const [isDarkMap, setIsDarkMap] = useState(() => isDarkTheme(getSettings().theme));
+
+  // Sync map style when app theme changes (e.g. from settings modal)
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const theme = document.documentElement.getAttribute('data-theme') as AppTheme | null;
+      if (!theme || !map.current) return;
+      const shouldBeDark = isDarkTheme(theme);
+      setIsDarkMap(prev => {
+        if (prev === shouldBeDark) return prev;
+        (async () => {
+          try {
+            if (shouldBeDark) {
+              const darkStyle = await fetchDarkMapStyle();
+              map.current?.setStyle(darkStyle);
+            } else {
+              map.current?.setStyle('https://tiles.openfreemap.org/styles/bright');
+            }
+          } catch (err) {
+            console.error('Auto style sync failed:', err);
+          }
+        })();
+        return shouldBeDark;
+      });
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     console.log('Map component mounted');
@@ -190,8 +220,9 @@ export const Map = () => {
         const initialZoom = zoomParam ? parseFloat(zoomParam) : 13;
 
         let style: any;
+        const wantDark = isDarkTheme(getSettings().theme);
         try {
-          style = await fetchDarkMapStyle();
+          style = wantDark ? await fetchDarkMapStyle() : 'https://tiles.openfreemap.org/styles/bright';
         } catch {
           style = 'https://tiles.openfreemap.org/styles/bright';
         }
