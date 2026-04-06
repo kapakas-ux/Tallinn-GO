@@ -337,12 +337,14 @@ export const Planner = () => {
     return stop ? { lat: stop.lat, lon: stop.lng } : null;
   }, [stops, userCoords]);
 
-  const findRoutes = async () => {
+  const findRoutes = async (overrideFrom?: string, overrideTo?: string) => {
+    const searchFrom = overrideFrom ?? from;
+    const searchTo = overrideTo ?? to;
     setError(null);
-    const fromCoords = resolveCoords(from, 'from');
-    const toCoords = resolveCoords(to, 'to');
-    if (!fromCoords) { setError(from === 'Current Location' ? 'Waiting for GPS...' : `Stop not found: "${from}"`); return; }
-    if (!toCoords) { setError(`Stop not found: "${to}"`); return; }
+    const fromCoords = resolveCoords(searchFrom, 'from');
+    const toCoords = resolveCoords(searchTo, 'to');
+    if (!fromCoords) { setError(searchFrom === 'Current Location' ? 'Waiting for GPS...' : `Stop not found: "${searchFrom}"`); return; }
+    if (!toCoords) { setError(`Stop not found: "${searchTo}"`); return; }
     if (fromCoords.lat === toCoords.lat && fromCoords.lon === toCoords.lon) { setError('Origin and destination are the same.'); return; }
 
     setIsLoading(true);
@@ -351,7 +353,7 @@ export const Planner = () => {
     try {
       const results = await planJourney(fromCoords.lat, fromCoords.lon, toCoords.lat, toCoords.lon);
       if (!results.length) setError('No routes found between these stops.');
-      else { setItineraries(results); setExpandedIndex(0); saveSearch(from, to); setSearchHistory(getSearchHistory()); }
+      else { setItineraries(results); setExpandedIndex(0); saveSearch(searchFrom, searchTo); setSearchHistory(getSearchHistory()); }
     } catch (e) {
       console.error(e);
       setError('Could not fetch routes. Check your connection.');
@@ -516,6 +518,7 @@ export const Planner = () => {
                   setTo(entry.to);
                   selectedFromStop.current = null;
                   selectedToStop.current = null;
+                  findRoutes(entry.from, entry.to);
                 }}
                 className="flex items-center gap-3 bg-surface-container-lowest p-3 rounded-[14px] shadow-sm hover:bg-surface-container-low transition-all text-left active:scale-[0.98]"
               >
