@@ -1,12 +1,14 @@
 const SETTINGS_KEY = 'tallinn_go_settings';
 
 export type AppTheme = 'daylight' | 'plum' | 'havgra' | 'latte';
+export type AppLanguage = 'en' | 'et' | 'ru';
 
 export interface AppSettings {
   alarmSound: string;
   showDailyFact: boolean;
   showFavoritesFirst: boolean;
   theme: AppTheme;
+  language: AppLanguage;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -14,6 +16,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   showDailyFact: true,
   showFavoritesFirst: false,
   theme: 'daylight',
+  language: 'en',
 };
 
 export const ALARM_SOUNDS = [

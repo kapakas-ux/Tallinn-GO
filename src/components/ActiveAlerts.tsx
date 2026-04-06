@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, X, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { getActiveAlerts, removeActiveAlert, ActiveAlert } from '../services/alertService';
 import { cn } from '../lib/utils';
 
@@ -9,6 +10,7 @@ interface ActiveAlertsProps {
 }
 
 export const ActiveAlerts: React.FC<ActiveAlertsProps> = ({ onAlertsChange }) => {
+  const { t } = useTranslation();
   const [alerts, setAlerts] = useState<ActiveAlert[]>([]);
   const [now, setNow] = useState(Date.now());
 
@@ -39,10 +41,10 @@ export const ActiveAlerts: React.FC<ActiveAlertsProps> = ({ onAlertsChange }) =>
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-amber-500 fill-amber-500/20" />
-          <h3 className="font-headline font-bold text-sm text-primary uppercase tracking-widest">Active Alerts</h3>
+          <h3 className="font-headline font-bold text-sm text-primary uppercase tracking-widest">{t('alerts.title')}</h3>
         </div>
         <span className="font-label text-[10px] font-bold text-secondary uppercase tracking-widest bg-surface-container-high px-2 py-0.5 rounded-full">
-          {alerts.length} {alerts.length === 1 ? 'Alert' : 'Alerts'}
+          {t('alerts.alert', { count: alerts.length })}
         </span>
       </div>
 
@@ -66,10 +68,10 @@ export const ActiveAlerts: React.FC<ActiveAlertsProps> = ({ onAlertsChange }) =>
                   </div>
                   <div className="flex flex-col">
                     <span className="font-headline font-extrabold text-primary text-sm leading-tight">
-                      To {alert.destination}
+                      {t('alerts.to', { destination: alert.destination })}
                     </span>
                     <span className="font-label text-[9px] text-amber-700/70 font-bold uppercase tracking-widest mt-0.5">
-                      From {alert.stopName}
+                      {t('alerts.from', { stopName: alert.stopName })}
                     </span>
                   </div>
                 </div>
@@ -84,7 +86,7 @@ export const ActiveAlerts: React.FC<ActiveAlertsProps> = ({ onAlertsChange }) =>
                       </span>
                     </div>
                     <p className="text-[8px] font-label font-bold text-amber-700/50 uppercase tracking-widest">
-                      Departing
+                      {t('alerts.departing')}
                     </p>
                   </div>
                   

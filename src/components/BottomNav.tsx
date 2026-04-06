@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Map as MapIcon, Route as RouteIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
 
 const StopsIcon = ({ className }: { className?: string }) => (
@@ -28,11 +29,12 @@ const StopsIcon = ({ className }: { className?: string }) => (
 );
 
 export const BottomNav = () => {
+  const { t } = useTranslation();
   const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/stops', icon: StopsIcon, label: 'Stops' },
-    { to: '/map', icon: MapIcon, label: 'Map' },
-    { to: '/plan', icon: RouteIcon, label: 'Plan' },
+    { to: '/', icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: '/stops', icon: StopsIcon, label: t('nav.stops') },
+    { to: '/map', icon: MapIcon, label: t('nav.map') },
+    { to: '/plan', icon: RouteIcon, label: t('nav.plan') },
   ];
 
   return (

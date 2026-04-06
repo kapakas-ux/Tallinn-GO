@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { X, Play, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ALARM_SOUNDS, getSettings, saveSettings, previewSound, stopPreview } from '../services/settingsService';
 import type { AppTheme } from '../services/settingsService';
 
 interface Props { onClose: () => void; }
 
-const THEMES: { id: AppTheme; label: string; desc: string; orb1: string; orb2: string; orb3: string }[] = [
-  { id: 'daylight', label: 'Daylight', desc: 'Light & airy, sea accent',   orb1: '#b8d4e8', orb2: '#c9dce8', orb3: '#a8c8d8' },
-  { id: 'plum',     label: 'Plum',    desc: 'Deep violet & magenta',       orb1: '#7c3aed', orb2: '#a21caf', orb3: '#4338ca' },
-  { id: 'havgra',   label: 'Havgrå',  desc: 'Norwegian sea gray',          orb1: '#1a3f6b', orb2: '#0d4f4f', orb3: '#1e3550' },
-  { id: 'latte',    label: 'Latte',   desc: 'Sand & caramel',              orb1: '#92400e', orb2: '#7c2d12', orb3: '#854d0e' },
+const THEMES: { id: AppTheme; labelKey: string; descKey: string; orb1: string; orb2: string; orb3: string }[] = [
+  { id: 'daylight', labelKey: 'settings.daylight', descKey: 'settings.daylightDesc',   orb1: '#b8d4e8', orb2: '#c9dce8', orb3: '#a8c8d8' },
+  { id: 'plum',     labelKey: 'settings.plum',    descKey: 'settings.plumDesc',       orb1: '#7c3aed', orb2: '#a21caf', orb3: '#4338ca' },
+  { id: 'havgra',   labelKey: 'settings.havgra',  descKey: 'settings.havgraDesc',          orb1: '#1a3f6b', orb2: '#0d4f4f', orb3: '#1e3550' },
+  { id: 'latte',    labelKey: 'settings.latte',   descKey: 'settings.latteDesc',              orb1: '#92400e', orb2: '#7c2d12', orb3: '#854d0e' },
 ];
 
 export const SettingsModal = ({ onClose }: Props) => {
+  const { t } = useTranslation();
   const handleClose = () => { stopPreview(); onClose(); };
   const [selectedSound, setSelectedSound] = useState(getSettings().alarmSound);
   const [showFact, setShowFact] = useState(getSettings().showDailyFact);
@@ -40,7 +42,7 @@ export const SettingsModal = ({ onClose }: Props) => {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-outline-variant/20">
-          <h2 className="font-headline font-black text-2xl gradient-text">Settings</h2>
+          <h2 className="font-headline font-black text-2xl gradient-text">{t('settings.title')}</h2>
           <button onClick={handleClose} className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-secondary">
             <X className="w-6 h-6" />
           </button>
@@ -52,26 +54,26 @@ export const SettingsModal = ({ onClose }: Props) => {
           {/* Theme picker */}
           <div>
             <h3 className="font-headline font-bold text-sm text-secondary uppercase tracking-widest mb-3">
-              Theme
+              {t('settings.theme')}
             </h3>
             <div className="grid grid-cols-4 gap-2">
-              {THEMES.map((t) => (
+              {THEMES.map((th) => (
                 <button
-                  key={t.id}
-                  onClick={() => handleTheme(t.id)}
+                  key={th.id}
+                  onClick={() => handleTheme(th.id)}
                   className={`relative flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all
-                    ${activeTheme === t.id
+                    ${activeTheme === th.id
                       ? 'border-primary scale-[1.03] shadow-lg'
                       : 'border-outline-variant/30 hover:border-outline-variant/60'
                     }`}
                 >
                   {/* Mini orb preview */}
                   <div className="relative w-12 h-12 rounded-full overflow-hidden">
-                    <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 30% 35%, ${t.orb1}, ${t.orb2} 55%, ${t.orb3})` }} />
+                    <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 30% 35%, ${th.orb1}, ${th.orb2} 55%, ${th.orb3})` }} />
                   </div>
-                  <span className="font-headline font-bold text-xs text-on-surface leading-tight text-center">{t.label}</span>
-                  <span className="font-label text-[9px] text-secondary leading-tight text-center">{t.desc}</span>
-                  {activeTheme === t.id && (
+                  <span className="font-headline font-bold text-xs text-on-surface leading-tight text-center">{t(th.labelKey)}</span>
+                  <span className="font-label text-[9px] text-secondary leading-tight text-center">{t(th.descKey)}</span>
+                  {activeTheme === th.id && (
                     <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
                       <Check className="w-2.5 h-2.5 text-white" />
                     </div>
@@ -83,10 +85,10 @@ export const SettingsModal = ({ onClose }: Props) => {
 
           <div>
             <h3 className="font-headline font-bold text-sm text-secondary uppercase tracking-widest mb-3">
-              Alert Sound
+              {t('settings.alertSound')}
             </h3>
             <p className="text-xs text-secondary font-label mb-4 leading-relaxed">
-              Choose the sound played when a departure alert fires. Press ▶ to preview.
+              {t('settings.alertSoundDesc')}
             </p>
             <div className="space-y-2">
               {ALARM_SOUNDS.map((sound) => (
@@ -122,8 +124,8 @@ export const SettingsModal = ({ onClose }: Props) => {
           {/* Daily Fact toggle */}
           <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-black/8 bg-black/4">
             <div>
-              <p className="font-headline font-bold text-sm text-primary">Daily Transit Fact</p>
-              <p className="font-label text-[10px] text-secondary mt-0.5">Show a fun fact on the dashboard each day</p>
+              <p className="font-headline font-bold text-sm text-primary">{t('settings.dailyFact')}</p>
+              <p className="font-label text-[10px] text-secondary mt-0.5">{t('settings.dailyFactDesc')}</p>
             </div>
             <button
               onClick={() => {
@@ -140,8 +142,8 @@ export const SettingsModal = ({ onClose }: Props) => {
           {/* Show Favorites First toggle */}
           <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-black/8 bg-black/4">
             <div>
-              <p className="font-headline font-bold text-sm text-primary">Show Favorites First</p>
-              <p className="font-label text-[10px] text-secondary mt-0.5">Display favorites above nearby stops</p>
+              <p className="font-headline font-bold text-sm text-primary">{t('settings.showFavoritesFirst')}</p>
+              <p className="font-label text-[10px] text-secondary mt-0.5">{t('settings.showFavoritesFirstDesc')}</p>
             </div>
             <button
               onClick={() => {
@@ -159,7 +161,7 @@ export const SettingsModal = ({ onClose }: Props) => {
         {/* Footer */}
         <div className="p-6 border-t border-black/8 bg-black/4">
           <button onClick={handleClose} className="w-full py-3 bg-primary text-white rounded-xl font-bold font-headline hover:bg-primary/90 transition-colors">
-            Done
+            {t('common.done')}
           </button>
         </div>
       </div>

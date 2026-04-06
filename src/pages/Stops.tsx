@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Star, Navigation as NearMe, ChevronRight, Loader2, X, Trash2, Map as MapIcon, MapPin, ChevronDown, ChevronUp, Footprints, Edit, X as CloseIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
@@ -14,6 +15,7 @@ import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { AnimatePresence } from 'motion/react';
 
 export const Stops = () => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [allStops, setAllStops] = useState([] as Stop[]);
   const [filteredStops, setFilteredStops] = useState([] as Stop[]);
@@ -37,13 +39,13 @@ export const Stops = () => {
   }, []);
 
   const emojiOptions = [
-    { label: 'Home', emoji: '🏠' },
-    { label: 'Gym', emoji: '🏋️' },
-    { label: 'Work', emoji: '💼' },
-    { label: 'Market', emoji: '🛒' },
-    { label: 'Airport', emoji: '✈️' },
-    { label: 'Bus', emoji: '🚌' },
-    { label: 'Heart', emoji: '❤️' },
+    { label: t('dashboard.emojiHome'), emoji: '🏠' },
+    { label: t('dashboard.emojiGym'), emoji: '🏋️' },
+    { label: t('dashboard.emojiWork'), emoji: '💼' },
+    { label: t('dashboard.emojiMarket'), emoji: '🛒' },
+    { label: t('dashboard.emojiAirport'), emoji: '✈️' },
+    { label: t('dashboard.emojiBus'), emoji: '🚌' },
+    { label: t('dashboard.emojiHeart'), emoji: '❤️' },
   ];
 
   useEffect(() => {
@@ -59,6 +61,8 @@ export const Stops = () => {
   const [nearbyDepartures, setNearbyDepartures] = useState({} as { [key: string]: Arrival[] });
   const [nearbyLoading, setNearbyLoading] = useState({} as { [key: string]: boolean });
   const [isSimulated, setIsSimulated] = useState(false);
+  const [searchDepartures, setSearchDepartures] = useState({} as { [key: string]: Arrival[] });
+  const [searchLoading, setSearchLoading] = useState({} as { [key: string]: boolean });
 
   useEffect(() => {
     const cleanup = watchLocation((location, simulated) => {
@@ -135,6 +139,32 @@ export const Stops = () => {
 
     setFilteredStops(results.slice(0, 20)); // limit to 20 results for performance
   }, [searchQuery, allStops, userLocation]);
+
+  // Auto-fetch departures for search results
+  useEffect(() => {
+    if (filteredStops.length === 0) return;
+    filteredStops.forEach(async (stop) => {
+      if (searchDepartures[stop.id]) return;
+      setSearchLoading(prev => ({ ...prev, [stop.id]: true }));
+      try {
+        const deps = await fetchDepartures(stop.id, stop.siriId);
+        setSearchDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 2) }));
+      } catch (err) {
+        console.error('Failed to load search departures', err);
+      } finally {
+        setSearchLoading(prev => ({ ...prev, [stop.id]: false }));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredStops]);
+
+  // Clear search departures cache when query changes
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchDepartures({});
+      setSearchLoading({});
+    }
+  }, [searchQuery]);
 
   useEffect(() => {
     if (favorites.length === 0) return;
@@ -239,7 +269,7 @@ export const Stops = () => {
           <div className="bg-surface-container-lowest editorial-shadow w-full max-w-sm rounded-[32px] overflow-hidden">
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="font-headline font-bold text-2xl text-primary">Edit Favorite</h3>
+                <h3 className="font-headline font-bold text-2xl text-primary">{t('stops.editFavorite')}</h3>
                 <button onClick={() => setEditingFav(null)} className="text-secondary hover:text-primary transition-colors">
                   <CloseIcon className="w-6 h-6" />
                 </button>
@@ -247,7 +277,7 @@ export const Stops = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">Custom Name</label>
+                  <label className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{t('stops.customName')}</label>
                   <input 
                     type="text" 
                     value={editName}
@@ -258,7 +288,7 @@ export const Stops = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">Choose Emoji</label>
+                  <label className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{t('stops.chooseEmoji')}</label>
                   <div className="grid grid-cols-4 gap-2">
                     <button 
                       onClick={() => setEditEmoji('')}
@@ -267,7 +297,7 @@ export const Stops = () => {
                         editEmoji === '' ? "bg-primary text-white" : "bg-surface-container-low hover:bg-surface-container-high text-secondary"
                       )}
                     >
-                      None
+                      {t('common.none')}
                     </button>
                     {emojiOptions.map((opt) => (
                       <button 
@@ -290,7 +320,7 @@ export const Stops = () => {
                 onClick={handleSaveEdit}
                 className="w-full h-14 bg-primary text-white font-headline font-black text-lg rounded-2xl hover:bg-primary/90 active:scale-95 transition-all"
               >
-                Save Changes
+                {t('common.save')}
               </button>
             </div>
           </div>
@@ -305,7 +335,7 @@ export const Stops = () => {
           </div>
           <input
             className="w-full bg-surface-container-highest border-none h-16 pl-14 pr-6 rounded-full font-headline font-semibold text-on-surface focus:ring-2 focus:ring-primary-fixed transition-all placeholder:text-on-surface/40"
-            placeholder="Search stops..."
+            placeholder={t('stops.searchPlaceholder')}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -321,15 +351,16 @@ export const Stops = () => {
       {searchQuery.trim() ? (
         /* Search Results Section */
         <section className="px-6 mb-12">
-          <h2 className="font-headline text-2xl font-extrabold tracking-tight mb-6 gradient-text">Search Results</h2>
+          <h2 className="font-headline text-2xl font-extrabold tracking-tight mb-6 gradient-text">{t('stops.searchResults')}</h2>
           {filteredStops.length > 0 ? (
             <div className="space-y-3">
               {filteredStops.map((stop) => (
                 <div
                   key={stop.id}
                   onClick={() => handleStopClick(stop)}
-                  className="flex items-center justify-between p-4 bg-surface-container-lowest rounded-[20px] shadow-sm hover:bg-surface-container-low transition-colors cursor-pointer"
+                  className="bg-surface-container-lowest rounded-[20px] shadow-sm hover:bg-surface-container-low transition-colors cursor-pointer"
                 >
+                  <div className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-surface-container-high rounded-full flex items-center justify-center text-primary">
                       <NearMe className="w-5 h-5" />
@@ -357,17 +388,45 @@ export const Stops = () => {
                           </div>
                         </div>
                       ) : (
-                        <p className="font-label text-xs text-secondary mt-0.5">Stop ID: {stop.id}</p>
+                        <p className="font-label text-xs text-secondary mt-0.5">{t('stops.stopId', { id: stop.id })}</p>
                       )}
                     </div>
                   </div>
                   <ChevronRight className="text-outline-variant w-5 h-5" />
+                  </div>
+                  {/* Inline departure preview */}
+                  {searchLoading[stop.id] ? (
+                    <div className="flex items-center gap-2 px-4 pb-3">
+                      <Loader2 className="w-3 h-3 animate-spin text-secondary/40" />
+                      <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
+                    </div>
+                  ) : searchDepartures[stop.id]?.filter(a => a.status !== 'departed')?.length > 0 ? (
+                    <div className="px-4 pb-3 border-t border-outline-variant/10 pt-2 flex gap-3">
+                      {searchDepartures[stop.id].filter(a => a.status !== 'departed').map((arr, i) => (
+                        <div key={i} className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between py-0.5 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
+                                {arr.line}
+                              </div>
+                              <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
+                                {arr.destination}
+                              </span>
+                            </div>
+                            <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
+                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : (arr.time ?? `${getLiveMinutes(arr)}m`)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-10 text-secondary">
-              <p>No stops matching "{searchQuery}"</p>
+              <p>{t('stops.noMatching', { query: searchQuery })}</p>
             </div>
           )}
         </section>
@@ -378,14 +437,14 @@ export const Stops = () => {
             <div className="px-6 flex items-end justify-between mb-6">
               <div>
                 <span className="font-label text-xs uppercase tracking-widest text-secondary mb-1 block">
-                  Live Coverage
+                  {t('stops.liveCoverage')}
                 </span>
-                <h2 className="font-headline text-3xl font-extrabold tracking-tight gradient-text">Nearby Stops</h2>
+                <h2 className="font-headline text-3xl font-extrabold tracking-tight gradient-text">{t('stops.nearbyStops')}</h2>
               </div>
               {isSimulated && (
                 <div className="flex items-center gap-1.5 px-2 py-1 bg-error/10 text-error rounded-full text-[10px] font-bold uppercase tracking-widest border border-error/20">
                   <NearMe className="w-2.5 h-2.5" />
-                  GPS Disabled
+                  {t('stops.gpsDisabled')}
                 </div>
               )}
             </div>
@@ -396,9 +455,9 @@ export const Stops = () => {
                   <div className="w-12 h-12 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-1">
                     <NearMe className="w-6 h-6" />
                   </div>
-                  <h4 className="font-headline font-bold text-lg text-primary">Location required</h4>
+                  <h4 className="font-headline font-bold text-lg text-primary">{t('stops.locationRequired')}</h4>
                   <p className="text-secondary text-xs max-w-[200px] mx-auto">
-                    Please enable GPS to find stops near your current location.
+                    {t('stops.locationRequiredDesc')}
                   </p>
                 </div>
               </div>
@@ -450,7 +509,7 @@ export const Stops = () => {
                       nearbyLoading[stop.id] ? (
                         <div className="flex items-center gap-2 px-3 pb-2.5">
                           <Loader2 className="w-3 h-3 animate-spin text-secondary/40" />
-                          <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
+                          <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">{t('stops.loading')}</span>
                         </div>
                       ) : nearbyDepartures[stop.id]?.length > 0 ? (
                         <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 flex gap-3">
@@ -467,7 +526,7 @@ export const Stops = () => {
                                     </span>
                                   </div>
                                   <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                                    {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? 'Now' : (arr.time ?? `${getLiveMinutes(arr)}m`)}
+                                    {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : (arr.time ?? `${getLiveMinutes(arr)}m`)}
                                   </span>
                                 </div>
                               ))}
@@ -509,7 +568,7 @@ export const Stops = () => {
                             ))}
                           </div>
                         ) : (
-                          <div className="py-4 text-center text-sm text-secondary">No upcoming departures</div>
+                          <div className="py-4 text-center text-sm text-secondary">{t('stops.noUpcoming')}</div>
                         )}
                       </div>
                     )}
@@ -519,7 +578,7 @@ export const Stops = () => {
             ) : (
               <div className="px-6 py-12 flex flex-col items-center justify-center text-secondary">
                 <Loader2 className="w-8 h-8 animate-spin mb-4" />
-                <p className="font-label font-bold uppercase tracking-widest text-xs">Nearby Stops...</p>
+                <p className="font-label font-bold uppercase tracking-widest text-xs">{t('stops.nearbyLoading')}</p>
               </div>
             )}
           </section>
@@ -529,16 +588,16 @@ export const Stops = () => {
             <div className="flex items-end justify-between mb-6">
               <div>
                 <span className="font-label text-xs uppercase tracking-widest text-secondary mb-1 block">
-                  Quick Access
+                  {t('stops.quickAccess')}
                 </span>
-                <h2 className="font-headline text-3xl font-extrabold tracking-tight gradient-text">Favorites</h2>
+                <h2 className="font-headline text-3xl font-extrabold tracking-tight gradient-text">{t('stops.favorites')}</h2>
               </div>
               {favorites.length > 0 && (
                 <button 
                   onClick={() => setIsEditMode(!isEditMode)}
                   className="text-primary font-bold text-sm hover:underline"
                 >
-                  {isEditMode ? 'Done' : 'Edit'}
+                  {isEditMode ? t('common.done') : t('common.edit')}
                 </button>
               )}
             </div>
@@ -616,7 +675,7 @@ export const Stops = () => {
                       {favLoading[stop.id] ? (
                         <div className="flex items-center gap-2 py-2">
                           <Loader2 className="w-3 h-3 animate-spin text-secondary" />
-                          <span className="text-[9px] font-label font-bold uppercase tracking-widest text-secondary opacity-50">Loading...</span>
+                          <span className="text-[9px] font-label font-bold uppercase tracking-widest text-secondary opacity-50">{t('stops.loading')}</span>
                         </div>
                       ) : favDepartures[stop.id]?.length > 0 ? (
                         favDepartures[stop.id].map((arr, i) => (
@@ -645,7 +704,7 @@ export const Stops = () => {
                         ))
                       ) : (
                         <div className="py-2">
-                          <span className="text-[9px] font-label font-bold uppercase tracking-widest text-secondary opacity-50">No departures</span>
+                          <span className="text-[9px] font-label font-bold uppercase tracking-widest text-secondary opacity-50">{t('stops.noDepartures')}</span>
                         </div>
                       )}
                     </div>
@@ -653,7 +712,7 @@ export const Stops = () => {
                     <div className="mt-4 pt-3 border-t border-outline-variant/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <NearMe className="w-3 h-3 text-primary" />
-                        <span className="font-label text-[10px] font-bold text-primary uppercase tracking-widest">Schedule</span>
+                        <span className="font-label text-[10px] font-bold text-primary uppercase tracking-widest">{t('stops.schedule')}</span>
                       </div>
                       <ChevronRight className="w-4 h-4 text-outline-variant" />
                     </div>
@@ -665,9 +724,9 @@ export const Stops = () => {
                 <div className="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center mx-auto mb-4 text-secondary/40">
                   <Star className="w-8 h-8" />
                 </div>
-                <h3 className="font-headline font-bold text-primary mb-2">No Favorites</h3>
+                <h3 className="font-headline font-bold text-primary mb-2">{t('stops.noFavorites')}</h3>
                 <p className="text-secondary text-sm max-w-[200px] mx-auto">
-                  Add stops to your favorites for quick access.
+                  {t('stops.noFavoritesDesc')}
                 </p>
               </div>
             )}
@@ -719,7 +778,7 @@ export const Stops = () => {
                       </div>
                     </div>
                   ) : (
-                    <p className="font-label text-xs text-secondary uppercase tracking-widest font-bold">Stop ID: {selectedStop.id}</p>
+                    <p className="font-label text-xs text-secondary uppercase tracking-widest font-bold">{t('stops.stopId', { id: selectedStop.id })}</p>
                   )}
                 </div>
               </div>
@@ -742,7 +801,7 @@ export const Stops = () => {
                   <Link 
                     to={`/map?lat=${selectedStop.lat}&lng=${selectedStop.lng}&zoom=20&stopId=${selectedStop.id}`}
                     className="absolute bottom-3 right-3 bg-surface/90 backdrop-blur-md p-3 rounded-full shadow-xl text-primary active:scale-90 transition-transform"
-                    title="Open in full map"
+                    title={t('stops.openInFullMap')}
                   >
                     <MapIcon className="w-5 h-5" />
                   </Link>
@@ -752,13 +811,13 @@ export const Stops = () => {
               {isDeparturesLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 text-secondary">
                   <Loader2 className="w-10 h-10 animate-spin mb-4" />
-                  <p className="font-label font-bold uppercase tracking-widest text-xs">Fetching Schedule...</p>
+                  <p className="font-label font-bold uppercase tracking-widest text-xs">{t('stops.fetchingSchedule')}</p>
                 </div>
               ) : departures.length > 0 ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">Daily Departures</span>
-                    <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{departures.length} found</span>
+                    <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{t('stops.dailyDepartures')}</span>
+                    <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{departures.length} {t('stops.found')}</span>
                   </div>
                   {departures.map((arr, i) => (
                     <div key={i} className={cn("relative", alertingArrival?.arrival === arr && alertingArrival?.stop === selectedStop ? "z-50" : "z-10")}>
@@ -783,7 +842,7 @@ export const Stops = () => {
                 </div>
               ) : (
                 <div className="py-20 text-center text-secondary">
-                  <p className="font-headline font-bold">No departures today</p>
+                  <p className="font-headline font-bold">{t('stops.noDeparturesToday')}</p>
                 </div>
               )}
             </div>

@@ -3,6 +3,7 @@ import { Arrival, Stop } from '../types';
 import { getRouteStopsForArrival, fetchTripStoptimes, TripStoptime } from '../services/transportService';
 import { cn, getVehicleColorClass } from '../lib/utils';
 import { CheckCircle2, ChevronDown, ChevronUp, MapPin, Bell } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { VehicleMap } from './VehicleMap';
 
 interface ArrivalItemProps {
@@ -24,6 +25,7 @@ export function getLiveMinutes(arrival: Arrival): number {
 }
 
 export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive, expandable = true }: ArrivalItemProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [routeStops, setRouteStops] = useState<Stop[]>([]);
   const [tripStoptimes, setTripStoptimes] = useState<TripStoptime[]>([]);
@@ -106,11 +108,11 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
               isCompact ? "text-sm" : "text-sm",
               arrival.status === 'departed' && "line-through text-on-surface-variant"
             )}>
-              {arrival.destination || 'Unknown Destination'}
+              {arrival.destination || t('arrivals.unknownDestination')}
             </span>
             {!isCompact && (
               <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-widest">
-                {arrival.type.charAt(0).toUpperCase() + arrival.type.slice(1)} • {arrival.info || 'Local'}
+                {arrival.type.charAt(0).toUpperCase() + arrival.type.slice(1)} • {arrival.info || t('arrivals.local')}
               </span>
             )}
           </div>
@@ -138,7 +140,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
               )}
               <div className="flex items-baseline gap-1">
                 <span className={cn("font-headline font-black text-primary flex items-baseline gap-1", isCompact ? "text-lg" : "text-xl")}>
-                  {liveMinutes <= 1 ? 'Now' : (liveMinutes <= 59 ? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>min</span></> : (arrival.time ?? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>min</span></>))}
+                  {liveMinutes <= 1 ? t('arrivals.now') : (liveMinutes <= 59 ? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></> : (arrival.time ?? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></>))}
                 </span>
               </div>
               {expandable && (expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />)}
@@ -153,9 +155,9 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
           !isCompact && "editorial-shadow"
         )}>
           {loading ? (
-            <div className="text-center text-sm text-secondary py-4">Loading route...</div>
+            <div className="text-center text-sm text-secondary py-4">{t('arrivals.loadingRoute')}</div>
           ) : routeStops.length === 0 ? (
-            <div className="text-center text-sm text-secondary py-4">Route data not available</div>
+            <div className="text-center text-sm text-secondary py-4">{t('arrivals.routeNotAvailable')}</div>
           ) : (
             <div className="flex flex-col gap-4">
               <div className="h-48 rounded-xl overflow-hidden bg-surface-container relative">
@@ -178,7 +180,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                   }
                 }}
               >
-                <div className="text-xs font-bold text-secondary uppercase tracking-wider mb-1 sticky top-0 bg-surface-container-lowest z-10 py-1">Route Stops</div>
+                <div className="text-xs font-bold text-secondary uppercase tracking-wider mb-1 sticky top-0 bg-surface-container-lowest z-10 py-1">{t('arrivals.routeStops')}</div>
                 {tripStoptimes.length > 0 ? (
                   /* Use trip stoptimes (has schedule times) */
                   tripStoptimes.map((st, i) => {

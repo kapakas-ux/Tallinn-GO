@@ -1,16 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18next from 'i18next';
 import { Capacitor } from '@capacitor/core';
 import { useLocation } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes } from '../services/transportService';
+import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes, fetchServiceAlerts } from '../services/transportService';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
 import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
-import { Stop, Arrival, Vehicle, PlanItinerary, LegMode } from '../types';
-import { Bus, Loader2, Navigation, Footprints, Bell, X } from 'lucide-react';
+import { Stop, Arrival, Vehicle, PlanItinerary, LegMode, ServiceAlert } from '../types';
+import { Bus, Loader2, Navigation, Footprints, Bell, X, Construction, TriangleAlert, Sun, Moon } from 'lucide-react';
 import { getDistance } from '../lib/geo';
 import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
+import { fetchDarkMapStyle } from '../lib/mapStyles';
 import { scheduleDepartureNotification } from '../services/notificationService';
 import { addActiveAlert, getActiveAlerts, isAlertActive } from '../services/alertService';
 import { getRouteStopsForVehicle, fetchVehicleTripStoptimes } from '../services/transportService';
@@ -26,6 +29,7 @@ const isValidLngLat = (lng: number, lat: number) => {
 };
 
 export const Map = () => {
+  const { t } = useTranslation();
   console.log('Map component rendering');
   const location = useLocation();
   const mapContainer = useRef(null as HTMLDivElement | null);
@@ -51,6 +55,9 @@ export const Map = () => {
   const [vehicles, setVehicles] = useState([] as Vehicle[]);
   const [vehicleError, setVehicleError] = useState<string | null>(null);
   const [styleLoadCount, setStyleLoadCount] = useState(0);
+  const [serviceAlerts, setServiceAlerts] = useState<ServiceAlert[]>([]);
+  const [showAlertsPanel, setShowAlertsPanel] = useState(false);
+  const [isDarkMap, setIsDarkMap] = useState(true);
 
   useEffect(() => {
     console.log('Map component mounted');
@@ -119,6 +126,16 @@ export const Map = () => {
     return cleanup;
   }, []);
 
+  // Service alerts polling
+  useEffect(() => {
+    const loadAlerts = () => {
+      fetchServiceAlerts().then(setServiceAlerts).catch(() => {});
+    };
+    loadAlerts();
+    const interval = setInterval(loadAlerts, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Update user marker
   useEffect(() => {
     if (!map.current || !userLocation || styleLoadCount === 0 || isSimulated) {
@@ -158,26 +175,39 @@ export const Map = () => {
     if (map.current || !mapContainer.current) return;
     
     console.log('Initializing map instance...');
-    try {
-      const searchParams = new URLSearchParams(location.search);
-      const latParam = searchParams.get('lat');
-      const lngParam = searchParams.get('lng');
-      const zoomParam = searchParams.get('zoom');
 
-      const initialCenter: [number, number] = latParam && lngParam 
-        ? [parseFloat(lngParam), parseFloat(latParam)] 
-        : TALLINN_CENTER;
-      const initialZoom = zoomParam ? parseFloat(zoomParam) : 13;
+    const initMap = async () => {
+      if (!mapContainer.current) return;
+      try {
+        const searchParams = new URLSearchParams(location.search);
+        const latParam = searchParams.get('lat');
+        const lngParam = searchParams.get('lng');
+        const zoomParam = searchParams.get('zoom');
 
-      map.current = new maplibregl.Map({
-        container: mapContainer.current,
-        style: 'https://tiles.openfreemap.org/styles/bright',
-        center: initialCenter,
-        zoom: initialZoom,
-        attributionControl: false
-      });
+        const initialCenter: [number, number] = latParam && lngParam 
+          ? [parseFloat(lngParam), parseFloat(latParam)] 
+          : TALLINN_CENTER;
+        const initialZoom = zoomParam ? parseFloat(zoomParam) : 13;
+
+        let style: any;
+        try {
+          style = await fetchDarkMapStyle();
+        } catch {
+          style = 'https://tiles.openfreemap.org/styles/bright';
+        }
+
+        map.current = new maplibregl.Map({
+          container: mapContainer.current,
+          style,
+          center: initialCenter,
+          zoom: initialZoom,
+          attributionControl: false
+        });
 
       map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+      // Dark/Light map toggle handler — stored on the map instance for access
+      (map.current as any)._toggleDarkLight = null;
 
       // Double tap to clear pulsating effect
       map.current.on('dblclick', (e) => {
@@ -190,8 +220,8 @@ export const Map = () => {
         console.error('MapLibre error:', e.error?.message || e);
       });
 
-      map.current.on('load', () => {
-        console.log('Map "load" event fired (count:', styleLoadCount + 1, ')');
+      map.current.on('style.load', () => {
+        console.log('Map "style.load" event fired (count:', styleLoadCount + 1, ')');
         setStyleLoadCount(prev => prev + 1);
 
         // Hide native bus stops to prevent clutter
@@ -235,6 +265,9 @@ export const Map = () => {
     } catch (err) {
       console.error('Error initializing map:', err);
     }
+    };
+
+    initMap();
 
     return () => {
       console.log('Map component unmounting');
@@ -564,13 +597,13 @@ export const Map = () => {
             departures = await fetchDepartures(id, siriId);
           } catch (err: any) {
             console.error('Error in handleStopClick:', err);
-            errorMsg = err.message || 'No live data';
+            errorMsg = err.message || i18next.t('map.noLiveData');
           }
         }
 
         let departuresHtml = '';
         if (isLoading) {
-          departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">Loading...</div>`;
+          departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">${i18next.t('map.loading')}</div>`;
         } else if (errorMsg) {
           departuresHtml = `<div class="py-4 text-center text-red-500 font-label text-xs uppercase tracking-wider">${errorMsg}</div>`;
         } else if (departures.length > 0) {
@@ -599,7 +632,7 @@ export const Map = () => {
                   ` : ''}
                   <div class="text-right flex items-baseline gap-1">
                     <span class="font-headline font-black text-lg text-primary flex items-baseline gap-1">
-                      ${(() => { const depSec = (d as any).departureTimeSeconds; const m = depSec ? Math.max(0, Math.floor((depSec - Date.now() / 1000) / 60)) : d.minutes; return m <= 1 ? 'Now' : (m <= 59 ? m + '<span class="text-xs font-medium ' + (d.isRealtime ? 'text-emerald-500 animate-pulse' : 'text-secondary') + '">min</span>' : (d.time ?? m + '<span class="text-xs font-medium ' + (d.isRealtime ? 'text-emerald-500 animate-pulse' : 'text-secondary') + '">min</span>')); })()}
+                      ${(() => { const depSec = (d as any).departureTimeSeconds; const m = depSec ? Math.max(0, Math.floor((depSec - Date.now() / 1000) / 60)) : d.minutes; return m <= 1 ? i18next.t('arrivals.now') : (m <= 59 ? m + '<span class="text-xs font-medium ' + (d.isRealtime ? 'text-emerald-500 animate-pulse' : 'text-secondary') + '">' + i18next.t('arrivals.min') + '</span>' : (d.time ?? m + '<span class="text-xs font-medium ' + (d.isRealtime ? 'text-emerald-500 animate-pulse' : 'text-secondary') + '">' + i18next.t('arrivals.min') + '</span>')); })()}
                     </span>
                   </div>
                 </div>
@@ -607,7 +640,7 @@ export const Map = () => {
             `;
           }).join('');
         } else {
-          departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">No departures scheduled</div>`;
+          departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">${i18next.t('map.noDepartures')}</div>`;
         }
 
         const lastUpdated = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -632,7 +665,7 @@ export const Map = () => {
             </div>
           `;
         } else {
-          distanceHtml = `<p class="text-[10px] font-label uppercase tracking-wider text-secondary font-bold">ID: ${siriId || id}</p>`;
+          distanceHtml = `<p class="text-[10px] font-label uppercase tracking-wider text-secondary font-bold">${i18next.t('map.stopId', { id: siriId || id })}</p>`;
         }
 
         popupContent.innerHTML = `
@@ -650,7 +683,7 @@ export const Map = () => {
             ${departuresHtml}
           </div>
           <div class="mt-4 pt-2 border-t border-surface-container-high text-[9px] text-secondary font-label uppercase tracking-widest text-center opacity-70">
-            Updated ${lastUpdated}
+            ${i18next.t('map.updated', { time: lastUpdated })}
           </div>
         `;
 
@@ -675,11 +708,11 @@ export const Map = () => {
             const overlay = document.createElement('div');
               overlay.className = 'absolute inset-0 backdrop-blur-md bg-surface/90 z-[100] flex flex-col items-center justify-center p-4 text-center rounded-[16px] overflow-hidden min-h-full';
             overlay.innerHTML = `
-              <h4 class="font-headline font-bold text-xs text-primary uppercase tracking-widest mb-2">Set Alert</h4>
-              <p class="text-[10px] text-secondary mb-4 leading-tight">Notify me before ${line} to ${dest} departs.</p>
+              <h4 class="font-headline font-bold text-xs text-primary uppercase tracking-widest mb-2">${i18next.t('map.setAlert')}</h4>
+              <p class="text-[10px] text-secondary mb-4 leading-tight">${i18next.t('map.notifyBefore', { line, dest })}</p>
               <div class="flex flex-col gap-2 w-full">
-                <button id="alert-5" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">5 Mins Before</button>
-                <button id="alert-10" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">10 Mins Before</button>                  <button id="alert-15" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">15 Mins Before</button>                <button id="alert-cancel" class="py-1 text-[10px] text-secondary hover:text-primary mt-1 uppercase font-bold tracking-widest">Cancel</button>
+                <button id="alert-5" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">${i18next.t('map.fiveMin')}</button>
+                <button id="alert-10" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">${i18next.t('map.tenMin')}</button>                  <button id="alert-15" class="py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors">${i18next.t('map.fifteenMin')}</button>                <button id="alert-cancel" class="py-1 text-[10px] text-secondary hover:text-primary mt-1 uppercase font-bold tracking-widest">${i18next.t('common.cancel')}</button>
               </div>
             `;
             popupContent.appendChild(overlay);
@@ -927,7 +960,7 @@ export const Map = () => {
                 🚶
               </div>
               <div style="background: white; color: #374151; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); white-space: nowrap; text-align: center;">
-                ${walkMins} min · ${walkDist}
+                ${walkMins} ${i18next.t('arrivals.min')} · ${walkDist}
               </div>
             `;
             journeyMarkers.current.push(
@@ -946,7 +979,7 @@ export const Map = () => {
               ${routeLabel}
             </div>
             <div style="background: white; color: #374151; font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); white-space: nowrap; text-align: center; max-width: 130px; overflow: hidden; text-overflow: ellipsis;">
-              ${leg.from.name || 'Board'} · ${fmtTime(leg.startTime)}
+              ${leg.from.name || i18next.t('map.board')} · ${fmtTime(leg.startTime)}
             </div>
           `;
           // Offset transit markers slightly above the point so they don't overlap with start/end
@@ -963,7 +996,7 @@ export const Map = () => {
                 <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color};"></div>
               </div>
               <div style="background: white; color: #6b7280; font-size: 8px; font-weight: 600; padding: 1px 4px; border-radius: 4px; margin-top: 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap; max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
-                ${leg.to.name || 'Alight'} · ${fmtTime(leg.endTime)}
+                ${leg.to.name || i18next.t('map.alight')} · ${fmtTime(leg.endTime)}
               </div>
             `;
             journeyMarkers.current.push(
@@ -985,7 +1018,7 @@ export const Map = () => {
             📍
           </div>
           <div style="background: #003571; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-top: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">
-            Start · ${fmtTime(itinerary.startTime)}
+            ${i18next.t('map.start')} · ${fmtTime(itinerary.startTime)}
           </div>
         `;
         journeyMarkers.current.push(
@@ -1004,7 +1037,7 @@ export const Map = () => {
             🏁
           </div>
           <div style="background: #DC143C; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-top: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">
-            ${last.to.name || 'Arrive'} · ${fmtTime(itinerary.endTime)}
+            ${last.to.name || i18next.t('map.arrive')} · ${fmtTime(itinerary.endTime)}
           </div>
         `;
         journeyMarkers.current.push(
@@ -1047,7 +1080,7 @@ export const Map = () => {
     if (userLocation && map.current) {
       // Don't fly to 0,0
       if (Math.abs(userLocation[0]) < 0.1 && Math.abs(userLocation[1]) < 0.1) {
-        alert('Waiting for GPS...');
+        alert(i18next.t('map.waitingGps'));
         return;
       }
       map.current.flyTo({
@@ -1056,7 +1089,7 @@ export const Map = () => {
         essential: true
       });
     } else if (locationError) {
-      alert(`Location error: ${locationError}`);
+      alert(i18next.t('map.locationError', { error: locationError }));
     }
   };
 
@@ -1066,12 +1099,50 @@ export const Map = () => {
         <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer" className="no-underline text-inherit">OpenFreeMap</a>, <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="no-underline text-inherit">OSM</a>, <a href="https://www.opentripplanner.org" target="_blank" rel="noopener noreferrer" className="no-underline text-inherit">OTP</a> & <a href="https://transpordiamet.ee" target="_blank" rel="noopener noreferrer" className="no-underline text-inherit">Transpordiamet</a>
       </div>
 
+      {/* Dark/Light Map Toggle */}
+      <button
+        onClick={async () => {
+          if (!map.current) return;
+          const goLight = isDarkMap;
+          try {
+            if (goLight) {
+              map.current.setStyle('https://tiles.openfreemap.org/styles/bright');
+            } else {
+              const darkStyle = await fetchDarkMapStyle();
+              map.current.setStyle(darkStyle);
+            }
+            setIsDarkMap(!isDarkMap);
+          } catch (err) {
+            console.error('Style toggle failed:', err);
+          }
+        }}
+        className="absolute z-10 bg-white hover:bg-gray-100 p-1.5 rounded-md shadow-lg border border-surface-container-high transition-colors"
+        style={{ top: 'calc(env(safe-area-inset-top) + 11.5rem)', right: '10px' }}
+        title={isDarkMap ? 'Switch to light map' : 'Switch to dark map'}
+      >
+        {isDarkMap ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+      </button>
 
+
+
+      {/* Service Alerts Button */}
+      <button
+        onClick={() => setShowAlertsPanel(true)}
+        className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-4 z-10 bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors group"
+        title={t('map.serviceAlerts')}
+      >
+        <Construction className="w-5 h-5 text-red-500" />
+        {serviceAlerts.length > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
+            {serviceAlerts.length > 9 ? '9+' : serviceAlerts.length}
+          </span>
+        )}
+      </button>
 
       <button 
         onClick={handleLocateMe}
-        className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-10 bg-white p-3 rounded-full shadow-lg border border-surface-container-high hover:bg-surface-container-low transition-colors group"
-        title="Locate me"
+        className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-10 bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors group"
+        title={t('map.locateMe')}
       >
         <Navigation className={`w-5 h-5 ${userLocation ? 'text-blue-600 fill-blue-600' : 'text-primary'}`} />
       </button>
@@ -1082,7 +1153,7 @@ export const Map = () => {
         <div className="absolute inset-0 bg-surface/20 backdrop-blur-[2px] z-50 flex items-center justify-center">
           <div className="bg-surface p-4 rounded-full shadow-xl flex items-center gap-3">
             <Loader2 className="w-5 h-5 text-primary animate-spin" />
-            <span className="font-headline font-bold text-primary">Fetching departures...</span>
+            <span className="font-headline font-bold text-primary">{t('map.fetchingDepartures')}</span>
           </div>
         </div>
       )}
@@ -1111,7 +1182,7 @@ export const Map = () => {
                 </div>
                 <div>
                   <h3 className="font-headline font-bold text-xl gradient-text leading-tight">
-                    {selectedVehicle.vehicle.destination || 'Unknown Destination'}
+                    {selectedVehicle.vehicle.destination || t('map.unknownDestination')}
                   </h3>
                   <p className="font-label text-xs text-secondary font-bold uppercase tracking-widest mt-0.5">
                     {selectedVehicle.vehicle.type}{selectedVehicle.vehicle.speed && selectedVehicle.vehicle.speed > 0 ? ` • ${Math.round(selectedVehicle.vehicle.speed)} km/h` : ''}
@@ -1132,9 +1203,9 @@ export const Map = () => {
               </div>
               
               <div className="flex flex-col gap-2">
-                <h4 className="font-label text-xs font-bold text-secondary uppercase tracking-widest px-2 gradient-text">Route Stops</h4>
+                <h4 className="font-label text-xs font-bold text-secondary uppercase tracking-widest px-2 gradient-text">{t('map.routeStops')}</h4>
                 {selectedVehicle.routeStops.length === 0 ? (
-                  <p className="text-sm text-secondary px-2">Route data not available</p>
+                  <p className="text-sm text-secondary px-2">{t('map.routeNotAvailable')}</p>
                 ) : (
                   selectedVehicle.routeStops.map((stop, idx) => {
                     const st = tripStoptimes.find(t => t.stopName === stop.name);
@@ -1165,6 +1236,75 @@ export const Map = () => {
                   })
                 )}
               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Service Alerts Panel */}
+      <AnimatePresence>
+        {showAlertsPanel && (
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="absolute bottom-0 left-0 right-0 z-50 rounded-t-[32px] editorial-shadow bg-surface flex flex-col"
+            style={{ maxHeight: 'calc(100vh - 4.5rem - env(safe-area-inset-top))', paddingBottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}
+          >
+            <div className="w-full flex justify-center pt-3 pb-2" onClick={() => setShowAlertsPanel(false)}>
+              <div className="w-12 h-1.5 bg-outline-variant/30 rounded-full" />
+            </div>
+
+            <div className="px-6 pb-4 flex items-center justify-between border-b border-outline-variant/10">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-red-100">
+                  <TriangleAlert className="w-5 h-5 text-red-500" />
+                </div>
+                <h3 className="font-headline font-bold text-xl gradient-text leading-tight">
+                  {t('map.serviceAlerts')}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAlertsPanel(false)}
+                className="p-2 rounded-full bg-surface-container-high text-secondary hover:text-primary transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3">
+              {serviceAlerts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-secondary">
+                  <Construction className="w-12 h-12 mb-3 opacity-30" />
+                  <p className="font-label font-bold text-sm">{t('map.noServiceAlerts')}</p>
+                </div>
+              ) : (
+                serviceAlerts.map(alert => (
+                  <div key={alert.id} className="bg-red-50 border border-red-200/50 rounded-[20px] p-4 space-y-2">
+                    <div className="flex items-start gap-3">
+                      {alert.routes.length > 0 && (
+                        <div className="flex flex-wrap gap-1 shrink-0">
+                          {alert.routes.map((r, i) => (
+                            <span key={i} className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                              {r.shortName}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="font-label font-bold text-sm text-on-surface leading-snug">{alert.headerText}</p>
+                    </div>
+                    {alert.descriptionText && alert.descriptionText !== alert.headerText && (
+                      <p className="font-body text-xs text-secondary leading-relaxed">{alert.descriptionText}</p>
+                    )}
+                    {alert.effectiveEndDate && (
+                      <p className="font-label text-[10px] text-secondary uppercase tracking-wider">
+                        Until {new Date(alert.effectiveEndDate * 1000).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </motion.div>
         )}

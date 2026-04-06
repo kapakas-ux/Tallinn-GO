@@ -86,3 +86,13 @@ export interface PlanItinerary {
   transfers: number;
   legs: PlanLeg[];
 }
+
+export interface ServiceAlert {
+  id: string;
+  headerText: string;
+  descriptionText: string;
+  url?: string;
+  effectiveStartDate?: number; // unix seconds
+  effectiveEndDate?: number;   // unix seconds
+  routes: { shortName: string; mode: string }[];
+}

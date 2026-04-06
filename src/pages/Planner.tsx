@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import {
@@ -211,8 +212,9 @@ interface CardProps {
 }
 
 const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onToggle, onViewOnMap }) => {
+  const { t } = useTranslation();
   const leavesInMin = Math.round((itinerary.startTime - Date.now()) / 60000);
-  const label = index === 0 ? 'Fastest' : index === 1 ? 'Alternative' : 'Less walking';
+  const label = index === 0 ? t('planner.fastest') : index === 1 ? t('planner.alternative') : t('planner.lessWalking');
 
   return (
     <div
@@ -229,7 +231,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
               {fmtDuration(itinerary.duration)}
             </span>
             <p className="font-label text-[10px] uppercase tracking-widest text-secondary font-bold mt-0.5">
-              {label} &middot; {itinerary.transfers === 0 ? 'Direct' : `${itinerary.transfers} transfer${itinerary.transfers > 1 ? 's' : ''}`}
+              {label} &middot; {itinerary.transfers === 0 ? t('planner.direct') : t('planner.transfer', { count: itinerary.transfers })}
             </p>
           </div>
           <div className="text-right">
@@ -237,7 +239,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
               {fmtTime(itinerary.startTime)} &ndash; {fmtTime(itinerary.endTime)}
             </p>
             <p className="font-label text-[10px] text-secondary mt-0.5">
-              {leavesInMin > 0 ? `Leaves in ${leavesInMin} min` : leavesInMin === 0 ? 'Leaving now' : 'Departed'}
+              {leavesInMin > 0 ? t('planner.leavesIn', { min: leavesInMin }) : leavesInMin === 0 ? t('planner.leavingNow') : t('planner.departed')}
             </p>
           </div>
         </div>
@@ -264,7 +266,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
           ))}
           {itinerary.walkDistance > 0 && (
             <span className="ml-auto font-label text-[9px] text-secondary uppercase tracking-wide">
-              {fmtDistance(itinerary.walkDistance)} walk total
+              {t('planner.walkTotal', { distance: fmtDistance(itinerary.walkDistance) })}
             </span>
           )}
         </div>
@@ -299,17 +301,17 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
                       {fmtTime(leg.startTime)}
                     </span>
                     <span className="font-headline font-bold text-sm text-on-surface">
-                      {leg.from.name || 'Departure'}
+                      {!leg.from.name || leg.from.name === 'Origin' ? t('planner.origin') : leg.from.name}
                     </span>
                   </div>
                   {leg.mode !== 'WALK' ? (
                     <p className="text-xs text-secondary mt-0.5">
-                      {leg.mode === 'TRAM' ? 'Tram' : leg.mode === 'RAIL' ? 'Train' : 'Bus'} {leg.routeShortName}
+                      {leg.mode === 'TRAM' ? t('planner.tram') : leg.mode === 'RAIL' ? t('planner.train') : t('planner.bus')} {leg.routeShortName}
                       {leg.headsign ? ` â†’ ${leg.headsign}` : ''}
                     </p>
                   ) : (
                     <p className="text-xs text-secondary mt-0.5">
-                      Walk {fmtDistance(leg.distance)} &middot; {Math.ceil(leg.duration / 60)} min
+                      {t('planner.walkLeg', { distance: fmtDistance(leg.distance), duration: Math.ceil(leg.duration / 60) })}
                     </p>
                   )}
                 </div>
@@ -325,7 +327,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
                     {fmtTime(itinerary.endTime)}
                   </span>
                   <span className="font-headline font-bold text-sm text-on-surface ml-2">
-                    {itinerary.legs[itinerary.legs.length - 1].to.name || 'Destination'}
+                    {!itinerary.legs[itinerary.legs.length - 1].to.name || itinerary.legs[itinerary.legs.length - 1].to.name === 'Destination' ? t('planner.destination') : itinerary.legs[itinerary.legs.length - 1].to.name}
                   </span>
                 </div>
               </div>
@@ -338,7 +340,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
               className="w-full py-3 rounded-[16px] bg-primary text-white font-headline font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
             >
               <MapIcon className="w-4 h-4" />
-              View on Map
+              {t('planner.viewOnMap')}
             </button>
           </div>
         </div>
@@ -354,8 +356,9 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
 // â”€â”€â”€ main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const Planner = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const [from, setFrom] = useState('Current Location');
+  const [from, setFrom] = useState(t('planner.currentLocation'));
   const [to, setTo] = useState('');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isSimulated, setIsSimulated] = useState(false);
@@ -422,10 +425,10 @@ export const Planner = () => {
     setSuggestions([]);
   };
 
-  const swapLocations = () => { const t = from; setFrom(to); setTo(t); };
+  const swapLocations = () => { const tmp = from; setFrom(to); setTo(tmp); };
 
   const resolveCoords = useCallback((name: string, type: 'from' | 'to'): { lat: number; lon: number } | null => {
-    if (name === 'Current Location') {
+    if (name === t('planner.currentLocation')) {
       return userCoords ? { lat: userCoords.lat, lon: userCoords.lng } : null;
     }
     // Use the exact stop that was selected from the dropdown first
@@ -434,7 +437,7 @@ export const Planner = () => {
     // Fall back to first name match
     const stop = stops.find(s => s.name === name);
     return stop ? { lat: stop.lat, lon: stop.lng } : null;
-  }, [stops, userCoords]);
+  }, [stops, userCoords, t]);
 
   const findRoutes = async (overrideFrom?: string, overrideTo?: string) => {
     const searchFrom = overrideFrom ?? from;
@@ -442,9 +445,9 @@ export const Planner = () => {
     setError(null);
     const fromCoords = resolveCoords(searchFrom, 'from');
     const toCoords = resolveCoords(searchTo, 'to');
-    if (!fromCoords) { setError(searchFrom === 'Current Location' ? 'Waiting for GPS...' : `Stop not found: "${searchFrom}"`); return; }
-    if (!toCoords) { setError(`Stop not found: "${searchTo}"`); return; }
-    if (fromCoords.lat === toCoords.lat && fromCoords.lon === toCoords.lon) { setError('Origin and destination are the same.'); return; }
+    if (!fromCoords) { setError(searchFrom === t('planner.currentLocation') ? t('planner.waitingGps') : t('planner.stopNotFound', { name: searchFrom })); return; }
+    if (!toCoords) { setError(t('planner.stopNotFound', { name: searchTo })); return; }
+    if (fromCoords.lat === toCoords.lat && fromCoords.lon === toCoords.lon) { setError(t('planner.sameOriginDest')); return; }
 
     setIsLoading(true);
     setItineraries([]);
@@ -454,11 +457,11 @@ export const Planner = () => {
         ? { date: selectedDate, time: selectedTime, arriveBy: timeMode === 'arrive-at' }
         : undefined;
       const results = await planJourney(fromCoords.lat, fromCoords.lon, toCoords.lat, toCoords.lon, 3, timeOptions);
-      if (!results.length) setError('No routes found between these stops.');
+      if (!results.length) setError(t('map.noRoutes'));
       else { setItineraries(results); setExpandedIndex(0); saveSearch(searchFrom, searchTo); setSearchHistory(getSearchHistory()); }
     } catch (e) {
       console.error(e);
-      setError('Could not fetch routes. Check your connection.');
+      setError(t('map.connectionError'));
     } finally {
       setIsLoading(false);
     }
@@ -471,7 +474,7 @@ export const Planner = () => {
 
   return (
     <div className="max-w-2xl mx-auto px-4 pb-8 pt-4" ref={containerRef}>
-      <h1 className="font-headline font-black text-2xl mb-6 px-2 gradient-text">Plan a Journey</h1>
+      <h1 className="font-headline font-black text-2xl mb-6 px-2 gradient-text">{t('planner.title')}</h1>
 
       {/* Search inputs */}
       <section className="relative bg-surface-container-low p-4 rounded-[20px] mb-6 shadow-sm">
@@ -481,22 +484,22 @@ export const Planner = () => {
             'flex items-center gap-3 bg-surface-container-lowest p-4 rounded-[16px] shadow-sm border-2 transition-all',
             activeInput === 'from' ? 'border-primary' : 'border-transparent'
           )}>
-            <Navigation className={cn('w-5 h-5 shrink-0', from === 'Current Location' ? 'text-blue-500 fill-blue-500' : 'text-secondary')} />
+            <Navigation className={cn('w-5 h-5 shrink-0', from === t('planner.currentLocation') ? 'text-blue-500 fill-blue-500' : 'text-secondary')} />
             <div className="flex-1 min-w-0">
-              <p className="text-[9px] font-label uppercase tracking-widest text-secondary mb-0.5">From</p>
+              <p className="text-[9px] font-label uppercase tracking-widest text-secondary mb-0.5">{t('planner.from')}</p>
               <input
                 className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none font-headline font-semibold text-on-surface placeholder:text-outline-variant text-sm"
                 value={from}
                 onChange={e => handleSearch(e.target.value, 'from')}
                 onFocus={() => {
                   setActiveInput('from');
-                  if (from === 'Current Location') { setFrom(''); setSuggestions(stops.slice(0, 6)); }
+                  if (from === t('planner.currentLocation')) { setFrom(''); setSuggestions(stops.slice(0, 6)); }
                   else handleSearch(from, 'from');
                 }}
-                placeholder="Starting point..."
+                placeholder={t('planner.fromPlaceholder')}
               />
             </div>
-            {from !== 'Current Location' && from !== '' && (
+            {from !== t('planner.currentLocation') && from !== '' && (
               <button onClick={() => setFrom('')} className="text-secondary shrink-0"><X className="w-4 h-4" /></button>
             )}
           </div>
@@ -516,13 +519,13 @@ export const Planner = () => {
           )}>
             <MapPin className="text-error w-5 h-5 shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-[9px] font-label uppercase tracking-widest text-secondary mb-0.5">To</p>
+              <p className="text-[9px] font-label uppercase tracking-widest text-secondary mb-0.5">{t('planner.to')}</p>
               <input
                 className="w-full bg-transparent border-none p-0 focus:ring-0 outline-none font-headline font-semibold text-on-surface placeholder:text-outline-variant text-sm"
                 value={to}
                 onChange={e => handleSearch(e.target.value, 'to')}
                 onFocus={() => { setActiveInput('to'); handleSearch(to, 'to'); }}
-                placeholder="Where to?"
+                placeholder={t('planner.toPlaceholder')}
               />
             </div>
             {to !== '' && (
@@ -533,9 +536,9 @@ export const Planner = () => {
           {/* Autocomplete dropdown */}
           {activeInput && (suggestions.length > 0 || activeInput === 'from') && (
             <div className="dropdown-popover absolute left-0 right-0 top-full mt-2 rounded-[16px] shadow-2xl z-50 overflow-hidden">
-              {activeInput === 'from' && from !== 'Current Location' && (
+              {activeInput === 'from' && from !== t('planner.currentLocation') && (
                 <button
-                  onClick={() => { setFrom('Current Location'); selectedFromStop.current = null; setActiveInput(null); setSuggestions([]); }}
+                  onClick={() => { setFrom(t('planner.currentLocation')); selectedFromStop.current = null; setActiveInput(null); setSuggestions([]); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10"
                 >
                   <div className="bg-blue-500/10 p-2 rounded-full shrink-0">
@@ -543,10 +546,10 @@ export const Planner = () => {
                   </div>
                   <div>
                     <p className="font-headline font-bold text-blue-400 text-sm">
-                      {isSimulated ? 'Simulate My Location' : 'Use My Location'}
+                      {isSimulated ? t('planner.simulateLocation') : t('planner.useMyLocation')}
                     </p>
                     <p className="text-[9px] font-label uppercase tracking-wider text-blue-500/60">
-                      {isSimulated ? 'Tallinn Center' : 'Real-time GPS'}
+                      {isSimulated ? t('planner.tallinnCenter') : t('planner.realtimeGps')}
                     </p>
                   </div>
                 </button>
@@ -564,7 +567,7 @@ export const Planner = () => {
                     <p className="font-headline font-bold text-on-surface text-sm truncate">{stop.name}</p>
                     <p className="text-[9px] font-label text-secondary truncate mt-0.5">
                       {[stop.desc, stop.siriId ? `#${stop.siriId}` : null]
-                        .filter(Boolean).join(' \u00b7 ') || 'Stop'}
+                        .filter(Boolean).join(' \u00b7 ') || t('planner.stop')}
                     </p>
                   </div>
                   {stop.modes && stop.modes.length > 0 && (
@@ -588,9 +591,9 @@ export const Planner = () => {
           {/* Mode toggle pills */}
           <div className="flex gap-1.5 bg-surface-container-lowest rounded-[14px] p-1 shadow-sm">
             {([
-              { key: 'now' as const, label: 'Leave now', icon: '⚡' },
-              { key: 'leave-at' as const, label: 'Leave at', icon: '🕐' },
-              { key: 'arrive-at' as const, label: 'Arrive by', icon: '🏁' },
+              { key: 'now' as const, label: t('planner.leaveNow'), icon: '⚡' },
+              { key: 'leave-at' as const, label: t('planner.leaveAt'), icon: '🕐' },
+              { key: 'arrive-at' as const, label: t('planner.arriveBy'), icon: '🏁' },
             ]).map(opt => (
               <button
                 key={opt.key}
@@ -630,7 +633,7 @@ export const Planner = () => {
                   <CalendarDays className="w-4 h-4 text-primary shrink-0" />
                   <span className="font-headline font-bold text-sm text-on-surface whitespace-nowrap">
                     {selectedDate === new Date().toISOString().slice(0, 10)
-                      ? 'Today'
+                      ? t('planner.today')
                       : new Date(selectedDate + 'T00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
                   </span>
                   <input
@@ -670,7 +673,7 @@ export const Planner = () => {
                     const tmrw = new Date(now);
                     tmrw.setDate(tmrw.getDate() + 1);
                     pills.push({
-                      label: 'Tmrw',
+                      label: t('planner.tmrw'),
                       date: tmrw.toISOString().slice(0, 10),
                       time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
                     });
@@ -718,7 +721,7 @@ export const Planner = () => {
                 onClick={() => setTimePickerOpen(false)}
                 className="w-full py-2.5 text-primary font-label font-bold text-xs uppercase tracking-widest border-t border-outline-variant/10"
               >
-                Done
+                {t('common.done')}
               </button>
             </div>
           )}
@@ -730,9 +733,9 @@ export const Planner = () => {
           className="w-full mt-4 bg-primary text-white py-4 rounded-[16px] font-headline font-black text-base shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isLoading ? (
-            <><Loader2 className="w-5 h-5 animate-spin" />Planning route...</>
+            <><Loader2 className="w-5 h-5 animate-spin" />{t('planner.planningRoute')}</>
           ) : (
-            <><Search className="w-5 h-5" />Find Routes</>
+            <><Search className="w-5 h-5" />{t('planner.findRoutes')}</>
           )}
         </button>
       </section>
@@ -743,13 +746,13 @@ export const Planner = () => {
           <div className="flex items-center justify-between px-2 mb-2">
             <div className="flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-secondary" />
-              <h2 className="font-label font-bold text-[10px] uppercase tracking-widest text-secondary">Recent</h2>
+              <h2 className="font-label font-bold text-[10px] uppercase tracking-widest text-secondary">{t('planner.recent')}</h2>
             </div>
             <button
               onClick={() => { localStorage.removeItem(HISTORY_KEY); setSearchHistory([]); }}
               className="text-[9px] font-label text-secondary/50 uppercase tracking-wider hover:text-primary transition-colors"
             >
-              Clear
+              {t('planner.clear')}
             </button>
           </div>
           <div className="flex flex-col gap-2">
@@ -769,7 +772,7 @@ export const Planner = () => {
                   <RouteIcon className="w-4 h-4 text-secondary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-headline font-bold text-sm text-on-surface truncate">{entry.from === 'Current Location' ? '📍 Current Location' : entry.from}</p>
+                  <p className="font-headline font-bold text-sm text-on-surface truncate">{entry.from === 'Current Location' ? `📍 ${t('planner.currentLocation')}` : entry.from}</p>
                   <p className="text-[10px] text-secondary truncate">→ {entry.to}</p>
                 </div>
               </button>
@@ -792,7 +795,7 @@ export const Planner = () => {
           <div className="flex items-center gap-2 px-1 mb-2">
             <Clock className="w-4 h-4 text-secondary" />
             <h2 className="font-label font-bold text-[10px] uppercase tracking-widest text-secondary">
-              {itineraries.length} route{itineraries.length > 1 ? 's' : ''} found
+              {t('planner.routeFound', { count: itineraries.length })}
             </h2>
           </div>
           {itineraries.map((it, i) => (
@@ -815,7 +818,7 @@ export const Planner = () => {
             <Search className="w-8 h-8 opacity-40" />
           </div>
           <p className="font-label font-bold text-[10px] uppercase tracking-widest opacity-60">
-            Enter origin &amp; destination above
+            {t('planner.enterOriginDest')}
           </p>
         </div>
       )}

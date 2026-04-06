@@ -1237,7 +1237,7 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
 export async function computeEtaToStop(
   arrival: Arrival,
   stop: Stop
-): Promise<{ etaMinutes: number; source: 'gps' | 'schedule' | 'blended' }> {
+): Promise<{ etaMinutes: number; source: 'gps' | 'schedule' | 'blended' | 'passed' }> {
   const scheduleEta = arrival.minutes; // Fallback: peatus.ee realtime/scheduled minutes
   
   // 1. Try to find the matching vehicle on the map
@@ -1270,8 +1270,23 @@ export async function computeEtaToStop(
     targetIdx = routeStops.findIndex(s => s.id.split('-')[0] === baseId);
   }
   
-  if (vehicleClosestIdx === -1 || targetIdx === -1 || vehicleClosestIdx >= targetIdx) {
-    // Vehicle has already passed the stop, or can't resolve position — fall back to sched
+  if (vehicleClosestIdx === -1 || targetIdx === -1) {
+    return { etaMinutes: scheduleEta, source: 'schedule' };
+  }
+  
+  if (vehicleClosestIdx > targetIdx) {
+    // Vehicle appears to have passed the stop.
+    // Only trust this if the vehicle is close to the route (not at a depot)
+    // and only 1-3 stops past (further means likely a wrong match / return trip).
+    if (minVehicleDist < 0.3 && (vehicleClosestIdx - targetIdx) <= 3) {
+      return { etaMinutes: 0, source: 'passed' };
+    }
+    // Otherwise, don't trust the match — fall back to schedule
+    return { etaMinutes: scheduleEta, source: 'schedule' };
+  }
+  
+  if (vehicleClosestIdx === targetIdx) {
+    // Vehicle is at the target stop — keep schedule ETA (bus is here or about to depart)
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
 
@@ -1655,6 +1670,16 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     if (targetStop) {
       await Promise.all(arrivals.map(async (arrival) => {
         const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
+        
+        if (source === 'passed') {
+          // GPS confirms vehicle has already passed this stop
+          arrival.status = 'departed';
+          arrival.minutes = 0;
+          arrival.departureTimeSeconds = Math.floor(Date.now() / 1000);
+          arrival.info = 'Live GPS';
+          return;
+        }
+        
         arrival.minutes = etaMinutes;
         
         // Update departureTimeSeconds to match the new GPS-based minutes
@@ -1771,4 +1796,66 @@ export async function planJourney(
   });
 
   return itineraries;
+}
+
+/**
+ * Fetch active service alerts from peatus.ee GraphQL API.
+ */
+export async function fetchServiceAlerts(): Promise<import('../types').ServiceAlert[]> {
+  const query = `{
+    alerts {
+      id
+      alertHeaderText
+      alertDescriptionText
+      alertUrl
+      effectiveStartDate
+      effectiveEndDate
+      route { shortName mode }
+    }
+  }`;
+
+  try {
+    const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+    let text = '';
+
+    if (Capacitor.isNativePlatform()) {
+      const response = await CapacitorHttp.post({
+        url,
+        headers: { 'Content-Type': 'application/json' },
+        data: { query }
+      });
+      text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    } else {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      text = await response.text();
+    }
+
+    const data = JSON.parse(text);
+    const rawAlerts = data?.data?.alerts;
+    if (!rawAlerts || !Array.isArray(rawAlerts)) return [];
+
+    const nowSec = Date.now() / 1000;
+    return rawAlerts
+      .filter((a: any) => {
+        const start = a.effectiveStartDate ?? 0;
+        const end = a.effectiveEndDate ?? Number.MAX_SAFE_INTEGER;
+        return nowSec >= start && nowSec <= end;
+      })
+      .map((a: any) => ({
+        id: a.id ?? String(Math.random()),
+        headerText: a.alertHeaderText ?? '',
+        descriptionText: a.alertDescriptionText ?? '',
+        url: a.alertUrl ?? undefined,
+        effectiveStartDate: a.effectiveStartDate ?? undefined,
+        effectiveEndDate: a.effectiveEndDate ?? undefined,
+        routes: a.route ? [{ shortName: a.route.shortName ?? '', mode: a.route.mode ?? '' }] : [],
+      }));
+  } catch (error) {
+    console.error('Error fetching service alerts:', error);
+    return [];
+  }
 }

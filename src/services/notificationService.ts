@@ -1,6 +1,50 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { getSettings, ALARM_SOUNDS } from './settingsService';
+import i18next from 'i18next';
+
+// Strong vibration pattern for departure alerts (ms): pause-vibrate-pause-vibrate...
+// Pattern: short burst, pause, long burst, pause, short burst
+const ALERT_VIBRATION_PATTERN = [0, 200, 100, 400, 100, 200];
+const VIBRATION_CYCLE_MS = ALERT_VIBRATION_PATTERN.reduce((a, b) => a + b, 0) + 500; // pattern duration + pause
+
+let vibrationInterval: ReturnType<typeof setInterval> | null = null;
+
+function startContinuousVibration() {
+  stopContinuousVibration();
+  if (!navigator.vibrate) return;
+  navigator.vibrate(ALERT_VIBRATION_PATTERN);
+  vibrationInterval = setInterval(() => {
+    navigator.vibrate(ALERT_VIBRATION_PATTERN);
+  }, VIBRATION_CYCLE_MS);
+}
+
+function stopContinuousVibration() {
+  if (vibrationInterval) {
+    clearInterval(vibrationInterval);
+    vibrationInterval = null;
+  }
+  if (navigator.vibrate) {
+    navigator.vibrate(0); // cancel any ongoing vibration
+  }
+}
+
+// Register notification listeners for vibration on Android
+let listenerRegistered = false;
+function registerVibrationListener() {
+  if (listenerRegistered || !Capacitor.isNativePlatform()) return;
+  listenerRegistered = true;
+
+  // Start buzzing when notification fires
+  LocalNotifications.addListener('localNotificationReceived', () => {
+    startContinuousVibration();
+  });
+
+  // Stop buzzing when user taps or dismisses
+  LocalNotifications.addListener('localNotificationActionPerformed', () => {
+    stopContinuousVibration();
+  });
+}
 
 
 export const scheduleDepartureNotification = async (
@@ -19,8 +63,8 @@ export const scheduleDepartureNotification = async (
           const delayMs = (minutesToDeparture - minutesBefore) * 60 * 1000;
           if (delayMs > 0) {
             setTimeout(() => {
-              new Notification(`GO NOW: ${line} to ${destination}`, {
-                body: `Your bus from ${stopName} is arriving in ${minutesBefore} minutes!`,
+              new Notification(i18next.t('notifications.title', { line, destination }), {
+                body: i18next.t('notifications.body', { stopName, minutes: minutesBefore }),
                 icon: '/logo.png'
               });
             }, delayMs);
@@ -36,6 +80,8 @@ export const scheduleDepartureNotification = async (
   try {
     const permission = await LocalNotifications.requestPermissions();
     if (permission.display !== 'granted') return true;
+
+    registerVibrationListener();
 
     const scheduleDate = new Date();
     scheduleDate.setSeconds(scheduleDate.getSeconds() + (minutesToDeparture - minutesBefore) * 60);
@@ -64,8 +110,8 @@ export const scheduleDepartureNotification = async (
     await LocalNotifications.schedule({
       notifications: [
         {
-          title: `GO NOW: ${line} to ${destination}`,
-          body: `Your bus from ${stopName} is arriving in ${minutesBefore} minutes!`,
+          title: i18next.t('notifications.title', { line, destination }),
+          body: i18next.t('notifications.body', { stopName, minutes: minutesBefore }),
           id: Math.floor(Math.random() * 1000000),
           schedule: { at: scheduleDate },
           channelId,

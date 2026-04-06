@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleColorClass } from '../lib/utils';
@@ -17,6 +18,7 @@ import { getDailyFact, dismissDailyFact } from '../services/dailyFactService';
 import { getSettings } from '../services/settingsService';
 
 export const Dashboard = () => {
+  const { t } = useTranslation();
   const [closestStop, setClosestStop] = useState(null as Stop | null);
   const [nearbyStops, setNearbyStops] = useState([] as Stop[]);
   const [userLocation, setUserLocation] = useState(null as { lat: number; lng: number } | null);
@@ -75,19 +77,37 @@ export const Dashboard = () => {
   }, []);
 
   const emojiOptions = [
-    { label: 'Home', emoji: '🏠' },
-    { label: 'Gym', emoji: '🏋️' },
-    { label: 'Work', emoji: '💼' },
-    { label: 'Market', emoji: '🛒' },
-    { label: 'Airport', emoji: '✈️' },
-    { label: 'Bus', emoji: '🚌' },
-    { label: 'Heart', emoji: '❤️' },
+    { label: t('dashboard.emojiHome'), emoji: '🏠' },
+    { label: t('dashboard.emojiGym'), emoji: '🏋️' },
+    { label: t('dashboard.emojiWork'), emoji: '💼' },
+    { label: t('dashboard.emojiMarket'), emoji: '🛒' },
+    { label: t('dashboard.emojiAirport'), emoji: '✈️' },
+    { label: t('dashboard.emojiBus'), emoji: '🚌' },
+    { label: t('dashboard.emojiHeart'), emoji: '❤️' },
   ];
 
   useEffect(() => {
     setFavorites(getFavorites());
     setScheduledAlerts(getActiveAlerts());
   }, []);
+
+  // Auto-fetch departures for favorite stops
+  useEffect(() => {
+    if (favorites.length === 0) return;
+    favorites.forEach(async (fav) => {
+      if (nearbyDepartures[fav.id]) return;
+      setNearbyLoading(prev => ({ ...prev, [fav.id]: true }));
+      try {
+        const deps = await fetchDepartures(fav.id, fav.siriId);
+        setNearbyDepartures(prev => ({ ...prev, [fav.id]: deps.slice(0, 6) }));
+      } catch (err) {
+        console.error('Failed to load fav departures', err);
+      } finally {
+        setNearbyLoading(prev => ({ ...prev, [fav.id]: false }));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favorites]);
 
   // Continuous geolocation tracking
   useEffect(() => {
@@ -281,7 +301,7 @@ export const Dashboard = () => {
     nearbyStops.length > 0 && (
       <section className="mb-12 space-y-4">
         <div className="flex items-baseline justify-between">
-          <h3 className="font-headline font-bold text-2xl gradient-text">Nearby Stops</h3>
+          <h3 className="font-headline font-bold text-2xl gradient-text">{t('dashboard.nearbyStops')}</h3>
         </div>
         <div className="grid grid-cols-1 gap-3">
           {nearbyStops.map((stop) => (
@@ -301,7 +321,7 @@ export const Dashboard = () => {
                       "h-10 w-10 rounded-full flex items-center justify-center transition-colors active:scale-90",
                       getStopColorClass(stop)
                     )}
-                    title="View on Map"
+                    title={t('dashboard.viewOnMap')}
                   >
                     <MapPin className="w-5 h-5" />
                   </Link>
@@ -351,9 +371,9 @@ export const Dashboard = () => {
                     <Loader2 className="w-3 h-3 animate-spin text-secondary/40" />
                     <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
                   </div>
-                ) : nearbyDepartures[stop.id]?.length > 0 ? (
+                ) : nearbyDepartures[stop.id]?.filter(a => a.status !== 'departed')?.length > 0 ? (
                   <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 flex gap-3">
-                    {[nearbyDepartures[stop.id].slice(0, 1), nearbyDepartures[stop.id].slice(1, 2)].map((col, ci) => (
+                    {(() => { const active = nearbyDepartures[stop.id].filter(a => a.status !== 'departed'); return [active.slice(0, 1), active.slice(1, 2)]; })().map((col, ci) => (
                       <div key={ci} className="flex-1 min-w-0 space-y-0.5">
                         {col.map((arr, i) => (
                           <div key={i} className="flex items-center justify-between py-0.5 min-w-0">
@@ -366,7 +386,7 @@ export const Dashboard = () => {
                               </span>
                             </div>
                             <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? 'Now' : (arr.time ?? `${getLiveMinutes(arr)}m`)}
+                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : (arr.time ?? `${getLiveMinutes(arr)}m`)}
                             </span>
                           </div>
                         ))}
@@ -411,7 +431,7 @@ export const Dashboard = () => {
                     </div>
                   ) : (
                     <div className="py-4 text-center text-sm text-secondary">
-                      No upcoming departures
+                      {t('dashboard.noUpcoming')}
                     </div>
                   )}
                 </div>
@@ -426,7 +446,7 @@ export const Dashboard = () => {
   const renderFavorites = () => (
     <section className="space-y-4 mb-12">
       <div className="flex items-baseline justify-between">
-        <h3 className="font-headline font-bold text-2xl gradient-text">Favorites</h3>
+        <h3 className="font-headline font-bold text-2xl gradient-text">{t('dashboard.favorites')}</h3>
         {favorites.length > 0 && (
           <button 
             onClick={() => setIsEditingFavs(!isEditingFavs)}
@@ -435,7 +455,7 @@ export const Dashboard = () => {
               isEditingFavs ? "bg-primary text-white" : "text-primary hover:bg-primary/5"
             )}
           >
-            {isEditingFavs ? 'Done' : 'Edit'}
+            {isEditingFavs ? t('common.done') : t('common.edit')}
           </button>
         )}
       </div>
@@ -460,7 +480,7 @@ export const Dashboard = () => {
                     to={`/map?lat=${fav.lat}&lng=${fav.lng}&zoom=20&stopId=${fav.id}`}
                     onClick={(e) => e.stopPropagation()}
                     className="h-10 w-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center hover:bg-amber-500 hover:text-white transition-colors active:scale-90"
-                    title="View on Map"
+                    title={t('dashboard.viewOnMap')}
                   >
                     {fav.emoji ? <span className="text-xl">{fav.emoji}</span> : <MapPin className="w-5 h-5" />}
                   </Link>
@@ -518,6 +538,38 @@ export const Dashboard = () => {
               </div>
             </div>
             
+            {/* Inline departure preview (visible when collapsed) */}
+            {!expandedNearby || expandedNearby !== fav.id ? (
+              nearbyLoading[fav.id] ? (
+                <div className="flex items-center gap-2 px-3 pb-2.5">
+                  <Loader2 className="w-3 h-3 animate-spin text-secondary/40" />
+                  <span className="font-label text-[9px] text-secondary/40 uppercase tracking-widest">Loading...</span>
+                </div>
+              ) : nearbyDepartures[fav.id]?.filter(a => a.status !== 'departed')?.length > 0 ? (
+                <div className="px-3 pb-2.5 border-t border-outline-variant/10 pt-2 flex gap-3">
+                  {(() => { const active = nearbyDepartures[fav.id].filter(a => a.status !== 'departed'); return [active.slice(0, 1), active.slice(1, 2)]; })().map((col, ci) => (
+                    <div key={ci} className="flex-1 min-w-0 space-y-0.5">
+                      {col.map((arr, i) => (
+                        <div key={i} className="flex items-center justify-between py-0.5 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
+                              {arr.line}
+                            </div>
+                            <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
+                              {arr.destination}
+                            </span>
+                          </div>
+                          <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
+                            {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : (arr.time ?? `${getLiveMinutes(arr)}m`)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : null
+            ) : null}
+
             {/* Expanded Departures */}
             {expandedNearby === fav.id && (
               <div className="px-4 pb-4 pt-2 border-t border-outline-variant/20 bg-surface-container-lowest/50 rounded-b-[20px]">
@@ -553,7 +605,7 @@ export const Dashboard = () => {
                   </div>
                 ) : (
                   <div className="py-4 text-center text-sm text-secondary">
-                    No upcoming departures
+                    {t('dashboard.noUpcoming')}
                   </div>
                 )}
               </div>
@@ -568,9 +620,9 @@ export const Dashboard = () => {
           className="w-full py-3 flex items-center justify-center gap-2 text-primary font-bold text-sm uppercase tracking-widest hover:bg-surface-container-low rounded-[20px] transition-colors"
         >
           {showAllFavs ? (
-            <>Show Less <ChevronUp className="w-4 h-4" /></>
+            <>{t('dashboard.showLess')} <ChevronUp className="w-4 h-4" /></>
           ) : (
-            <>Show All {favorites.length} Favorites <ChevronDown className="w-4 h-4" /></>
+            <>{t('dashboard.showAllFavorites', { count: favorites.length })} <ChevronDown className="w-4 h-4" /></>
           )}
         </button>
       )}
@@ -580,9 +632,9 @@ export const Dashboard = () => {
           <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-400/40">
             <Star className="w-8 h-8" />
           </div>
-          <h4 className="font-headline font-bold text-primary mb-2 text-lg">No favorites yet</h4>
+          <h4 className="font-headline font-bold text-primary mb-2 text-lg">{t('dashboard.noFavorites')}</h4>
           <p className="text-secondary text-sm max-w-[240px] mx-auto">
-            Add stops to your favourites for quick access to live departures.
+            {t('dashboard.noFavoritesDesc')}
           </p>
         </div>
       )}
@@ -597,7 +649,7 @@ export const Dashboard = () => {
           <div className="bg-surface-container-lowest editorial-shadow w-full max-w-sm rounded-[32px] overflow-hidden">
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="font-headline font-bold text-2xl text-primary">Edit Favorite</h3>
+                <h3 className="font-headline font-bold text-2xl text-primary">{t('dashboard.editFavorite')}</h3>
                 <button onClick={() => setEditingFav(null)} className="text-secondary hover:text-primary transition-colors">
                   <CloseIcon className="w-6 h-6" />
                 </button>
@@ -605,7 +657,7 @@ export const Dashboard = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">Custom Name</label>
+                  <label className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{t('dashboard.customName')}</label>
                   <input 
                     type="text" 
                     value={editName}
@@ -616,7 +668,7 @@ export const Dashboard = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">Choose Emoji</label>
+                  <label className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{t('dashboard.chooseEmoji')}</label>
                   <div className="grid grid-cols-4 gap-2">
                     <button 
                       onClick={() => setEditEmoji('')}
@@ -625,7 +677,7 @@ export const Dashboard = () => {
                         editEmoji === '' ? "bg-primary text-white" : "bg-surface-container-low hover:bg-surface-container-high text-secondary"
                       )}
                     >
-                      None
+                      {t('common.none')}
                     </button>
                     {emojiOptions.map((opt) => (
                       <button 
@@ -648,7 +700,7 @@ export const Dashboard = () => {
                 onClick={handleSaveEdit}
                 className="w-full h-14 bg-primary text-white font-headline font-black text-lg rounded-2xl hover:bg-primary/90 active:scale-95 transition-all"
               >
-                Save Changes
+                {t('common.save')}
               </button>
             </div>
           </div>
@@ -664,7 +716,7 @@ export const Dashboard = () => {
         <section className="mb-8">
           <div className="px-4 py-3 bg-surface-container-lowest editorial-shadow rounded-[20px] border-l-2 border-primary/30 flex items-start gap-3">
             <div className="flex-1 min-w-0">
-              <p className="font-label text-[9px] font-bold uppercase tracking-widest text-primary/50 mb-1">Did you know?</p>
+              <p className="font-label text-[9px] font-bold uppercase tracking-widest text-primary/50 mb-1">{t('dashboard.didYouKnow')}</p>
               <p className="font-body text-[11px] text-secondary leading-relaxed">{dailyFact.text}</p>
             </div>
             <button
@@ -682,18 +734,18 @@ export const Dashboard = () => {
         <div className="flex justify-between items-start">
           <div className="space-y-1">
             <div className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary opacity-70 mb-0.5">
-              Closest stop
+              {t('dashboard.closestStop')}
             </div>
             <div className={cn(
               "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-widest mb-1",
               !userLocation ? "bg-blue-50 border-blue-100 text-blue-600 animate-pulse" : (isSimulated ? "bg-error/10 border-error/20 text-error" : "bg-blue-50 border-blue-100 text-blue-600")
             )}>
               <Navigation className={cn("w-2.5 h-2.5", userLocation && "fill-current")} />
-              {!userLocation ? 'Acquiring GPS...' : (isSimulated ? 'GPS Disabled' : 'Live Location Active')}
+              {!userLocation ? t('dashboard.acquiringGps') : (isSimulated ? t('dashboard.gpsDisabled') : t('dashboard.liveLocation'))}
             </div>
             <h2 className="font-headline font-black text-primary text-5xl md:text-6xl tracking-tighter leading-none flex items-center gap-3">
               {isSimulated ? (
-                <span className="text-error">Please enable GPS</span>
+                <span className="text-error">{t('dashboard.pleaseEnableGps')}</span>
               ) : closestStop ? (
                 <>
                   {favorites.find(f => f.id === closestStop.id)?.emoji && (
@@ -701,7 +753,7 @@ export const Dashboard = () => {
                   )}
                   {favorites.find(f => f.id === closestStop.id)?.customName || closestStop.name}
                 </>
-              ) : 'Locating...'}
+              ) : t('dashboard.locating')}
             </h2>
             {closestStop?.distance !== undefined && !isSimulated && (
               <div className="flex items-center gap-2 pt-1.5">
@@ -722,7 +774,7 @@ export const Dashboard = () => {
               <Link
                 to={`/map?lat=${closestStop.lat}&lng=${closestStop.lng}&zoom=20&stopId=${closestStop.id}`}
                 className="bg-surface-container-lowest editorial-shadow h-12 w-12 rounded-full flex items-center justify-center active:scale-90 transition-all text-secondary hover:text-primary"
-                title="View on Map"
+                title={t('dashboard.viewOnMap')}
               >
                 <MapIcon className="w-5 h-5" />
               </Link>
@@ -745,11 +797,11 @@ export const Dashboard = () => {
       {/* Real-Time Arrivals Section */}
       <section className="mb-12 space-y-6">
         <div className="flex items-baseline justify-between">
-          <h3 className="font-headline font-bold text-2xl gradient-text">Live Arrivals</h3>
+          <h3 className="font-headline font-bold text-2xl gradient-text">{t('dashboard.liveArrivals')}</h3>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-error rounded-full animate-pulse"></div>
             <span className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">
-              Live Update
+              {t('dashboard.liveUpdate')}
             </span>
           </div>
         </div>
@@ -757,16 +809,16 @@ export const Dashboard = () => {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12 text-secondary">
             <Loader2 className="w-8 h-8 animate-spin mb-4" />
-            <p>Finding closest stop and departures...</p>
+            <p>{t('dashboard.findingClosest')}</p>
           </div>
         ) : isSimulated ? (
           <div className="p-12 bg-surface-container-low rounded-[32px] text-center space-y-4 border border-outline-variant/10">
             <div className="w-16 h-16 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-2">
               <Navigation className="w-8 h-8" />
             </div>
-            <h4 className="font-headline font-bold text-xl text-primary">GPS is required</h4>
+            <h4 className="font-headline font-bold text-xl text-primary">{t('dashboard.gpsRequired')}</h4>
             <p className="text-secondary text-sm max-w-[240px] mx-auto">
-              Please enable location services to see live arrivals for your closest stop.
+              {t('dashboard.gpsRequiredDesc')}
             </p>
           </div>
         ) : error ? (
@@ -775,7 +827,7 @@ export const Dashboard = () => {
           </div>
         ) : departures.length === 0 ? (
           <div className="p-6 bg-surface-container-high rounded-[20px] text-center text-secondary">
-            No upcoming departures found for this stop.
+            {t('dashboard.noDepartures')}
           </div>
         ) : (
           <div className="space-y-2">

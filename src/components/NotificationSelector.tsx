@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { Bell, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Stop, Arrival } from '../types';
 import { scheduleDepartureNotification } from '../services/notificationService';
 import { addActiveAlert } from '../services/alertService';
@@ -12,6 +13,7 @@ interface NotificationSelectorProps {
 }
 
 export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: NotificationSelectorProps) => {
+  const { t } = useTranslation();
   const popupRef = useRef<HTMLDivElement>(null);
   const handleSchedule = async (minutesBefore: number) => {
     const success = await scheduleDepartureNotification(
@@ -51,32 +53,32 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
         onClick={(e) => e.stopPropagation()}
       >
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-headline font-bold text-xs text-primary uppercase tracking-widest">Set Alert</h4>
+        <h4 className="font-headline font-bold text-xs text-primary uppercase tracking-widest">{t('alerts.setAlert')}</h4>
         <button onClick={onClose} className="text-secondary hover:text-primary">
           <X className="w-4 h-4" />
         </button>
       </div>
       <p className="text-[10px] text-secondary mb-4 leading-tight">
-        Notify me before {arrival.line} to {arrival.destination} departs from {stop.name}.
+        {t('alerts.notifyBefore', { line: arrival.line, destination: arrival.destination, stopName: stop.name })}
       </p>
       <div className="space-y-2">
         <button
           onClick={() => handleSchedule(5)}
           className="w-full py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
         >
-          <Bell className="w-3 h-3" /> 5 Minutes Before
+          <Bell className="w-3 h-3" /> {t('alerts.fiveMin')}
         </button>
         <button
           onClick={() => handleSchedule(10)}
           className="w-full py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
         >
-          <Bell className="w-3 h-3" /> 10 Minutes Before
+          <Bell className="w-3 h-3" /> {t('alerts.tenMin')}
         </button>
         <button
           onClick={() => handleSchedule(15)}
           className="w-full py-2 bg-primary/5 hover:bg-primary/10 text-primary font-headline font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2"
         >
-          <Bell className="w-3 h-3" /> 15 Minutes Before
+          <Bell className="w-3 h-3" /> {t('alerts.fifteenMin')}
         </button>
       </div>
       </div>
