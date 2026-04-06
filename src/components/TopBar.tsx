@@ -96,21 +96,19 @@ export const TopBar = () => {
         </button>
         {isLangOpen && (
           <div
-            className="absolute right-0 mt-1 w-28 rounded-xl shadow-lg border border-outline-variant/10 overflow-hidden"
+            className="absolute right-0 mt-1 w-28 rounded-xl shadow-lg border border-outline-variant overflow-hidden backdrop-blur-xl"
             style={{
-              background: 'rgba(0, 0, 0, 0.55)',
-              WebkitBackdropFilter: 'blur(20px)',
-              backdropFilter: 'blur(20px)',
+              background: 'var(--color-surface)',
             }}
           >
             {LANGS.map((l) => (
               <button
                 key={l.code}
                 onClick={() => switchLang(l.code)}
-                className={`w-full text-left px-4 py-2.5 text-sm font-bold transition-colors border-t border-outline-variant/10 first:border-t-0 ${
+                className={`w-full text-left px-4 py-2.5 text-sm font-bold transition-colors border-t border-outline-variant first:border-t-0 ${
                   i18n.language === l.code
-                    ? 'text-primary bg-surface-container-low/40'
-                    : 'text-secondary hover:bg-surface-container-low'
+                    ? 'text-primary bg-primary-fixed'
+                    : 'text-on-surface hover:bg-surface-container-high'
                 }`}
               >
                 {t(`language.${l.code}`)}
