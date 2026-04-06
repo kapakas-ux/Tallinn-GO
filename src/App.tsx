@@ -45,18 +45,23 @@ function AppContent() {
       
       // Set status bar style
       const updateStatusBar = () => {
-        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        // Top bar is always dark (primary in light mode, slate-950 in dark mode)
-        // so we always want light text (Style.Dark)
-        StatusBar.setStyle({ style: Style.Dark });
-        StatusBar.setBackgroundColor({ color: isDark ? '#020617' : '#003571' });
+        const currentTheme = getSettings().theme;
+        const isLightTheme = currentTheme === 'daylight' || currentTheme === 'latte';
+        StatusBar.setStyle({ style: isLightTheme ? Style.Light : Style.Dark });
+        const bgColors: Record<string, string> = {
+          daylight: '#f5f8fb',
+          latte: '#faf6ef',
+          plum: '#0c0718',
+          havgra: '#060e18',
+        };
+        StatusBar.setBackgroundColor({ color: bgColors[currentTheme] || '#020617' });
       };
 
       updateStatusBar();
 
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const listener = () => updateStatusBar();
-      mediaQuery.addEventListener('change', listener);
+      // Re-apply on theme changes
+      const settingsListener = () => updateStatusBar();
+      window.addEventListener('settings_changed', settingsListener);
 
       // Handle back button
       const backListener = CapApp.addListener('backButton', ({ canGoBack }) => {
@@ -69,7 +74,7 @@ function AppContent() {
 
       return () => {
         backListener.then(l => l.remove());
-        mediaQuery.removeEventListener('change', listener);
+        window.removeEventListener('settings_changed', settingsListener);
       };
     }
   }, [navigate, location]);
@@ -85,9 +90,13 @@ function AppContent() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/stops" element={<Stops />} />
-            <Route path="/map" element={<Map />} />
+            <Route path="/map" element={null} />
             <Route path="/plan" element={<Planner />} />
           </Routes>
+          {/* Map stays mounted but hidden to preserve tile cache and state */}
+          <div className={location.pathname === '/map' ? 'h-full' : 'hidden'}>
+            <Map />
+          </div>
         </main>
         <BottomNav />
       </div>

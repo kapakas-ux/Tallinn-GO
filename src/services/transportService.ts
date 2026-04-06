@@ -1237,7 +1237,7 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
 export async function computeEtaToStop(
   arrival: Arrival,
   stop: Stop
-): Promise<{ etaMinutes: number; source: 'gps' | 'schedule' | 'blended' | 'passed' }> {
+): Promise<{ etaMinutes: number; source: 'gps' | 'schedule' | 'blended' }> {
   const scheduleEta = arrival.minutes; // Fallback: peatus.ee realtime/scheduled minutes
   
   // 1. Try to find the matching vehicle on the map
@@ -1275,13 +1275,9 @@ export async function computeEtaToStop(
   }
   
   if (vehicleClosestIdx > targetIdx) {
-    // Vehicle appears to have passed the stop.
-    // Only trust this if the vehicle is close to the route (not at a depot)
-    // and only 1-3 stops past (further means likely a wrong match / return trip).
-    if (minVehicleDist < 0.3 && (vehicleClosestIdx - targetIdx) <= 3) {
-      return { etaMinutes: 0, source: 'passed' };
-    }
-    // Otherwise, don't trust the match — fall back to schedule
+    // Vehicle has passed the target stop — fall back to schedule.
+    // The schedule will naturally stop showing this departure once
+    // the scheduled time passes, avoiding false "Now" at multiple stops.
     return { etaMinutes: scheduleEta, source: 'schedule' };
   }
   
@@ -1328,6 +1324,13 @@ export async function computeEtaToStop(
   // matched vehicle almost certainly belongs to a different trip (e.g. it just
   // finished its previous run and is near the route start, or is a wrong match).
   // Only trust GPS when it is within a reasonable band around the schedule.
+  //
+  // Special case: if the schedule says >=5 min but GPS says ~0, the bus is
+  // probably still at/near a depot and hasn't started service yet. Fall back.
+  // (Tallinn stops can be <1 min apart, so only distrust big discrepancies.)
+  if (gpsEtaMinutes <= 1 && scheduleEta >= 5) {
+    return { etaMinutes: scheduleEta, source: 'schedule' };
+  }
   const lowerBound = Math.max(0, scheduleEta - Math.max(5, scheduleEta * 0.5));
   const upperBound = scheduleEta + Math.max(5, scheduleEta * 0.5);
   if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
@@ -1349,7 +1352,7 @@ export async function computeEtaToStop(
   }
   
   const blendedEta = gpsWeight * gpsEtaMinutes + (1 - gpsWeight) * scheduleEta;
-  const finalEta = Math.max(0, Math.round(blendedEta));
+  const finalEta = Math.max(1, Math.round(blendedEta));
   
   const source = gpsWeight >= 0.75 ? 'gps' : 'blended';
   return { etaMinutes: finalEta, source };
@@ -1671,15 +1674,6 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       await Promise.all(arrivals.map(async (arrival) => {
         const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
         
-        if (source === 'passed') {
-          // GPS confirms vehicle has already passed this stop
-          arrival.status = 'departed';
-          arrival.minutes = 0;
-          arrival.departureTimeSeconds = Math.floor(Date.now() / 1000);
-          arrival.info = 'Live GPS';
-          return;
-        }
-        
         arrival.minutes = etaMinutes;
         
         // Update departureTimeSeconds to match the new GPS-based minutes
@@ -1699,7 +1693,24 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     // Re-sort by updated minutes
     arrivals.sort((a, b) => a.minutes - b.minutes);
 
-    return arrivals.slice(0, time === '0' ? 50 : 10);
+    // Deduplicate: after GPS ETA adjustment, multiple entries for the same
+    // line + destination can collapse to the same ETA. Keep only the first
+    // occurrence within a 2-minute window for each line+destination combo.
+    const seen = new Map<string, number[]>(); // key -> list of kept departureTimeSeconds
+    const deduped = arrivals.filter(a => {
+      const key = `${a.line}-${a.destination}`;
+      const kept = seen.get(key) || [];
+      const depTime = a.departureTimeSeconds || 0;
+      // Check if any already-kept entry is within 120s of this one
+      if (kept.some(t => Math.abs(t - depTime) < 120)) {
+        return false; // duplicate
+      }
+      kept.push(depTime);
+      seen.set(key, kept);
+      return true;
+    });
+
+    return deduped.slice(0, time === '0' ? 50 : 10);
   } catch (error) {
     console.error('Error fetching departures:', error);
     return [];

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Arrival, Stop } from '../types';
-import { getRouteStopsForArrival, fetchTripStoptimes, TripStoptime } from '../services/transportService';
+import { Arrival, Stop, Vehicle } from '../types';
+import { getRouteStopsForArrival, fetchTripStoptimes, TripStoptime, getVehicleForArrival } from '../services/transportService';
 import { cn, getVehicleColorClass } from '../lib/utils';
 import { CheckCircle2, ChevronDown, ChevronUp, MapPin, Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
   const [expanded, setExpanded] = useState(false);
   const [routeStops, setRouteStops] = useState<Stop[]>([]);
   const [tripStoptimes, setTripStoptimes] = useState<TripStoptime[]>([]);
+  const [matchedVehicle, setMatchedVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [liveMinutes, setLiveMinutes] = useState(() => getLiveMinutes(arrival));
@@ -45,6 +46,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
     setExpanded(false);
     setRouteStops([]);
     setTripStoptimes([]);
+    setMatchedVehicle(null);
     setHasFetched(false);
   }, [arrival.type, arrival.line, arrival.destination, arrival.vehicleIndex]);
 
@@ -56,13 +58,15 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [stops, stoptimes] = await Promise.all([
+        const [stops, stoptimes, vehicle] = await Promise.all([
           getRouteStopsForArrival(arrival),
           arrival.tripId ? fetchTripStoptimes(arrival.tripId) : Promise.resolve([]),
+          getVehicleForArrival(arrival, stop),
         ]);
         if (!isMounted) return;
         setRouteStops(stops);
         setTripStoptimes(stoptimes);
+        setMatchedVehicle(vehicle);
       } catch (error) {
         console.error("Error fetching route:", error);
       } finally {
@@ -75,8 +79,15 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
 
     fetchData();
 
+    // Refresh vehicle position every 10s while expanded
+    const refreshId = setInterval(async () => {
+      const v = await getVehicleForArrival(arrival, stop);
+      if (isMounted) setMatchedVehicle(v);
+    }, 10_000);
+
     return () => {
       isMounted = false;
+      clearInterval(refreshId);
     };
   }, [expanded, arrival, hasFetched]);
 
@@ -140,7 +151,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
               )}
               <div className="flex items-baseline gap-1">
                 <span className={cn("font-headline font-black text-primary flex items-baseline gap-1", isCompact ? "text-lg" : "text-xl")}>
-                  {liveMinutes <= 1 ? t('arrivals.now') : (liveMinutes <= 59 ? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></> : (arrival.time ?? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></>))}
+                  {liveMinutes === 0 ? t('arrivals.now') : (liveMinutes <= 59 ? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></> : (arrival.time ?? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></>))}
                 </span>
               </div>
               {expandable && (expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />)}
@@ -161,7 +172,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
           ) : (
             <div className="flex flex-col gap-4">
               <div className="h-48 rounded-xl overflow-hidden bg-surface-container relative">
-                <VehicleMap routeStops={routeStops} targetStop={stop} />
+                <VehicleMap routeStops={routeStops} targetStop={stop} vehicle={matchedVehicle ?? undefined} />
               </div>
               
               <div 
