@@ -497,15 +497,21 @@ export const Dashboard = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(fav);
-                  }}
-                  className="h-10 w-10 rounded-full flex items-center justify-center text-amber-400 active:scale-90 transition-all"
-                >
-                  <Star className="w-5 h-5 fill-current" />
-                </button>
+                {isEditingFavs ? (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(fav);
+                    }}
+                    className="h-10 w-10 rounded-full flex items-center justify-center text-amber-400 active:scale-90 transition-all"
+                  >
+                    <Star className="w-5 h-5 fill-current" />
+                  </button>
+                ) : (
+                  <div className="h-10 w-10 rounded-full flex items-center justify-center text-amber-400">
+                    <Star className="w-5 h-5 fill-current" />
+                  </div>
+                )}
                 <div className="text-secondary">
                   {expandedNearby === fav.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                 </div>

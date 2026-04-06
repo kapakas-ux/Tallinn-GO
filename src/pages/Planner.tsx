@@ -1,9 +1,10 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import {
   MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram,
-  Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon, Route as RouteIcon
+  Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon, Route as RouteIcon,
+  CalendarDays
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { fetchStops, planJourney } from '../services/transportService';
@@ -14,7 +15,7 @@ import type { Stop, PlanItinerary, LegMode } from '../types';
 // ─── search history ─────────────────────────────────────────────
 interface SearchEntry { from: string; to: string; timestamp: number }
 const HISTORY_KEY = 'planner_search_history';
-const MAX_HISTORY = 5;
+const MAX_HISTORY = 6;
 
 function getSearchHistory(): SearchEntry[] {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
@@ -54,7 +55,91 @@ function ModeIcon({ mode, className }: { mode: LegMode; className?: string }) {
   return <Bus className={className} />;
 }
 
-// â”€â”€â”€ mini-map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── scroll wheel picker ────────────────────────────────────────────────────
+
+const ITEM_H = 40;          // px per row
+const VISIBLE = 5;          // rows visible
+
+const ScrollPicker: React.FC<{
+  items: string[];
+  value: string;
+  onChange: (v: string) => void;
+}> = ({ items, value, onChange }) => {
+  const listRef = useRef<HTMLDivElement>(null);
+  const isUserScroll = useRef(true);
+
+  // Scroll to selected value on mount / value change
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const idx = items.indexOf(value);
+    if (idx < 0) return;
+    isUserScroll.current = false;
+    el.scrollTop = idx * ITEM_H;
+    requestAnimationFrame(() => { isUserScroll.current = true; });
+  }, [value, items]);
+
+  // Snap & pick value on scroll end
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!isUserScroll.current) return;
+        const idx = Math.round(el.scrollTop / ITEM_H);
+        const clamped = Math.max(0, Math.min(items.length - 1, idx));
+        el.scrollTo({ top: clamped * ITEM_H, behavior: 'smooth' });
+        if (items[clamped] !== value) onChange(items[clamped]);
+      }, 80);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => { clearTimeout(timer); el.removeEventListener('scroll', onScroll); };
+  }, [items, value, onChange]);
+
+  const pad = (VISIBLE - 1) / 2;  // blank rows above/below
+
+  return (
+    <div className="relative overflow-hidden" style={{ height: ITEM_H * VISIBLE }}>
+      {/* highlight band */}
+      <div
+        className="absolute inset-x-1 rounded-[10px] bg-primary/10 pointer-events-none z-0"
+        style={{ top: ITEM_H * pad, height: ITEM_H }}
+      />
+      <div
+        ref={listRef}
+        className="h-full overflow-y-auto no-scrollbar relative z-10"
+        style={{ scrollSnapType: 'y mandatory' }}
+      >
+        {Array.from({ length: pad }).map((_, i) => (
+          <div key={`pt-${i}`} style={{ height: ITEM_H }} />
+        ))}
+        {items.map(item => (
+          <div
+            key={item}
+            className={cn(
+              'flex items-center justify-center font-headline font-bold text-lg transition-colors cursor-pointer select-none',
+              item === value ? 'text-primary' : 'text-secondary/40'
+            )}
+            style={{ height: ITEM_H, scrollSnapAlign: 'start' }}
+            onClick={() => onChange(item)}
+          >
+            {item}
+          </div>
+        ))}
+        {Array.from({ length: pad }).map((_, i) => (
+          <div key={`pb-${i}`} style={{ height: ITEM_H }} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
+// ─── mini-map ───────────────────────────────────────────────────────────────
 
 const ItineraryMap: React.FC<{ itinerary: PlanItinerary }> = ({ itinerary }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -283,6 +368,20 @@ export const Planner = () => {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [searchHistory, setSearchHistory] = useState<SearchEntry[]>(() => getSearchHistory());
 
+  // Time chooser state
+  type TimeMode = 'now' | 'leave-at' | 'arrive-at';
+  const [timeMode, setTimeMode] = useState<TimeMode>('now');
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  });
+  const [selectedTime, setSelectedTime] = useState(() => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  });
+  const [timePickerOpen, setTimePickerOpen] = useState<false | 'date' | 'time'>(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   // Track the exact selected stop objects to avoid ambiguity when names collide
   const selectedFromStop = useRef<Stop | null>(null);
   const selectedToStop = useRef<Stop | null>(null);
@@ -351,7 +450,10 @@ export const Planner = () => {
     setItineraries([]);
     setExpandedIndex(null);
     try {
-      const results = await planJourney(fromCoords.lat, fromCoords.lon, toCoords.lat, toCoords.lon);
+      const timeOptions = timeMode !== 'now'
+        ? { date: selectedDate, time: selectedTime, arriveBy: timeMode === 'arrive-at' }
+        : undefined;
+      const results = await planJourney(fromCoords.lat, fromCoords.lon, toCoords.lat, toCoords.lon, 3, timeOptions);
       if (!results.length) setError('No routes found between these stops.');
       else { setItineraries(results); setExpandedIndex(0); saveSearch(searchFrom, searchTo); setSearchHistory(getSearchHistory()); }
     } catch (e) {
@@ -481,8 +583,149 @@ export const Planner = () => {
           )}
         </div>
 
+        {/* Time chooser */}
+        <div className="mt-3">
+          {/* Mode toggle pills */}
+          <div className="flex gap-1.5 bg-surface-container-lowest rounded-[14px] p-1 shadow-sm">
+            {([
+              { key: 'now' as const, label: 'Leave now', icon: '⚡' },
+              { key: 'leave-at' as const, label: 'Leave at', icon: '🕐' },
+              { key: 'arrive-at' as const, label: 'Arrive by', icon: '🏁' },
+            ]).map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => {
+                  setTimeMode(opt.key);
+                  if (opt.key !== 'now') {
+                    const d = new Date();
+                    setSelectedDate(d.toISOString().slice(0, 10));
+                    setSelectedTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+                  } else {
+                    setTimePickerOpen(false);
+                  }
+                }}
+                className={cn(
+                  'flex-1 py-2.5 rounded-[10px] font-label font-bold text-[10px] uppercase tracking-wider transition-all',
+                  timeMode === opt.key
+                    ? 'bg-primary text-white shadow-md'
+                    : 'text-secondary hover:text-on-surface'
+                )}
+              >
+                <span className="mr-1">{opt.icon}</span>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Compact date/time display – tap to open picker */}
+          {timeMode !== 'now' && (
+            <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex gap-2 items-center">
+                {/* Date chip – opens native date picker directly */}
+                <button
+                  type="button"
+                  onClick={() => dateInputRef.current?.showPicker()}
+                  className="flex items-center gap-2 bg-surface-container-lowest px-3.5 py-2.5 rounded-[12px] shadow-sm transition-all active:scale-[0.97] cursor-pointer relative overflow-hidden shrink-0"
+                >
+                  <CalendarDays className="w-4 h-4 text-primary shrink-0" />
+                  <span className="font-headline font-bold text-sm text-on-surface whitespace-nowrap">
+                    {selectedDate === new Date().toISOString().slice(0, 10)
+                      ? 'Today'
+                      : new Date(selectedDate + 'T00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                  </span>
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    value={selectedDate}
+                    onChange={e => { if (e.target.value) setSelectedDate(e.target.value); }}
+                    min={new Date().toISOString().slice(0, 10)}
+                    className="absolute inset-0 opacity-0 pointer-events-none"
+                    tabIndex={-1}
+                  />
+                </button>
+                {/* Time chip */}
+                <button
+                  onClick={() => setTimePickerOpen(timePickerOpen === 'time' ? false : 'time')}
+                  className={cn(
+                    'flex items-center gap-2 bg-surface-container-lowest px-3.5 py-2.5 rounded-[12px] shadow-sm transition-all active:scale-[0.97] shrink-0',
+                    timePickerOpen === 'time' && 'ring-2 ring-primary'
+                  )}
+                >
+                  <Clock className="w-4 h-4 text-primary shrink-0" />
+                  <span className="font-headline font-bold text-sm text-on-surface">{selectedTime}</span>
+                </button>
+                {/* Quick pills */}
+                <div className="flex gap-1.5 items-center ml-auto flex-wrap justify-end">
+                  {(() => {
+                    const now = new Date();
+                    const pills: { label: string; date: string; time: string }[] = [];
+                    for (const offset of [15, 30, 60]) {
+                      const d = new Date(now.getTime() + offset * 60000);
+                      pills.push({
+                        label: offset < 60 ? `+${offset}m` : `+1h`,
+                        date: d.toISOString().slice(0, 10),
+                        time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+                      });
+                    }
+                    const tmrw = new Date(now);
+                    tmrw.setDate(tmrw.getDate() + 1);
+                    pills.push({
+                      label: 'Tmrw',
+                      date: tmrw.toISOString().slice(0, 10),
+                      time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+                    });
+                    return pills.map(p => (
+                      <button
+                        key={p.label}
+                        onClick={() => { setSelectedDate(p.date); setSelectedTime(p.time); setTimePickerOpen(false); }}
+                        className={cn(
+                          'px-2.5 py-1.5 rounded-full text-[9px] font-label font-bold uppercase tracking-wider transition-all',
+                          selectedDate === p.date && selectedTime === p.time
+                            ? 'bg-primary/15 text-primary'
+                            : 'bg-surface-container-low text-secondary hover:text-on-surface'
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Time picker popup */}
+          {timePickerOpen === 'time' && (
+            <div className="mt-2 bg-surface-container-lowest rounded-[14px] shadow-lg animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
+              <div className="flex items-center">
+                <div className="flex-1">
+                  <ScrollPicker
+                    items={HOURS}
+                    value={selectedTime.split(':')[0]}
+                    onChange={h => setSelectedTime(`${h}:${selectedTime.split(':')[1]}`)}
+                  />
+                </div>
+                <span className="font-headline font-black text-2xl text-on-surface px-1 shrink-0">:</span>
+                <div className="flex-1">
+                  <ScrollPicker
+                    items={MINUTES}
+                    value={selectedTime.split(':')[1]}
+                    onChange={m => setSelectedTime(`${selectedTime.split(':')[0]}:${m}`)}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={() => setTimePickerOpen(false)}
+                className="w-full py-2.5 text-primary font-label font-bold text-xs uppercase tracking-widest border-t border-outline-variant/10"
+              >
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+
         <button
-          onClick={findRoutes}
+          onClick={() => findRoutes()}
           disabled={isLoading || !from || !to}
           className="w-full mt-4 bg-primary text-white py-4 rounded-[16px] font-headline font-black text-base shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
@@ -510,7 +753,7 @@ export const Planner = () => {
             </button>
           </div>
           <div className="flex flex-col gap-2">
-            {searchHistory.map((entry, i) => (
+            {searchHistory.slice(0, 6).map((entry, i) => (
               <button
                 key={i}
                 onClick={() => {

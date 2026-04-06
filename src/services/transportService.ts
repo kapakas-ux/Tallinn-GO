@@ -1521,14 +1521,21 @@ export async function planJourney(
   fromLon: number,
   toLat: number,
   toLon: number,
-  numItineraries = 3
+  numItineraries = 3,
+  options?: { date?: string; time?: string; arriveBy?: boolean }
 ): Promise<PlanItinerary[]> {
+  const extraParams: string[] = [];
+  if (options?.date) extraParams.push(`date: "${options.date}"`);
+  if (options?.time) extraParams.push(`time: "${options.time}"`);
+  if (options?.arriveBy !== undefined) extraParams.push(`arriveBy: ${options.arriveBy}`);
+  const extraStr = extraParams.length ? '\n        ' + extraParams.join('\n        ') : '';
+
   const query = `
     {
       plan(
         from: { lat: ${fromLat}, lon: ${fromLon} }
         to: { lat: ${toLat}, lon: ${toLon} }
-        numItineraries: ${numItineraries}
+        numItineraries: ${numItineraries}${extraStr}
         transportModes: [
           { mode: WALK }
           { mode: BUS }

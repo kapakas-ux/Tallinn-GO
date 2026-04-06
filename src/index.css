@@ -77,6 +77,54 @@
   scrollbar-width: none;
 }
 
+/* Custom date/time input styling */
+input[type="date"],
+input[type="time"],
+.time-select {
+  accent-color: var(--color-primary);
+  color-scheme: light;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+  filter: none;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+[data-theme="plum"] input[type="date"],
+[data-theme="plum"] input[type="time"],
+[data-theme="plum"] .time-select,
+[data-theme="havgra"] input[type="date"],
+[data-theme="havgra"] input[type="time"],
+[data-theme="havgra"] .time-select {
+  color-scheme: dark;
+}
+
+[data-theme="plum"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="plum"] input[type="time"]::-webkit-calendar-picker-indicator,
+[data-theme="havgra"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="havgra"] input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(0.8);
+}
+
+/* Time picker scroll container */
+.time-scroller {
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+.time-scroller::-webkit-scrollbar {
+  display: none;
+}
+.time-scroller-item {
+  scroll-snap-align: center;
+}
+
 /* MapLibre Popup Custom Styling */
 .maplibregl-popup-close-button {
   font-size: 24px !important;
