@@ -1526,8 +1526,12 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       else if (modeStr.includes('trolley')) type = 'trolley';
       else if (modeStr.includes('rail') || modeStr.includes('train')) type = 'train';
       else if (modeStr.includes('bus')) {
-        // Distinguish city buses from county buses
-        if (agencyName && !agencyName.toLowerCase().includes('tallinna linnatransport')) {
+        // Distinguish city buses from county/regional buses
+        const agency = agencyName.toLowerCase();
+        const isCityBus = agency.includes('tallinna linnatransport') // Tallinn
+          || agency.includes('gobus')                                // Tartu
+          || agency.includes('sebe');                                // Pärnu
+        if (agencyName && !isCityBus) {
           type = 'regional';
         }
       }
