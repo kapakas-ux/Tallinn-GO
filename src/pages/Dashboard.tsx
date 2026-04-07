@@ -94,9 +94,10 @@ export const Dashboard = () => {
   // Auto-fetch departures for favorite stops
   useEffect(() => {
     if (favorites.length === 0) return;
-    favorites.forEach(async (fav) => {
-      if (nearbyDepartures[fav.id]) return;
-      setNearbyLoading(prev => ({ ...prev, [fav.id]: true }));
+    const toFetch = favorites.filter(fav => !nearbyDepartures[fav.id]);
+    if (toFetch.length === 0) return;
+    toFetch.forEach(fav => setNearbyLoading(prev => ({ ...prev, [fav.id]: true })));
+    Promise.all(toFetch.map(async (fav) => {
       try {
         const deps = await fetchDepartures(fav.id, fav.siriId);
         setNearbyDepartures(prev => ({ ...prev, [fav.id]: deps.slice(0, 6) }));
@@ -105,7 +106,7 @@ export const Dashboard = () => {
       } finally {
         setNearbyLoading(prev => ({ ...prev, [fav.id]: false }));
       }
-    });
+    }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [favorites]);
 
@@ -187,9 +188,10 @@ export const Dashboard = () => {
   // Auto-fetch departures for all nearby stops
   useEffect(() => {
     if (nearbyStops.length === 0) return;
-    nearbyStops.forEach(async (stop) => {
-      if (nearbyDepartures[stop.id]) return;
-      setNearbyLoading(prev => ({ ...prev, [stop.id]: true }));
+    const toFetch = nearbyStops.filter(stop => !nearbyDepartures[stop.id]);
+    if (toFetch.length === 0) return;
+    toFetch.forEach(stop => setNearbyLoading(prev => ({ ...prev, [stop.id]: true })));
+    Promise.all(toFetch.map(async (stop) => {
       try {
         const deps = await fetchDepartures(stop.id, stop.siriId);
         setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
@@ -198,7 +200,7 @@ export const Dashboard = () => {
       } finally {
         setNearbyLoading(prev => ({ ...prev, [stop.id]: false }));
       }
-    });
+    }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nearbyStops]);
 

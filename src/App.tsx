@@ -96,11 +96,17 @@ function AppContent() {
           location.pathname.startsWith('/map') ? '' : 'pt-[calc(4rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))]'
         }`}>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/stops" element={<Stops />} />
-            <Route path="/map" element={null} />
             <Route path="/plan" element={<Planner />} />
+            {/* Fallback so Routes doesn't complain on other paths */}
+            <Route path="*" element={null} />
           </Routes>
+          {/* Keep Dashboard and Stops mounted but hidden to preserve state across tab switches */}
+          <div className={location.pathname === '/' ? '' : 'hidden'}>
+            <Dashboard />
+          </div>
+          <div className={location.pathname === '/stops' ? '' : 'hidden'}>
+            <Stops />
+          </div>
           {/* Map stays mounted but hidden to preserve tile cache and state */}
           <div className={location.pathname === '/map' ? 'h-full' : 'hidden'}>
             <Map />

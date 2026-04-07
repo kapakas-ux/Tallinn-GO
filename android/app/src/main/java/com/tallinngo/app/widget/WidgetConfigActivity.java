@@ -127,7 +127,7 @@ public class WidgetConfigActivity extends Activity {
                 }
                 if (query.length() >= 2) {
                     pendingSearch = () -> searchStops(query);
-                    mainHandler.postDelayed(pendingSearch, 400);
+                    mainHandler.postDelayed(pendingSearch, 300);
                 } else {
                     searchResults.clear();
                     adapter.notifyDataSetChanged();
@@ -188,41 +188,19 @@ public class WidgetConfigActivity extends Activity {
         }
     }
 
+    private int searchGeneration = 0;
+
     private void searchStops(String query) {
+        final int gen = ++searchGeneration;
         executor.execute(() -> {
             List<StopEntry> results = new ArrayList<>();
             try {
-                long nowSeconds = System.currentTimeMillis() / 1000;
-                String gql = "{ stops(name: \"" + sanitize(query) + "\") { " +
-                        "gtfsId name lat lon " +
-                        "stoptimesWithoutPatterns(numberOfDepartures: 2, startTime: " + nowSeconds + ") { " +
-                        "headsign trip { route { shortName } } } } }";
+                // Phase 1: fast name-only query
+                String gql = "{ stops(name: \"" + sanitize(query) + "\") { gtfsId name lat lon } }";
                 String jsonBody = new JSONObject().put("query", gql).toString();
+                JSONArray stops = executeGraphQL(jsonBody);
 
-                URL url = new URL(PEATUS_URL);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setConnectTimeout(8000);
-                conn.setReadTimeout(8000);
-                conn.setDoOutput(true);
-
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
-                }
-
-                StringBuilder sb = new StringBuilder();
-                try (BufferedReader br = new BufferedReader(
-                        new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = br.readLine()) != null) sb.append(line);
-                }
-
-                JSONObject data = new JSONObject(sb.toString());
-                JSONArray stops = data.optJSONObject("data").optJSONArray("stops");
                 if (stops != null) {
-                    // Keep each platform that has departures (shows direction)
-                    // Dedup by gtfsId only; same-name stops with different departures are kept
                     List<String> seenIds = new ArrayList<>();
                     for (int i = 0; i < stops.length() && results.size() < 20; i++) {
                         JSONObject s = stops.getJSONObject(i);
@@ -231,45 +209,104 @@ public class WidgetConfigActivity extends Activity {
                         if (name.isEmpty() || id.isEmpty()) continue;
                         if (seenIds.contains(id)) continue;
                         seenIds.add(id);
-
-                        // Build departure summary from the 2 stoptimes
-                        String depSummary = "";
-                        JSONArray stoptimes = s.optJSONArray("stoptimesWithoutPatterns");
-                        if (stoptimes != null && stoptimes.length() > 0) {
-                            StringBuilder depSb = new StringBuilder();
-                            for (int j = 0; j < stoptimes.length() && j < 2; j++) {
-                                JSONObject st = stoptimes.getJSONObject(j);
-                                String headsign = st.optString("headsign", "");
-                                JSONObject trip = st.optJSONObject("trip");
-                                JSONObject route = (trip != null) ? trip.optJSONObject("route") : null;
-                                String shortName = (route != null) ? route.optString("shortName", "") : "";
-                                if (shortName.isEmpty() && headsign.isEmpty()) continue;
-                                if (depSb.length() > 0) depSb.append(",  ");
-                                if (!shortName.isEmpty()) {
-                                    depSb.append(shortName);
-                                    if (!headsign.isEmpty()) depSb.append(" → ").append(headsign);
-                                } else {
-                                    depSb.append(headsign);
-                                }
-                            }
-                            depSummary = depSb.toString();
-                        }
-
-                        double lat = s.optDouble("lat", 0);
-                        double lon = s.optDouble("lon", 0);
-                        results.add(new StopEntry(id, name, lat, lon, depSummary));
+                        results.add(new StopEntry(id, name, s.optDouble("lat", 0), s.optDouble("lon", 0), ""));
                     }
                 }
-                conn.disconnect();
             } catch (Exception e) {
                 // Silently fail
             }
+
+            // Show results immediately (no departures yet)
+            final List<StopEntry> phase1 = new ArrayList<>(results);
             mainHandler.post(() -> {
+                if (gen != searchGeneration) return;
                 searchResults.clear();
-                searchResults.addAll(results);
+                searchResults.addAll(phase1);
                 adapter.notifyDataSetChanged();
             });
+
+            // Phase 2: enrich with departures for the displayed stops
+            if (results.isEmpty() || gen != searchGeneration) return;
+            try {
+                long nowSeconds = System.currentTimeMillis() / 1000;
+                // Build a batch query for all stop IDs
+                StringBuilder gqlSb = new StringBuilder("{ ");
+                for (int i = 0; i < results.size(); i++) {
+                    StopEntry entry = results.get(i);
+                    gqlSb.append("s").append(i).append(": stop(id: \"estonia:").append(entry.gtfsId).append("\") { ")
+                          .append("gtfsId stoptimesWithoutPatterns(numberOfDepartures: 2, startTime: ")
+                          .append(nowSeconds).append(") { headsign trip { route { shortName } } } } ");
+                }
+                gqlSb.append("}");
+
+                String jsonBody = new JSONObject().put("query", gqlSb.toString()).toString();
+                String responseStr = executeGraphQLRaw(jsonBody);
+                JSONObject data = new JSONObject(responseStr).optJSONObject("data");
+                if (data != null && gen == searchGeneration) {
+                    for (int i = 0; i < results.size(); i++) {
+                        JSONObject stopData = data.optJSONObject("s" + i);
+                        if (stopData == null) continue;
+                        JSONArray stoptimes = stopData.optJSONArray("stoptimesWithoutPatterns");
+                        if (stoptimes == null || stoptimes.length() == 0) continue;
+                        StringBuilder depSb = new StringBuilder();
+                        for (int j = 0; j < stoptimes.length() && j < 2; j++) {
+                            JSONObject st = stoptimes.getJSONObject(j);
+                            String headsign = st.optString("headsign", "");
+                            JSONObject trip = st.optJSONObject("trip");
+                            JSONObject route = (trip != null) ? trip.optJSONObject("route") : null;
+                            String shortName = (route != null) ? route.optString("shortName", "") : "";
+                            if (shortName.isEmpty() && headsign.isEmpty()) continue;
+                            if (depSb.length() > 0) depSb.append(",  ");
+                            if (!shortName.isEmpty()) {
+                                depSb.append(shortName);
+                                if (!headsign.isEmpty()) depSb.append(" → ").append(headsign);
+                            } else {
+                                depSb.append(headsign);
+                            }
+                        }
+                        results.get(i).departureSummary = depSb.toString();
+                    }
+                    // Update UI with enriched data
+                    final List<StopEntry> phase2 = new ArrayList<>(results);
+                    mainHandler.post(() -> {
+                        if (gen != searchGeneration) return;
+                        searchResults.clear();
+                        searchResults.addAll(phase2);
+                        adapter.notifyDataSetChanged();
+                    });
+                }
+            } catch (Exception ignored) {
+                // Phase 2 failure is fine — stops are already shown
+            }
         });
+    }
+
+    private JSONArray executeGraphQL(String jsonBody) throws Exception {
+        String raw = executeGraphQLRaw(jsonBody);
+        JSONObject data = new JSONObject(raw);
+        JSONObject d = data.optJSONObject("data");
+        return (d != null) ? d.optJSONArray("stops") : null;
+    }
+
+    private String executeGraphQLRaw(String jsonBody) throws Exception {
+        URL url = new URL(PEATUS_URL);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
+        conn.setDoOutput(true);
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
+        }
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line);
+        }
+        conn.disconnect();
+        return sb.toString();
     }
 
     private void confirmWidget() {
@@ -310,7 +347,7 @@ public class WidgetConfigActivity extends Activity {
         final String name;
         final double lat;
         final double lon;
-        final String departureSummary;
+        String departureSummary;
 
         StopEntry(String gtfsId, String name, double lat, double lon, String departureSummary) {
             this.gtfsId = gtfsId;

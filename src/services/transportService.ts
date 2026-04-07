@@ -1605,11 +1605,17 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
     const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
     
+    // Run SIRI and peatus.ee fetches in parallel
+    const [siriText, allPeatusArrivals] = await Promise.all([
+      universalFetch(url).catch(e => { console.error('Error fetching SIRI departures:', e); return ''; }),
+      fetchPeatusDepartures(stopId, siriId, time, true)
+    ]);
+
     let arrivals: Arrival[] = [];
     
     try {
       console.log(`fetchDepartures: Fetching from ${url}`);
-      const text = await universalFetch(url);
+      const text = siriText;
       
       if (text) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -1710,11 +1716,8 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
         }
       }
     } catch (e) {
-      console.error('Error fetching SIRI departures:', e);
+      console.error('Error parsing SIRI departures:', e);
     }
-    
-    // Fetch ALL modes from peatus.ee to get tripIds and fill gaps
-    const allPeatusArrivals = await fetchPeatusDepartures(stopId, siriId, time, true);
     
     // Merge peatus arrivals: enrich matching SIRI arrivals with tripId, add non-duplicates
     allPeatusArrivals.forEach(pa => {
