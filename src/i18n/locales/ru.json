@@ -251,6 +251,7 @@
     "min": "мин",
     "unknownDestination": "Неизвестное направление",
     "local": "Местный",
+    "regional": "Междугородний",
     "loadingRoute": "Загрузка маршрута...",
     "routeNotAvailable": "Данные маршрута недоступны",
     "routeStops": "Остановки маршрута"

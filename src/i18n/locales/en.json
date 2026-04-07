@@ -247,6 +247,7 @@
     "min": "min",
     "unknownDestination": "Unknown Destination",
     "local": "Local",
+    "regional": "Regional",
     "loadingRoute": "Loading route...",
     "routeNotAvailable": "Route data not available",
     "routeStops": "Route Stops"

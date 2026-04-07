@@ -247,6 +247,7 @@
     "min": "min",
     "unknownDestination": "Tundmatu sihtkoht",
     "local": "Kohalik",
+    "regional": "Maakond",
     "loadingRoute": "Marsruudi laadimine...",
     "routeNotAvailable": "Marsruudiandmed pole saadaval",
     "routeStops": "Marsruudi peatused"
