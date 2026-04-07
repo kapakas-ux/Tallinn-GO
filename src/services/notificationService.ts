@@ -11,6 +11,8 @@ const VIBRATION_CYCLE_MS = ALERT_VIBRATION_PATTERN.reduce((a, b) => a + b, 0) + 
 let vibrationInterval: ReturnType<typeof setInterval> | null = null;
 let alertAudio: HTMLAudioElement | null = null;
 let audioLoopInterval: ReturnType<typeof setInterval> | null = null;
+let soundAutoStopTimeout: ReturnType<typeof setTimeout> | null = null;
+const handledNotificationIds = new Set<number>();
 
 function startContinuousVibration() {
   stopContinuousVibration();
@@ -48,6 +50,10 @@ function startContinuousSound() {
 }
 
 function stopContinuousSound() {
+  if (soundAutoStopTimeout) {
+    clearTimeout(soundAutoStopTimeout);
+    soundAutoStopTimeout = null;
+  }
   if (audioLoopInterval) {
     clearInterval(audioLoopInterval);
     audioLoopInterval = null;
@@ -77,18 +83,32 @@ function registerVibrationListener() {
   listenerRegistered = true;
 
   // Start buzzing and sound when notification fires
-  LocalNotifications.addListener('localNotificationReceived', () => {
+  LocalNotifications.addListener('localNotificationReceived', (notification) => {
+    // Prevent re-triggering sound when a stale event is re-delivered on app resume
+    if (handledNotificationIds.has(notification.id)) return;
+    handledNotificationIds.add(notification.id);
     startContinuousVibration();
     startContinuousSound();
+    // Auto-stop after 60s in case the user never interacts with the notification
+    soundAutoStopTimeout = setTimeout(() => {
+      stopContinuousVibration();
+      stopContinuousSound();
+    }, 60_000);
   });
 
-  // Stop buzzing and sound when user taps or dismisses
-  LocalNotifications.addListener('localNotificationActionPerformed', () => {
+  // Stop buzzing and sound when user taps the notification
+  LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+    handledNotificationIds.add(action.notification.id);
     stopContinuousVibration();
     stopContinuousSound();
   });
 }
 
+/** Stop any alert sound/vibration currently playing (called from UI dismiss) */
+export function stopAlertSound() {
+  stopContinuousVibration();
+  stopContinuousSound();
+}
 
 export const scheduleDepartureNotification = async (
   stopName: string,

@@ -3,6 +3,7 @@ import { Bell, X, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { getActiveAlerts, removeActiveAlert, ActiveAlert } from '../services/alertService';
+import { stopAlertSound } from '../services/notificationService';
 import { cn } from '../lib/utils';
 
 interface ActiveAlertsProps {
@@ -27,6 +28,7 @@ export const ActiveAlerts: React.FC<ActiveAlertsProps> = ({ onAlertsChange }) =>
 
   const handleRemove = (id: string) => {
     removeActiveAlert(id);
+    stopAlertSound();
     if (onAlertsChange) {
       onAlertsChange();
     } else {

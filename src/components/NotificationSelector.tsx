@@ -16,11 +16,17 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
   const { t } = useTranslation();
   const popupRef = useRef<HTMLDivElement>(null);
   const handleSchedule = async (minutesBefore: number) => {
+    // Use live departureTimeSeconds if available (GPS-updated), otherwise fall back to schedule
+    const departureTimestampMs = arrival.departureTimeSeconds
+      ? arrival.departureTimeSeconds * 1000
+      : Date.now() + arrival.minutes * 60 * 1000;
+    const liveMinutesToDeparture = Math.max(0, Math.round((departureTimestampMs - Date.now()) / 60000));
+
     const success = await scheduleDepartureNotification(
       stop.name,
       arrival.line,
       arrival.destination,
-      arrival.minutes,
+      liveMinutesToDeparture,
       minutesBefore
     );
     
@@ -32,7 +38,7 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
         stopName: stop.name,
         line: arrival.line,
         destination: arrival.destination,
-        departureTimestamp: Date.now() + arrival.minutes * 60 * 1000,
+        departureTimestamp: departureTimestampMs,
         minutesBefore
       });
       onScheduled();

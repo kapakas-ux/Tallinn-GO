@@ -13,6 +13,51 @@ import { watchLocation } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
 import type { Stop, PlanItinerary, LegMode } from '../types';
 
+// ─── geocoding ──────────────────────────────────────────────────
+interface GeocodedPlace {
+  name: string;
+  address: string;
+  lat: number;
+  lon: number;
+}
+
+let geocodeTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
+  if (query.length < 3) return [];
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      lat: '59.437',
+      lon: '24.745',
+      zoom: '14',
+      limit: '5',
+    });
+    const res = await fetch(`https://photon.komoot.io/api/?${params}`);
+    const data = await res.json();
+    if (!data.features) return [];
+    return data.features
+      .filter((f: any) => {
+        // Only keep results in/near Estonia (lat ~57-60, lon ~21-28)
+        const [lon, lat] = f.geometry.coordinates;
+        return lat >= 57 && lat <= 60.5 && lon >= 21 && lon <= 28.5;
+      })
+      .map((f: any) => {
+        const p = f.properties;
+        const name = p.name || p.street || query;
+        const parts = [p.housenumber, p.street, p.city || p.county].filter(Boolean);
+        return {
+          name,
+          address: parts.join(', ') || p.label || '',
+          lat: f.geometry.coordinates[1],
+          lon: f.geometry.coordinates[0],
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
 // ─── search history ─────────────────────────────────────────────
 interface SearchEntry { from: string; to: string; timestamp: number }
 const HISTORY_KEY = 'planner_search_history';
@@ -388,6 +433,10 @@ export const Planner = () => {
   // Track the exact selected stop objects to avoid ambiguity when names collide
   const selectedFromStop = useRef<Stop | null>(null);
   const selectedToStop = useRef<Stop | null>(null);
+  // Track geocoded address selections
+  const selectedFromPlace = useRef<GeocodedPlace | null>(null);
+  const selectedToPlace = useRef<GeocodedPlace | null>(null);
+  const [addressSuggestions, setAddressSuggestions] = useState<GeocodedPlace[]>([]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -407,25 +456,46 @@ export const Planner = () => {
   }, []);
 
   const handleSearch = (query: string, type: 'from' | 'to') => {
-    if (type === 'from') { setFrom(query); selectedFromStop.current = null; }
-    else { setTo(query); selectedToStop.current = null; }
+    if (type === 'from') { setFrom(query); selectedFromStop.current = null; selectedFromPlace.current = null; }
+    else { setTo(query); selectedToStop.current = null; selectedToPlace.current = null; }
     if (query.length > 1) {
       setSuggestions(stops.filter(s => s.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6));
       setActiveInput(type);
+      // Geocode addresses in parallel (debounced)
+      if (geocodeTimer) clearTimeout(geocodeTimer);
+      geocodeTimer = setTimeout(async () => {
+        const places = await geocodeAddress(query);
+        setAddressSuggestions(places);
+      }, 400);
     } else {
       setSuggestions([]);
+      setAddressSuggestions([]);
       setActiveInput(null);
     }
   };
 
   const selectSuggestion = (stop: Stop) => {
-    if (activeInput === 'from') { setFrom(stop.name); selectedFromStop.current = stop; }
-    else { setTo(stop.name); selectedToStop.current = stop; }
+    if (activeInput === 'from') { setFrom(stop.name); selectedFromStop.current = stop; selectedFromPlace.current = null; }
+    else { setTo(stop.name); selectedToStop.current = stop; selectedToPlace.current = null; }
     setActiveInput(null);
     setSuggestions([]);
+    setAddressSuggestions([]);
   };
 
-  const swapLocations = () => { const tmp = from; setFrom(to); setTo(tmp); };
+  const selectPlace = (place: GeocodedPlace) => {
+    const label = place.address || place.name;
+    if (activeInput === 'from') { setFrom(label); selectedFromPlace.current = place; selectedFromStop.current = null; }
+    else { setTo(label); selectedToPlace.current = place; selectedToStop.current = null; }
+    setActiveInput(null);
+    setSuggestions([]);
+    setAddressSuggestions([]);
+  };
+
+  const swapLocations = () => {
+    const tmp = from; setFrom(to); setTo(tmp);
+    const tmpStop = selectedFromStop.current; selectedFromStop.current = selectedToStop.current; selectedToStop.current = tmpStop;
+    const tmpPlace = selectedFromPlace.current; selectedFromPlace.current = selectedToPlace.current; selectedToPlace.current = tmpPlace;
+  };
 
   const resolveCoords = useCallback((name: string, type: 'from' | 'to'): { lat: number; lon: number } | null => {
     if (name === t('planner.currentLocation')) {
@@ -434,7 +504,10 @@ export const Planner = () => {
     // Use the exact stop that was selected from the dropdown first
     const pinned = type === 'from' ? selectedFromStop.current : selectedToStop.current;
     if (pinned) return { lat: pinned.lat, lon: pinned.lng };
-    // Fall back to first name match
+    // Check if a geocoded address was selected
+    const place = type === 'from' ? selectedFromPlace.current : selectedToPlace.current;
+    if (place) return { lat: place.lat, lon: place.lon };
+    // Fall back to first name match in stops
     const stop = stops.find(s => s.name === name);
     return stop ? { lat: stop.lat, lon: stop.lng } : null;
   }, [stops, userCoords, t]);
@@ -443,8 +516,17 @@ export const Planner = () => {
     const searchFrom = overrideFrom ?? from;
     const searchTo = overrideTo ?? to;
     setError(null);
-    const fromCoords = resolveCoords(searchFrom, 'from');
-    const toCoords = resolveCoords(searchTo, 'to');
+    let fromCoords = resolveCoords(searchFrom, 'from');
+    let toCoords = resolveCoords(searchTo, 'to');
+    // Auto-geocode typed text that didn't match any stop
+    if (!fromCoords && searchFrom !== t('planner.currentLocation')) {
+      const places = await geocodeAddress(searchFrom);
+      if (places.length) { fromCoords = { lat: places[0].lat, lon: places[0].lon }; selectedFromPlace.current = places[0]; }
+    }
+    if (!toCoords) {
+      const places = await geocodeAddress(searchTo);
+      if (places.length) { toCoords = { lat: places[0].lat, lon: places[0].lon }; selectedToPlace.current = places[0]; }
+    }
     if (!fromCoords) { setError(searchFrom === t('planner.currentLocation') ? t('planner.waitingGps') : t('planner.stopNotFound', { name: searchFrom })); return; }
     if (!toCoords) { setError(t('planner.stopNotFound', { name: searchTo })); return; }
     if (fromCoords.lat === toCoords.lat && fromCoords.lon === toCoords.lon) { setError(t('planner.sameOriginDest')); return; }
@@ -534,11 +616,11 @@ export const Planner = () => {
           </div>
 
           {/* Autocomplete dropdown */}
-          {activeInput && (suggestions.length > 0 || activeInput === 'from') && (
-            <div className="dropdown-popover absolute left-0 right-0 top-full mt-2 rounded-[16px] shadow-2xl z-50 overflow-hidden">
+          {activeInput && (suggestions.length > 0 || addressSuggestions.length > 0 || activeInput === 'from') && (
+            <div className="dropdown-popover absolute left-0 right-0 top-full mt-2 rounded-[16px] shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
               {activeInput === 'from' && from !== t('planner.currentLocation') && (
                 <button
-                  onClick={() => { setFrom(t('planner.currentLocation')); selectedFromStop.current = null; setActiveInput(null); setSuggestions([]); }}
+                  onClick={() => { setFrom(t('planner.currentLocation')); selectedFromStop.current = null; selectedFromPlace.current = null; setActiveInput(null); setSuggestions([]); setAddressSuggestions([]); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10"
                 >
                   <div className="bg-blue-500/10 p-2 rounded-full shrink-0">
@@ -582,6 +664,31 @@ export const Planner = () => {
                   )}
                 </button>
               ))}
+              {/* Address suggestions from geocoding */}
+              {addressSuggestions.length > 0 && (
+                <>
+                  {suggestions.length > 0 && (
+                    <div className="px-4 py-1.5 border-t border-outline-variant/10">
+                      <p className="text-[8px] font-label font-bold uppercase tracking-widest text-secondary/60">{t('planner.addresses')}</p>
+                    </div>
+                  )}
+                  {addressSuggestions.map((place, idx) => (
+                    <button
+                      key={`addr-${idx}`}
+                      onClick={() => selectPlace(place)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10 last:border-0"
+                    >
+                      <div className="bg-emerald-500/10 p-2 rounded-full shrink-0">
+                        <Search className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-headline font-bold text-on-surface text-sm truncate">{place.name}</p>
+                        <p className="text-[9px] font-label text-secondary truncate mt-0.5">{place.address}</p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>
