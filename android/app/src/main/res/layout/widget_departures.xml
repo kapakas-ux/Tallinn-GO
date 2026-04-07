@@ -15,6 +15,13 @@
         android:gravity="center_vertical"
         android:layout_marginBottom="8dp">
 
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@mipmap/ic_launcher"
+            android:contentDescription="Logo"
+            android:layout_marginEnd="6dp" />
+
         <TextView
             android:id="@+id/widget_title"
             android:layout_width="0dp"
@@ -23,7 +30,7 @@
             android:text="GO NOW"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="#00529B"
+            android:textColor="@color/widget_title"
             android:maxLines="1"
             android:ellipsize="end" />
 
@@ -31,7 +38,7 @@
             android:id="@+id/widget_refresh"
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@android:drawable/ic_popup_sync"
+            android:src="@drawable/ic_refresh"
             android:contentDescription="Refresh"
             android:background="?android:attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
@@ -54,7 +61,7 @@
         android:gravity="center"
         android:text="Tap to set up stops"
         android:textSize="13sp"
-        android:textColor="#999999"
+        android:textColor="@color/widget_empty_text"
         android:visibility="gone" />
 
 </LinearLayout>

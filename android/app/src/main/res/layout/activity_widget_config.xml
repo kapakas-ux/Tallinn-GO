@@ -3,24 +3,57 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:background="#FFFFFF">
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="24dp"
+    android:fitsSystemWindows="true"
+    android:background="@color/config_background">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Logo + Title header -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Widget Setup"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:textColor="#00529B"
-        android:layout_marginBottom="4dp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="4dp">
+
+        <ImageView
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@mipmap/ic_launcher"
+            android:contentDescription="GO NOW"
+            android:layout_marginEnd="10dp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="GO NOW"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="@color/config_title" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Widget Setup"
+                android:textSize="12sp"
+                android:textColor="@color/config_text_secondary" />
+        </LinearLayout>
+    </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Choose 1–2 stops to display"
         android:textSize="14sp"
-        android:textColor="#666666"
+        android:textColor="@color/config_text_secondary"
+        android:layout_marginTop="4dp"
         android:layout_marginBottom="16dp" />
 
     <!-- Search field -->
@@ -31,8 +64,10 @@
         android:hint="Search for a stop..."
         android:inputType="text"
         android:textSize="14sp"
+        android:textColor="@color/config_text"
+        android:textColorHint="@color/config_hint"
         android:padding="12dp"
-        android:background="@drawable/widget_background"
+        android:background="@drawable/config_search_bg"
         android:layout_marginBottom="8dp"
         android:importantForAutofill="no" />
 
@@ -42,7 +77,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:divider="#EEEEEE"
+        android:divider="@color/config_divider"
         android:dividerHeight="1dp" />
 
     <!-- Selected stops -->
@@ -60,7 +95,7 @@
             android:text="SELECTED STOPS"
             android:textSize="11sp"
             android:textStyle="bold"
-            android:textColor="#999999"
+            android:textColor="@color/config_text_secondary"
             android:letterSpacing="0.05"
             android:layout_marginBottom="4dp" />
 
@@ -69,8 +104,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="14sp"
-            android:textColor="#333333"
-            android:padding="8dp"
+            android:textColor="@color/config_text"
+            android:padding="10dp"
+            android:layout_marginBottom="4dp"
+            android:background="@drawable/config_selected_bg"
             android:visibility="gone" />
 
         <TextView
@@ -78,8 +115,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="14sp"
-            android:textColor="#333333"
-            android:padding="8dp"
+            android:textColor="@color/config_text"
+            android:padding="10dp"
+            android:background="@drawable/config_selected_bg"
             android:visibility="gone" />
     </LinearLayout>
 
@@ -89,9 +127,10 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:text="Add Widget"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/config_button_text"
         android:textStyle="bold"
-        android:background="@drawable/line_badge_bus"
+        android:textSize="15sp"
+        android:background="@drawable/config_button_bg"
         android:layout_marginTop="12dp"
         android:enabled="false"
         android:alpha="0.5" />

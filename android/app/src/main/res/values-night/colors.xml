@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget: Havgra (dark) theme -->
+    <color name="widget_background">#0A1522</color>
+    <color name="widget_surface">#111D2E</color>
+    <color name="widget_title">#7EC8E3</color>
+    <color name="widget_text">#CFD9E5</color>
+    <color name="widget_text_secondary">#8FAABB</color>
+    <color name="widget_text_muted">#5A7080</color>
+    <color name="widget_minutes">#7EC8E3</color>
+    <color name="widget_divider">#1A4A6B</color>
+    <color name="widget_icon_tint">#7EC8E3</color>
+    <color name="widget_header_text">#B0D4E5</color>
+    <color name="widget_empty_text">#5A7080</color>
+
+    <!-- Config: Havgra (dark) theme -->
+    <color name="config_background">#060E18</color>
+    <color name="config_surface">#0A1522</color>
+    <color name="config_title">#7EC8E3</color>
+    <color name="config_text">#CFD9E5</color>
+    <color name="config_text_secondary">#8FAABB</color>
+    <color name="config_hint">#5A7080</color>
+    <color name="config_search_bg">#111D2E</color>
+    <color name="config_button_bg">#7EC8E3</color>
+    <color name="config_button_text">#00293C</color>
+    <color name="config_divider">#1A4A6B</color>
+    <color name="config_selected_bg">#1A4A6B</color>
+</resources>

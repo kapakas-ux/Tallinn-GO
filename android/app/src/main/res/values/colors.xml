@@ -3,4 +3,30 @@
     <color name="colorPrimary">#00529B</color>
     <color name="colorPrimaryDark">#003E75</color>
     <color name="colorAccent">#FFC107</color>
+
+    <!-- Widget: Daylight theme -->
+    <color name="widget_background">#EEF3F7</color>
+    <color name="widget_surface">#F5F8FB</color>
+    <color name="widget_title">#1A6080</color>
+    <color name="widget_text">#1A2A35</color>
+    <color name="widget_text_secondary">#4A7A90</color>
+    <color name="widget_text_muted">#7A96A8</color>
+    <color name="widget_minutes">#1A6080</color>
+    <color name="widget_divider">#CCE3EF</color>
+    <color name="widget_icon_tint">#1A6080</color>
+    <color name="widget_header_text">#0D3D52</color>
+    <color name="widget_empty_text">#7A96A8</color>
+
+    <!-- Config: Daylight theme -->
+    <color name="config_background">#EEF3F7</color>
+    <color name="config_surface">#FFFFFF</color>
+    <color name="config_title">#1A6080</color>
+    <color name="config_text">#1A2A35</color>
+    <color name="config_text_secondary">#4A7A90</color>
+    <color name="config_hint">#7A96A8</color>
+    <color name="config_search_bg">#F5F8FB</color>
+    <color name="config_button_bg">#1A6080</color>
+    <color name="config_button_text">#FFFFFF</color>
+    <color name="config_divider">#CCE3EF</color>
+    <color name="config_selected_bg">#CCE3EF</color>
 </resources>

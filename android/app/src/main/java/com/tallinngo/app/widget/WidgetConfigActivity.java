@@ -10,6 +10,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -59,6 +60,11 @@ public class WidgetConfigActivity extends Activity {
         super.onCreate(savedInstanceState);
         setResult(RESULT_CANCELED);
 
+        // Theme the status and navigation bar to match
+        Window window = getWindow();
+        window.setStatusBarColor(getColor(R.color.config_background));
+        window.setNavigationBarColor(getColor(R.color.config_background));
+
         Intent intent = getIntent();
         if (intent != null) {
             appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
@@ -78,12 +84,21 @@ public class WidgetConfigActivity extends Activity {
         selectedText1 = findViewById(R.id.config_selected_1);
         selectedText2 = findViewById(R.id.config_selected_2);
 
-        adapter = new ArrayAdapter<StopEntry>(this, android.R.layout.simple_list_item_1, searchResults) {
+        adapter = new ArrayAdapter<StopEntry>(this, R.layout.config_search_item, R.id.item_stop_name, searchResults) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
-                if (view instanceof TextView) {
-                    ((TextView) view).setTextSize(14);
+                StopEntry entry = getItem(position);
+                if (entry != null) {
+                    TextView nameView = view.findViewById(R.id.item_stop_name);
+                    TextView depView = view.findViewById(R.id.item_departures);
+                    nameView.setText(entry.name);
+                    if (entry.departureSummary != null && !entry.departureSummary.isEmpty()) {
+                        depView.setVisibility(View.VISIBLE);
+                        depView.setText(entry.departureSummary);
+                    } else {
+                        depView.setVisibility(View.GONE);
+                    }
                 }
                 return view;
             }
@@ -177,7 +192,11 @@ public class WidgetConfigActivity extends Activity {
         executor.execute(() -> {
             List<StopEntry> results = new ArrayList<>();
             try {
-                String gql = "{ stops(name: \"" + sanitize(query) + "\") { gtfsId name lat lon } }";
+                long nowSeconds = System.currentTimeMillis() / 1000;
+                String gql = "{ stops(name: \"" + sanitize(query) + "\") { " +
+                        "gtfsId name lat lon " +
+                        "stoptimesWithoutPatterns(numberOfDepartures: 2, startTime: " + nowSeconds + ") { " +
+                        "headsign trip { route { shortName } } } } }";
                 String jsonBody = new JSONObject().put("query", gql).toString();
 
                 URL url = new URL(PEATUS_URL);
@@ -202,21 +221,43 @@ public class WidgetConfigActivity extends Activity {
                 JSONObject data = new JSONObject(sb.toString());
                 JSONArray stops = data.optJSONObject("data").optJSONArray("stops");
                 if (stops != null) {
-                    // Deduplicate by name (many platforms per stop)
-                    List<String> seenNames = new ArrayList<>();
+                    // Keep each platform that has departures (shows direction)
+                    // Dedup by gtfsId only; same-name stops with different departures are kept
+                    List<String> seenIds = new ArrayList<>();
                     for (int i = 0; i < stops.length() && results.size() < 20; i++) {
                         JSONObject s = stops.getJSONObject(i);
                         String name = s.optString("name", "");
                         String id = s.optString("gtfsId", "").replace("estonia:", "");
                         if (name.isEmpty() || id.isEmpty()) continue;
+                        if (seenIds.contains(id)) continue;
+                        seenIds.add(id);
 
-                        // Simple dedup: skip if we already have this exact name
-                        if (seenNames.contains(name)) continue;
-                        seenNames.add(name);
+                        // Build departure summary from the 2 stoptimes
+                        String depSummary = "";
+                        JSONArray stoptimes = s.optJSONArray("stoptimesWithoutPatterns");
+                        if (stoptimes != null && stoptimes.length() > 0) {
+                            StringBuilder depSb = new StringBuilder();
+                            for (int j = 0; j < stoptimes.length() && j < 2; j++) {
+                                JSONObject st = stoptimes.getJSONObject(j);
+                                String headsign = st.optString("headsign", "");
+                                JSONObject trip = st.optJSONObject("trip");
+                                JSONObject route = (trip != null) ? trip.optJSONObject("route") : null;
+                                String shortName = (route != null) ? route.optString("shortName", "") : "";
+                                if (shortName.isEmpty() && headsign.isEmpty()) continue;
+                                if (depSb.length() > 0) depSb.append(",  ");
+                                if (!shortName.isEmpty()) {
+                                    depSb.append(shortName);
+                                    if (!headsign.isEmpty()) depSb.append(" → ").append(headsign);
+                                } else {
+                                    depSb.append(headsign);
+                                }
+                            }
+                            depSummary = depSb.toString();
+                        }
 
                         double lat = s.optDouble("lat", 0);
                         double lon = s.optDouble("lon", 0);
-                        results.add(new StopEntry(id, name, lat, lon));
+                        results.add(new StopEntry(id, name, lat, lon, depSummary));
                     }
                 }
                 conn.disconnect();
@@ -269,12 +310,14 @@ public class WidgetConfigActivity extends Activity {
         final String name;
         final double lat;
         final double lon;
+        final String departureSummary;
 
-        StopEntry(String gtfsId, String name, double lat, double lon) {
+        StopEntry(String gtfsId, String name, double lat, double lon, String departureSummary) {
             this.gtfsId = gtfsId;
             this.name = name;
             this.lat = lat;
             this.lon = lon;
+            this.departureSummary = departureSummary;
         }
 
         @Override
