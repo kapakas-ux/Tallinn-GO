@@ -17,7 +17,7 @@ import { AnimatePresence } from 'motion/react';
 import { getDailyFact, dismissDailyFact } from '../services/dailyFactService';
 import { getSettings } from '../services/settingsService';
 
-export const Dashboard = () => {
+export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const { t } = useTranslation();
   const [closestStop, setClosestStop] = useState(null as Stop | null);
   const [nearbyStops, setNearbyStops] = useState([] as Stop[]);
@@ -110,15 +110,16 @@ export const Dashboard = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [favorites]);
 
-  // Continuous geolocation tracking
+  // Continuous geolocation tracking (only when active tab)
   useEffect(() => {
+    if (!active) return;
     const cleanup = watchLocation((location, simulated) => {
       setUserLocation(location);
       setIsSimulated(simulated);
     });
 
     return cleanup;
-  }, []);
+  }, [active]);
 
   useEffect(() => {
     let mounted = true;
@@ -260,6 +261,7 @@ export const Dashboard = () => {
   };
 
   useEffect(() => {
+    if (!active) return;
     const interval = setInterval(() => {
       // Refresh closest stop
       if (closestStop) {
@@ -287,7 +289,7 @@ export const Dashboard = () => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [closestStop, expandedNearby, allStops, favorites, nearbyStops]);
+  }, [active, closestStop, expandedNearby, allStops, favorites, nearbyStops]);
 
   const handleSaveEdit = () => {
     if (editingFav) {
@@ -388,7 +390,7 @@ export const Dashboard = () => {
                               </span>
                             </div>
                             <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
+                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) === 0 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
                             </span>
                           </div>
                         ))}
@@ -562,7 +564,7 @@ export const Dashboard = () => {
                             </span>
                           </div>
                           <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                            {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
+                            {arr.status === 'departed' ? '–' : getLiveMinutes(arr) === 0 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
                           </span>
                         </div>
                       ))}

@@ -102,10 +102,10 @@ function AppContent() {
           </Routes>
           {/* Keep Dashboard and Stops mounted but hidden to preserve state across tab switches */}
           <div className={location.pathname === '/' ? '' : 'hidden'}>
-            <Dashboard />
+            <Dashboard active={location.pathname === '/'} />
           </div>
           <div className={location.pathname === '/stops' ? '' : 'hidden'}>
-            <Stops />
+            <Stops active={location.pathname === '/stops'} />
           </div>
           {/* Map stays mounted but hidden to preserve tile cache and state */}
           <div className={location.pathname === '/map' ? 'h-full' : 'hidden'}>

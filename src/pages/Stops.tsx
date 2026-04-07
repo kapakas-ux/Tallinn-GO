@@ -14,7 +14,7 @@ import { NotificationSelector } from '../components/NotificationSelector';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { AnimatePresence } from 'motion/react';
 
-export const Stops = () => {
+export const Stops = ({ active = true }: { active?: boolean }) => {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [allStops, setAllStops] = useState([] as Stop[]);
@@ -34,9 +34,10 @@ export const Stops = () => {
   // Tick every 15 s so inline minute badges stay live
   const [, setTick] = useState(0);
   useEffect(() => {
+    if (!active) return;
     const id = setInterval(() => setTick(t => t + 1), 15_000);
     return () => clearInterval(id);
-  }, []);
+  }, [active]);
 
   const emojiOptions = [
     { label: t('dashboard.emojiHome'), emoji: '🏠' },
@@ -65,12 +66,13 @@ export const Stops = () => {
   const [searchLoading, setSearchLoading] = useState({} as { [key: string]: boolean });
 
   useEffect(() => {
+    if (!active) return;
     const cleanup = watchLocation((location, simulated) => {
       setUserLocation(location);
       setIsSimulated(simulated);
     });
     return cleanup;
-  }, []);
+  }, [active]);
 
   useEffect(() => {
     let mounted = true;
@@ -219,6 +221,7 @@ export const Stops = () => {
   };
 
   useEffect(() => {
+    if (!active) return;
     const interval = setInterval(() => {
       // Refresh favorites
       if (favorites.length > 0) {
@@ -251,7 +254,7 @@ export const Stops = () => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [favorites, expandedNearby, selectedStop, allStops]);
+  }, [active, favorites, expandedNearby, selectedStop, allStops]);
 
   const handleSaveEdit = () => {
     if (editingFav) {
@@ -414,7 +417,7 @@ export const Stops = () => {
                               </span>
                             </div>
                             <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
+                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) === 0 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
                             </span>
                           </div>
                         </div>
@@ -526,7 +529,7 @@ export const Stops = () => {
                                     </span>
                                   </div>
                                   <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                                    {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
+                                    {arr.status === 'departed' ? '–' : getLiveMinutes(arr) === 0 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
                                   </span>
                                 </div>
                               ))}
