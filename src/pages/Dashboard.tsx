@@ -388,7 +388,7 @@ export const Dashboard = () => {
                               </span>
                             </div>
                             <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : (arr.time ?? `${getLiveMinutes(arr)}m`)}
+                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
                             </span>
                           </div>
                         ))}
@@ -562,7 +562,7 @@ export const Dashboard = () => {
                             </span>
                           </div>
                           <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                            {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : (arr.time ?? `${getLiveMinutes(arr)}m`)}
+                            {arr.status === 'departed' ? '–' : getLiveMinutes(arr) <= 1 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
                           </span>
                         </div>
                       ))}
