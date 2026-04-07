@@ -4,4 +4,5 @@
     <string name="title_activity_main">GO NOW</string>
     <string name="package_name">com.tallinngo.app</string>
     <string name="custom_url_scheme">com.tallinngo.app</string>
+    <string name="widget_description">Shows next departures for your favourite stops</string>
 </resources>

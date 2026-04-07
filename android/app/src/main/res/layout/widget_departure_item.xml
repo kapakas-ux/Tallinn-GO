@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <!-- Line number badge -->
+    <TextView
+        android:id="@+id/departure_line"
+        android:layout_width="36dp"
+        android:layout_height="24dp"
+        android:gravity="center"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/white"
+        android:background="@drawable/line_badge_bus"
+        android:maxLines="1" />
+
+    <!-- Destination -->
+    <TextView
+        android:id="@+id/departure_destination"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:textSize="13sp"
+        android:textColor="#333333"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- Minutes -->
+    <TextView
+        android:id="@+id/departure_minutes"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#00529B" />
+
+</LinearLayout>
