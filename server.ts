@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import axios from "axios";
 import cors from "cors";
+import { WebSocketServer, WebSocket } from "ws";
 
 async function startServer() {
   const app = express();
@@ -394,8 +395,91 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  // WebSocket proxy for Ridango vehicle locations (browser dev only)
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (request, socket, head) => {
+    if (request.url === '/ws/ridango') {
+      wss.handleUpgrade(request, socket, head, (clientWs) => {
+        const upstream = new WebSocket(
+          'wss://wmb-public-api-peutk.eu-prod.ridango.cloud/ws/tenant/2/vehicle/locations'
+        );
+
+        let msgCount = 0;
+        upstream.on('message', (data) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            const str = data.toString();
+            clientWs.send(str);
+            if (msgCount === 0) {
+              console.log(`[WS Proxy] first message: ${str.length} bytes`);
+            }
+            msgCount++;
+          }
+        });
+
+        upstream.on('close', () => clientWs.close());
+        upstream.on('error', (err) => {
+          console.error('[WS Proxy] upstream error:', err.message);
+          clientWs.close();
+        });
+
+        clientWs.on('close', () => upstream.close());
+        clientWs.on('error', () => upstream.close());
+
+        console.log('[WS Proxy] Ridango connection established');
+      });
+    } else if (request.url === '/ws/tartu') {
+      wss.handleUpgrade(request, socket, head, (clientWs) => {
+        const upstream = new WebSocket('wss://api.ridango.com/rt-ws/vehicle-status');
+        const pendingMessages: string[] = [];
+
+        upstream.on('open', () => {
+          console.log('[WS Proxy] Tartu upstream connected');
+          // Send any queued client messages
+          for (const msg of pendingMessages) {
+            upstream.send(msg);
+          }
+          pendingMessages.length = 0;
+        });
+
+        let msgCount = 0;
+        upstream.on('message', (data) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            const str = data.toString();
+            clientWs.send(str);
+            console.log(`[WS Proxy Tartu] msg #${msgCount}: ${str.length} bytes`);
+            msgCount++;
+          }
+        });
+
+        upstream.on('close', () => clientWs.close());
+        upstream.on('error', (err) => {
+          console.error('[WS Proxy Tartu] upstream error:', err.message);
+          clientWs.close();
+        });
+
+        // Forward subscription messages from client to upstream
+        clientWs.on('message', (data) => {
+          const msg = data.toString();
+          if (upstream.readyState === WebSocket.OPEN) {
+            upstream.send(msg);
+          } else {
+            pendingMessages.push(msg);
+          }
+        });
+
+        clientWs.on('close', () => upstream.close());
+        clientWs.on('error', () => upstream.close());
+
+        console.log('[WS Proxy] Tartu connection established');
+      });
+    } else {
+      socket.destroy();
+    }
   });
 }
 

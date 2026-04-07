@@ -40,6 +40,7 @@ export const Map = () => {
   const markers = useRef([] as maplibregl.Marker[]);
   const vehicleMarkers = useRef({} as { [id: string]: maplibregl.Marker });
   const vehicleInterpolation = useRef({} as { [id: string]: { current: [number, number], target: [number, number], lastUpdate: number } });
+  const vehiclesRef = useRef<Vehicle[]>([]);
   const userMarker = useRef(null as maplibregl.Marker | null);
   const pulsatingMarker = useRef(null as maplibregl.Marker | null);
   const currentPopup = useRef(null as maplibregl.Popup | null);
@@ -310,6 +311,7 @@ export const Map = () => {
   // Update vehicle markers
   useEffect(() => {
     if (!map.current || styleLoadCount === 0) return;
+    vehiclesRef.current = vehicles;
 
     const currentIds = new Set(vehicles.map(v => v.id));
 
@@ -376,10 +378,12 @@ export const Map = () => {
 
         el.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const routeStops = await getRouteStopsForVehicle(vehicle);
-          setSelectedVehicle({ vehicle, routeStops });
+          // Use latest vehicle data (destination may have resolved since marker was created)
+          const latest = vehiclesRef.current?.find(v => v.id === vehicle.id) || vehicle;
+          const routeStops = await getRouteStopsForVehicle(latest);
+          setSelectedVehicle({ vehicle: latest, routeStops });
           setTripStoptimes([]);
-          fetchVehicleTripStoptimes(vehicle).then(st => setTripStoptimes(st));
+          fetchVehicleTripStoptimes(latest).then(st => setTripStoptimes(st));
         });
 
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })

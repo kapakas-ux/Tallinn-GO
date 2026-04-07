@@ -12,6 +12,8 @@ import { Map } from './pages/Map';
 import { Planner } from './pages/Planner';
 import { getSettings } from './services/settingsService';
 import type { AppTheme } from './services/settingsService';
+import { startRidangoWS, stopRidangoWS } from './services/ridangoWebSocket';
+import { startTartuWS, stopTartuWS } from './services/tartuWebSocket';
 
 function OrbLayer() {
   return (
@@ -37,6 +39,12 @@ function AppContent() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    startRidangoWS();
+    startTartuWS();
+    return () => { stopRidangoWS(); stopTartuWS(); };
+  }, []);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {

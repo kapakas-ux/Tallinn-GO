@@ -9,6 +9,8 @@ const ALERT_VIBRATION_PATTERN = [0, 200, 100, 400, 100, 200];
 const VIBRATION_CYCLE_MS = ALERT_VIBRATION_PATTERN.reduce((a, b) => a + b, 0) + 500; // pattern duration + pause
 
 let vibrationInterval: ReturnType<typeof setInterval> | null = null;
+let alertAudio: HTMLAudioElement | null = null;
+let audioLoopInterval: ReturnType<typeof setInterval> | null = null;
 
 function startContinuousVibration() {
   stopContinuousVibration();
@@ -17,6 +19,45 @@ function startContinuousVibration() {
   vibrationInterval = setInterval(() => {
     navigator.vibrate(ALERT_VIBRATION_PATTERN);
   }, VIBRATION_CYCLE_MS);
+}
+
+function startContinuousSound() {
+  stopContinuousSound();
+  const { alarmSound } = getSettings();
+  const soundEntry = ALARM_SOUNDS.find(s => s.id === alarmSound);
+  const file = soundEntry?.file;
+  if (!file) return; // system default — handled by notification channel
+
+  try {
+    alertAudio = new Audio(file);
+    alertAudio.play().catch(() => {});
+    // Re-trigger every time the clip ends
+    alertAudio.onended = () => {
+      alertAudio?.play().catch(() => {});
+    };
+    // Safety fallback: if onended doesn't fire, use interval
+    audioLoopInterval = setInterval(() => {
+      if (alertAudio && alertAudio.paused) {
+        alertAudio.currentTime = 0;
+        alertAudio.play().catch(() => {});
+      }
+    }, 3000);
+  } catch {
+    // audio not available
+  }
+}
+
+function stopContinuousSound() {
+  if (audioLoopInterval) {
+    clearInterval(audioLoopInterval);
+    audioLoopInterval = null;
+  }
+  if (alertAudio) {
+    alertAudio.pause();
+    alertAudio.currentTime = 0;
+    alertAudio.onended = null;
+    alertAudio = null;
+  }
 }
 
 function stopContinuousVibration() {
@@ -35,14 +76,16 @@ function registerVibrationListener() {
   if (listenerRegistered || !Capacitor.isNativePlatform()) return;
   listenerRegistered = true;
 
-  // Start buzzing when notification fires
+  // Start buzzing and sound when notification fires
   LocalNotifications.addListener('localNotificationReceived', () => {
     startContinuousVibration();
+    startContinuousSound();
   });
 
-  // Stop buzzing when user taps or dismisses
+  // Stop buzzing and sound when user taps or dismisses
   LocalNotifications.addListener('localNotificationActionPerformed', () => {
     stopContinuousVibration();
+    stopContinuousSound();
   });
 }
 

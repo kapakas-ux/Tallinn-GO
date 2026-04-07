@@ -1,6 +1,8 @@
 import { Arrival, Stop, Vehicle } from '../types';
 import { CapacitorHttp, Capacitor } from '@capacitor/core';
 import { getDistance, getBearing } from '../lib/geo';
+import { getRidangoVehicles, isRidangoConnected } from './ridangoWebSocket';
+import { getTartuVehicles, isTartuConnected } from './tartuWebSocket';
 
 const getApiBaseUrl = () => {
   // 1. Check for environment variable (set during build)
@@ -133,6 +135,10 @@ function populateStopLookups(stops: Stop[]): void {
   stopsByBaseIdMap = new Map();
   for (const stop of stops) {
     stopsByIdMap.set(stop.id, stop);
+    // Also index by gtfsId so pattern-stop lookups work for non-Tallinn stops
+    if (stop.gtfsId && stop.gtfsId !== stop.id) {
+      stopsByIdMap.set(stop.gtfsId, stop);
+    }
     const baseId = stop.id.split('-')[0];
     if (!stopsByBaseIdMap.has(baseId)) {
       stopsByBaseIdMap.set(baseId, stop);
@@ -581,6 +587,7 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
 
   // Secondary source: gis.ee GeoJSON — always fetch to get trains (type 10),
   // regional buses (type 20), and trolleybuses (type 1) that gps.txt doesn't include
+  let gisVehicles: Vehicle[] = [];
   const vehiclesUrl = Capacitor.isNativePlatform()
     ? 'https://gis.ee/tallinn/gps.php'
     : `${API_BASE}/api/transport/vehicles`;
@@ -629,19 +636,58 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
 
     if (extraVehicles.length > 0) {
       console.log(`fetchVehicles: added ${extraVehicles.length} extra vehicles from gis.ee (trains, regional, trolley)`);
-      return [...cityVehicles, ...extraVehicles];
+      gisVehicles = extraVehicles;
     }
   } catch (error) {
     console.warn('fetchVehicles: gis.ee extra vehicle fetch failed', error);
   }
 
-  // If gis.ee failed or had no regional data, return city vehicles alone
-  if (cityVehicles.length > 0) {
-    return cityVehicles;
+  // Tertiary source: Ridango WebSocket (regional buses, trains, trolleybuses)
+  // Preferred over gis.ee when connected — push-based, lower latency
+  let wsVehicles: Vehicle[] = [];
+  if (isRidangoConnected()) {
+    const raw = getRidangoVehicles();
+    console.log(`fetchVehicles: Ridango WS connected, got ${raw.length} raw vehicles`);
+    for (const v of raw) {
+      // Don't use routesMap fallback for WS vehicles — routesMap is for city transport
+      // and would give wrong destinations. WS vehicles get headsigns from peatus.ee.
+      // Skip vehicles already covered by gps.txt (same line, within 200m)
+      const isDuplicate = cityVehicles.some(
+        cv => cv.line === v.line && getDistance(cv.lat, cv.lng, v.lat, v.lng) < 200
+      );
+      if (!isDuplicate) wsVehicles.push(v);
+    }
+    if (wsVehicles.length > 0) {
+      console.log(`fetchVehicles: added ${wsVehicles.length} vehicles from Ridango WS`);
+    }
   }
 
-  // Both sources failed — return fallback empty from gis.ee full parse
-  console.warn('fetchVehicles: both sources returned no data');
+  // Merge: gps.txt city + gis.ee (trains/trolley) + WS regional
+  // WS vehicles dedup against both gps.txt and gis.ee by line + proximity
+  const allExtra = [...gisVehicles];
+  for (const v of wsVehicles) {
+    const isDupOfGis = gisVehicles.some(
+      gv => gv.line === v.line && getDistance(gv.lat, gv.lng, v.lat, v.lng) < 200
+    );
+    if (!isDupOfGis) allExtra.push(v);
+  }
+
+  // Tartu WS vehicles (separate city, no dedup needed against Tallinn sources)
+  let tartuVehicles: Vehicle[] = [];
+  if (isTartuConnected()) {
+    tartuVehicles = getTartuVehicles();
+    if (tartuVehicles.length > 0) {
+      console.log(`fetchVehicles: added ${tartuVehicles.length} vehicles from Tartu WS`);
+    }
+  }
+
+  const allVehicles = [...cityVehicles, ...allExtra, ...tartuVehicles];
+
+  if (allVehicles.length > 0) {
+    return allVehicles;
+  }
+
+  console.warn('fetchVehicles: all sources returned no data');
   return [];
 }
 
@@ -779,15 +825,10 @@ export async function fetchTripStoptimes(tripId: string): Promise<TripStoptime[]
  * Fetch scheduled stoptimes for a vehicle's current trip.
  * 1. Look up the OTP route by line name
  * 2. Match the pattern by destination/headsign
- * 3. Use fuzzyTrip to find the closest active trip
- * 4. Return stoptimes
+ * 3. Return pattern stops (with optional trip stoptimes for scheduled times)
  */
 export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripStoptime[]> {
-  const now = new Date();
-  const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-  const timeSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-
-  // Step 1: Find the route and its patterns
+  // Query routes with pattern stops included
   const routeQuery = `{
     routes(name: "${vehicle.line}") {
       gtfsId
@@ -795,6 +836,7 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
       patterns {
         directionId
         headsign
+        stops { gtfsId name }
       }
     }
   }`;
@@ -826,55 +868,82 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
     const routes = routeData?.data?.routes;
     if (!routes || routes.length === 0) return [];
 
-    // Find the route matching the line number
+    // Find the route matching the line number, preferring routes whose headsigns match the destination
     const normLine = vehicle.line.replace(/^0+/, '');
-    const route = routes.find((r: any) => (r.shortName || '').replace(/^0+/, '') === normLine) || routes[0];
-    if (!route?.gtfsId) return [];
-
-    // Match direction by destination
     const vDest = (vehicle.destination || '').toLowerCase();
-    let direction = 0;
-    if (route.patterns && route.patterns.length > 1) {
-      const match = route.patterns.find((p: any) => {
-        const h = (p.headsign || '').toLowerCase();
-        return h.includes(vDest) || vDest.includes(h);
-      });
-      if (match) direction = match.directionId ?? 0;
-    }
+    const candidateRoutes = routes.filter((r: any) => (r.shortName || '').replace(/^0+/, '') === normLine);
+    if (candidateRoutes.length === 0) return [];
 
-    // Step 2: fuzzyTrip to get the current trip's stoptimes
-    const tripQuery = `{
-      fuzzyTrip(route: "${route.gtfsId}", direction: ${direction}, date: "${dateStr}", time: ${timeSeconds}) {
-        gtfsId
-        stoptimes {
-          stop { gtfsId name }
-          scheduledArrival
-          scheduledDeparture
+    // Pick route whose headsign matches the destination
+    let route = candidateRoutes[0];
+    let matchedPattern: any = null;
+    if (vDest) {
+      for (const r of candidateRoutes) {
+        const match = (r.patterns || []).find((p: any) => {
+          const h = (p.headsign || '').toLowerCase();
+          if (!h) return false; // skip null/empty headsigns
+          return h.includes(vDest) || vDest.includes(h);
+        });
+        if (match) {
+          route = r;
+          matchedPattern = match;
+          break;
         }
       }
-    }`;
+    }
+    // If no headsign match, prefer route based on vehicle source
+    if (!matchedPattern) {
+      const isTartu = vehicle.id.startsWith('tartu-');
+      if (isTartu) {
+        // Exclude Tallinn routes for Tartu vehicles
+        const nonTallinn = candidateRoutes.find((r: any) => !r.gtfsId?.includes('tallinna-lin_'));
+        if (nonTallinn) route = nonTallinn;
+        else return []; // no suitable route
+      } else {
+        // Prefer Tallinn route; if none exists, return empty so routeStopsMap fallback can work
+        const tallinnRoute = candidateRoutes.find((r: any) => r.gtfsId?.includes('tallinna-lin_'));
+        if (tallinnRoute) route = tallinnRoute;
+        else return [];
+      }
+    }
+    if (!route?.gtfsId) return [];
 
-    const tripData = await fetchGql(tripQuery);
-    const stoptimes = tripData?.data?.fuzzyTrip?.stoptimes;
-    if (!stoptimes || !Array.isArray(stoptimes)) return [];
+    // Pick the best pattern: matched by headsign, or the one with most stops
+    let pattern = matchedPattern;
+    if (!pattern && route.patterns?.length > 0) {
+      // Pick pattern with most stops as default
+      pattern = route.patterns.reduce((best: any, p: any) =>
+        (p.stops?.length || 0) > (best.stops?.length || 0) ? p : best
+      , route.patterns[0]);
+    }
 
-    return stoptimes.map((st: any) => {
-      const arrSec = st.scheduledArrival ?? 0;
-      const depSec = st.scheduledDeparture ?? 0;
-      const fmtTime = (s: number) => {
-        const h = Math.floor(s / 3600);
-        const m = Math.floor((s % 3600) / 60);
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-      };
-      return {
-        stopName: st.stop?.name ?? '',
-        stopId: (st.stop?.gtfsId ?? '').replace('estonia:', ''),
-        scheduledArrival: arrSec,
-        scheduledDeparture: depSec,
-        arrivalTime: fmtTime(arrSec),
-        departureTime: fmtTime(depSec),
-      };
-    });
+    const stops = pattern?.stops;
+    if (!stops || stops.length === 0) return [];
+
+    // If there are multiple patterns with same headsign, pick the one with most stops (full route vs shortened)
+    if (matchedPattern && route.patterns) {
+      const sameDir = route.patterns.filter((p: any) =>
+        p.directionId === matchedPattern.directionId &&
+        (p.headsign || '').toLowerCase() === (matchedPattern.headsign || '').toLowerCase()
+      );
+      if (sameDir.length > 1) {
+        const longest = sameDir.reduce((best: any, p: any) =>
+          (p.stops?.length || 0) > (best.stops?.length || 0) ? p : best
+        , sameDir[0]);
+        pattern = longest;
+      }
+    }
+
+    const patternStops = pattern?.stops || stops;
+
+    return patternStops.map((s: any) => ({
+      stopName: s.name ?? '',
+      stopId: (s.gtfsId ?? '').replace('estonia:', ''),
+      scheduledArrival: 0,
+      scheduledDeparture: 0,
+      arrivalTime: '',
+      departureTime: '',
+    }));
   } catch (error) {
     console.error('Error fetching vehicle trip stoptimes:', error);
     return [];
@@ -946,10 +1015,26 @@ export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]>
 }
 
 export async function getRouteStopsForVehicle(vehicle: Vehicle, expectedDestination?: string): Promise<Stop[]> {
+  await fetchStops(); // Ensure stops are fetched and maps are populated
+
+  // Primary: use peatus.ee trip stoptimes — always direction-aware
+  try {
+    const stoptimes = await fetchVehicleTripStoptimes(vehicle);
+    if (stoptimes.length > 0) {
+      const stops = stoptimes.map(st => {
+        const stop = stopsByIdMap?.get(st.stopId) || stopsByBaseIdMap?.get(st.stopId.split('-')[0]);
+        return stop || { id: st.stopId, name: st.stopName, lat: 0, lng: 0 };
+      }).filter(s => s.lat !== 0 && s.lng !== 0);
+      if (stops.length > 0) return stops;
+    }
+  } catch {
+    // fall through to routeStopsMap
+  }
+
+  // Fallback: routeStopsMap from routes.txt (not direction-aware, city routes only)
   if (Object.keys(routeStopsMap).length === 0) {
     await fetchRoutes();
   }
-  await fetchStops(); // Ensure stops are fetched and maps are populated
   const routes = routeStopsMap[vehicle.line];
   if (!routes || routes.length === 0) return [];
   
