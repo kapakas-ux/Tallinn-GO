@@ -33,6 +33,26 @@ export const watchLocation = (callback: (location: Location, isSimulated: boolea
     maximumAge: 30000 // Allow 30s old cached location for faster initial fix
   };
 
+  let hasReceivedPosition = false;
+  let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // If no real position arrives within 15s, fall back to Tallinn center
+  const startFallbackTimer = () => {
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    fallbackTimer = setTimeout(() => {
+      if (!hasReceivedPosition) {
+        console.warn('watchLocation: No GPS fix after 15s, falling back to Tallinn center');
+        callback(TALLINN_CENTER, true);
+      }
+    }, 15_000);
+  };
+
+  const onPosition = (location: Location) => {
+    hasReceivedPosition = true;
+    if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+    callback(location, false);
+  };
+
   if (Capacitor.isNativePlatform()) {
     // Use Capacitor Geolocation for native apps
     let watchId: string | null = null;
@@ -54,6 +74,8 @@ export const watchLocation = (callback: (location: Location, isSimulated: boolea
           }
         }
 
+        startFallbackTimer();
+
         // Get initial position quickly (even if cached)
         try {
           console.log('watchLocation (native): Getting initial position...');
@@ -64,7 +86,7 @@ export const watchLocation = (callback: (location: Location, isSimulated: boolea
           });
           if (initialPosition) {
             console.log('watchLocation (native): Initial position received:', initialPosition.coords.latitude, initialPosition.coords.longitude);
-            callback(getEffectiveLocation(initialPosition.coords), false);
+            onPosition(getEffectiveLocation(initialPosition.coords));
           }
         } catch (e) {
           console.log('Initial fast location failed, waiting for watch...', e);
@@ -76,7 +98,7 @@ export const watchLocation = (callback: (location: Location, isSimulated: boolea
           (position) => {
             if (position) {
               console.log('watchLocation (native): Watch update:', position.coords.latitude, position.coords.longitude);
-              callback(getEffectiveLocation(position.coords), false);
+              onPosition(getEffectiveLocation(position.coords));
             }
           }
         );
@@ -89,6 +111,7 @@ export const watchLocation = (callback: (location: Location, isSimulated: boolea
     startWatching();
 
     return () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       if (watchId) {
         Geolocation.clearWatch({ id: watchId });
       }
@@ -100,10 +123,13 @@ export const watchLocation = (callback: (location: Location, isSimulated: boolea
       return () => {};
     }
 
+    startFallbackTimer();
+    let consecutiveErrors = 0;
+
     // Get initial position quickly
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        callback(getEffectiveLocation(position.coords), false);
+        onPosition(getEffectiveLocation(position.coords));
       },
       null,
       { ...options, enableHighAccuracy: false, timeout: 5000 }
@@ -111,19 +137,28 @@ export const watchLocation = (callback: (location: Location, isSimulated: boolea
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        callback(getEffectiveLocation(position.coords), false);
+        consecutiveErrors = 0;
+        onPosition(getEffectiveLocation(position.coords));
       },
       (error) => {
         console.warn('Geolocation error:', error);
-        // Don't immediately fallback to center on every error (like timeout)
-        // only if it's a permanent failure
         if (error.code === error.PERMISSION_DENIED) {
           callback(TALLINN_CENTER, true);
+        } else {
+          // TIMEOUT or POSITION_UNAVAILABLE — fall back after 3 consecutive failures
+          consecutiveErrors++;
+          if (consecutiveErrors >= 3 && !hasReceivedPosition) {
+            console.warn('watchLocation: 3 consecutive GPS errors, falling back to Tallinn center');
+            callback(TALLINN_CENTER, true);
+          }
         }
       },
       options
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      navigator.geolocation.clearWatch(watchId);
+    };
   }
 };

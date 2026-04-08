@@ -86,6 +86,8 @@
     "planner": "Plan your trip from A to B! Choose \"Leave now\", \"Leave at\", or \"Arrive by\" and pick a date and time to find the best routes with step-by-step directions.",
     "recentTitle": "Recent Searches",
     "recent": "Your last 6 journey searches are saved on the planner page so you can quickly re-plan a frequent route with a single tap.",
+    "widgetTitle": "Home Screen Widget",
+    "widget": "Add a widget to your home screen to see live departures from your favorite stops at a glance — no need to open the app!",
     "gotIt": "Got it!"
   },
   "settings": {

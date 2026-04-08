@@ -16,6 +16,7 @@ import { ActiveAlerts } from '../components/ActiveAlerts';
 import { AnimatePresence } from 'motion/react';
 import { getDailyFact, dismissDailyFact } from '../services/dailyFactService';
 import { getSettings } from '../services/settingsService';
+import { getWeatherForLocation, weatherIcon, WeatherData } from '../services/weatherService';
 
 export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const { t } = useTranslation();
@@ -29,6 +30,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const [showAllFavs, setShowAllFavs] = useState(false);
   const dailyFact = getDailyFact();
   const [factDismissed, setFactDismissed] = useState(dailyFact.dismissed);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
   
   const [expandedNearby, setExpandedNearby] = useState(null as string | null);
   const [nearbyDepartures, setNearbyDepartures] = useState({} as { [key: string]: Arrival[] });
@@ -120,6 +122,12 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
     return cleanup;
   }, [active]);
+
+  // Fetch weather data when location is available
+  useEffect(() => {
+    if (!userLocation || !active) return;
+    getWeatherForLocation(userLocation.lat, userLocation.lng).then(setWeather);
+  }, [userLocation, active]);
 
   useEffect(() => {
     let mounted = true;
@@ -770,6 +778,19 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                     {formatWalkingTime(closestStop.distance * 1000)}
                   </span>
                 </div>
+                {weather && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 bg-secondary/5 rounded-full border border-secondary/10">
+                    <span className="text-sm leading-none">{weatherIcon(weather.phenomenon)}</span>
+                    <span className="font-label text-secondary text-[10px] uppercase tracking-wider font-bold">
+                      {Math.round(weather.temperature)}°C
+                    </span>
+                    {weather.windSpeed !== null && (
+                      <span className="font-label text-secondary/50 text-[9px] uppercase tracking-wider font-bold">
+                        {weather.windSpeed} m/s
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

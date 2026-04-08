@@ -827,7 +827,16 @@ export async function fetchTripStoptimes(tripId: string): Promise<TripStoptime[]
  * 2. Match the pattern by destination/headsign
  * 3. Return pattern stops (with optional trip stoptimes for scheduled times)
  */
+const tripStoptimesCache = new Map<string, { data: TripStoptime[]; ts: number }>();
+const STOPTIMES_CACHE_TTL = 120_000; // 2 minutes
+
 export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripStoptime[]> {
+  const cacheKey = `${vehicle.line}::${(vehicle.destination || '').toLowerCase()}`;
+  const cached = tripStoptimesCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < STOPTIMES_CACHE_TTL) {
+    return cached.data;
+  }
+
   // Query routes with pattern stops included
   const routeQuery = `{
     routes(name: "${vehicle.line}") {
@@ -936,7 +945,7 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
 
     const patternStops = pattern?.stops || stops;
 
-    return patternStops.map((s: any) => ({
+    const result = patternStops.map((s: any) => ({
       stopName: s.name ?? '',
       stopId: (s.gtfsId ?? '').replace('estonia:', ''),
       scheduledArrival: 0,
@@ -944,6 +953,8 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
       arrivalTime: '',
       departureTime: '',
     }));
+    tripStoptimesCache.set(cacheKey, { data: result, ts: Date.now() });
+    return result;
   } catch (error) {
     console.error('Error fetching vehicle trip stoptimes:', error);
     return [];
@@ -1596,7 +1607,20 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
   }
 }
 
+const inflight = new Map<string, Promise<Arrival[]>>();
+
 export async function fetchDepartures(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
+  const dedupeKey = `${stopId}:${siriId || ''}:${time || ''}`;
+  const existing = inflight.get(dedupeKey);
+  if (existing) return existing;
+
+  const promise = _fetchDeparturesImpl(stopId, siriId, time);
+  inflight.set(dedupeKey, promise);
+  promise.finally(() => inflight.delete(dedupeKey));
+  return promise;
+}
+
+async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
   if (Object.keys(routesMap).length === 0) {
     await fetchRoutes();
   }
@@ -1753,7 +1777,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
       a.vehicleIndex = counts[key];
     });
 
-    // Compute ETA for all arrivals
+    // Compute ETA for first 5 arrivals only (rest keep schedule-based times)
     await fetchStops(); // Ensure stops and maps are loaded
     let targetStop = stopsByIdMap?.get(stopId);
     if (!targetStop && siriId) {
@@ -1763,7 +1787,8 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
     }
     
     if (targetStop) {
-      await Promise.all(arrivals.map(async (arrival) => {
+      const etaBatch = arrivals.slice(0, 5);
+      await Promise.all(etaBatch.map(async (arrival) => {
         const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
         
         arrival.minutes = etaMinutes;

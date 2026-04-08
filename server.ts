@@ -380,6 +380,22 @@ async function startServer() {
     }
   });
 
+  // Proxy for Estonian weather observations
+  app.get("/api/weather", async (req, res) => {
+    try {
+      const response = await axios.get('https://www.ilmateenistus.ee/ilma_andmed/xml/observations.php', {
+        timeout: 8000,
+        responseType: 'text'
+      });
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=600');
+      res.send(response.data);
+    } catch (error: any) {
+      console.error("Error fetching weather data:", error.message);
+      res.status(500).json({ error: "Failed to fetch weather data" });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

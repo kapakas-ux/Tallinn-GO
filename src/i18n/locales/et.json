@@ -86,6 +86,8 @@
     "planner": "Planeerige oma reis punktist A punkti B! Valige \"Välju kohe\", \"Välju kell\" või \"Saabu kell\" ning valige kuupäev ja kellaaeg, et leida parimad marsruudid samm-sammuliste juhistega.",
     "recentTitle": "Hiljutised otsingud",
     "recent": "Teie viimased 6 reisiotsingut salvestatakse planeerija lehel, et saaksite kiirelt korduvat marsruuti ühe puudutusega uuesti planeerida.",
+    "widgetTitle": "Avakuva vidin",
+    "widget": "Lisage avakuvale vidin, et näha lemmikpeatuste reaalajas väljumisi ühe pilguga — rakendust pole vaja avada!",
     "gotIt": "Selge!"
   },
   "settings": {
