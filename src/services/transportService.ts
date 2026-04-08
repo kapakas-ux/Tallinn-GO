@@ -1927,61 +1927,120 @@ export async function planJourney(
 }
 
 /**
- * Fetch active service alerts from peatus.ee GraphQL API.
+ * Fetch active service alerts from transport.tallinn.ee
+ * (interruptions = real-time disruptions, announcements = planned route changes)
  */
 export async function fetchServiceAlerts(): Promise<import('../types').ServiceAlert[]> {
-  const query = `{
-    alerts {
-      id
-      alertHeaderText
-      alertDescriptionText
-      alertUrl
-      effectiveStartDate
-      effectiveEndDate
-      route { shortName mode }
-    }
-  }`;
+  const transportModeMap: Record<string, string> = {
+    'Buss': 'BUS', 'Tramm': 'TRAM', 'Troll': 'TROLLEYBUS'
+  };
+
+  // Parse Estonian date format "DD.MM.YYYY HH:mm" or "DD.MM.YYYY" to unix seconds
+  function parseEstDate(s: string | null | undefined): number | undefined {
+    if (!s) return undefined;
+    const parts = s.split(' ');
+    const [d, m, y] = parts[0].split('.');
+    const timePart = parts[1] || '00:00';
+    const [hh, mm] = timePart.split(':');
+    const dt = new Date(+y, +m - 1, +d, +hh, +mm);
+    return isNaN(dt.getTime()) ? undefined : Math.floor(dt.getTime() / 1000);
+  }
+
+  // Decode announcement route number to display number + transport
+  function decodeAnnouncementRoute(num: number): { shortName: string; mode: string } {
+    if (num >= 400) return { shortName: String(num % 400), mode: 'TROLLEYBUS' };
+    if (num >= 300) return { shortName: String(num % 300), mode: 'TRAM' };
+    if (num >= 200) return { shortName: (num % 200) + 'b', mode: 'BUS' };
+    if (num >= 100) return { shortName: (num % 100) + 'a', mode: 'BUS' };
+    return { shortName: String(num), mode: 'BUS' };
+  }
+
+  function stripHtml(html: string): string {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+  }
 
   try {
-    const url = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
-    let text = '';
+    const baseUrl = getApiBaseUrl();
+    let data: { interruptions: any[]; announcements: any[] };
 
     if (Capacitor.isNativePlatform()) {
-      const response = await CapacitorHttp.post({
-        url,
-        headers: { 'Content-Type': 'application/json' },
-        data: { query }
-      });
-      text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+      // On native, fetch both JSON files directly
+      const [intRes, annRes] = await Promise.all([
+        CapacitorHttp.get({ url: 'https://transport.tallinn.ee/interruptions.json' }).catch(() => ({ data: [] })),
+        CapacitorHttp.get({ url: 'https://transport.tallinn.ee/announcements.json' }).catch(() => ({ data: [] })),
+      ]);
+      data = {
+        interruptions: Array.isArray(intRes.data) ? intRes.data : (typeof intRes.data === 'string' ? JSON.parse(intRes.data) : []),
+        announcements: Array.isArray(annRes.data) ? annRes.data : (typeof annRes.data === 'string' ? JSON.parse(annRes.data) : []),
+      };
     } else {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
-      });
-      text = await response.text();
+      // In browser, use server proxy to avoid CORS
+      const res = await fetch(`${baseUrl}/api/transport/alerts`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      data = await res.json();
     }
 
-    const data = JSON.parse(text);
-    const rawAlerts = data?.data?.alerts;
-    if (!rawAlerts || !Array.isArray(rawAlerts)) return [];
+    const alerts: import('../types').ServiceAlert[] = [];
+    const now = Math.floor(Date.now() / 1000);
 
-    const nowSec = Date.now() / 1000;
-    return rawAlerts
-      .filter((a: any) => {
-        const start = a.effectiveStartDate ?? 0;
-        const end = a.effectiveEndDate ?? Number.MAX_SAFE_INTEGER;
-        return nowSec >= start && nowSec <= end;
-      })
-      .map((a: any) => ({
-        id: a.id ?? String(Math.random()),
-        headerText: a.alertHeaderText ?? '',
-        descriptionText: a.alertDescriptionText ?? '',
-        url: a.alertUrl ?? undefined,
-        effectiveStartDate: a.effectiveStartDate ?? undefined,
-        effectiveEndDate: a.effectiveEndDate ?? undefined,
-        routes: a.route ? [{ shortName: a.route.shortName ?? '', mode: a.route.mode ?? '' }] : [],
-      }));
+    // Process interruptions (real-time disruptions like "väljumised hilinevad")
+    for (const item of (data.interruptions || [])) {
+      const transport = item.transport || '';
+      const mode = transportModeMap[transport] || 'BUS';
+      const routeNums = (item.routes || '').split(',').map((r: string) => r.trim()).filter(Boolean);
+
+      alerts.push({
+        id: `int-${item.start_time}-${item.routes}`,
+        headerText: item.announcement || '',
+        descriptionText: item.info ? stripHtml(item.info) : '',
+        effectiveStartDate: parseEstDate(item.start_time),
+        effectiveEndDate: parseEstDate(item.end_time),
+        routes: routeNums.map((num: string) => ({ shortName: num, mode })),
+        type: 'interruption',
+      });
+    }
+
+    // Process announcements (planned route changes)
+    for (const item of (data.announcements || [])) {
+      // Filter by publication dates
+      const pubStart = parseEstDate(item.publication_start_time);
+      const pubEnd = parseEstDate(item.publication_end_time);
+      if (pubStart && pubStart > now) continue;
+      if (pubEnd && pubEnd < now) continue;
+
+      const transport = item.transport || '';
+      const routeNums = (item.routes || '').split(',').map((r: string) => r.trim()).filter(Boolean);
+      const isMixed = transport.includes(','); // e.g. "Buss, Tramm"
+
+      const routes = routeNums.map((numStr: string) => {
+        const parsed = parseInt(numStr, 10);
+        if (isMixed && !isNaN(parsed)) {
+          return decodeAnnouncementRoute(parsed);
+        }
+        const mode = transportModeMap[transport] || 'BUS';
+        return { shortName: numStr, mode };
+      });
+
+      alerts.push({
+        id: `ann-${item.title}-${item.valid_start_time}`,
+        headerText: item.title || '',
+        descriptionText: item.info ? stripHtml(item.info) : '',
+        effectiveStartDate: parseEstDate(item.valid_start_time),
+        effectiveEndDate: parseEstDate(item.valid_end_time),
+        routes,
+        type: 'announcement',
+      });
+    }
+
+    // Sort: interruptions first, then by start date descending
+    alerts.sort((a, b) => {
+      if (a.type === 'interruption' && b.type !== 'interruption') return -1;
+      if (a.type !== 'interruption' && b.type === 'interruption') return 1;
+      return (b.effectiveStartDate || 0) - (a.effectiveStartDate || 0);
+    });
+
+    return alerts;
   } catch (error) {
     console.error('Error fetching service alerts:', error);
     return [];

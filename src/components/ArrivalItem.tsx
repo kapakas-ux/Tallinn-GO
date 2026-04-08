@@ -24,6 +24,15 @@ export function getLiveMinutes(arrival: Arrival): number {
   return arrival.minutes;
 }
 
+/** Compact time label: "Now", "5 min", or "14:35" for >59 min */
+export function CompactTime({ arrival, nowLabel }: { arrival: Arrival; nowLabel: string }) {
+  const mins = getLiveMinutes(arrival);
+  if (arrival.status === 'departed') return <>–</>;
+  if (mins === 0) return <>{nowLabel}</>;
+  if (mins >= 60 && arrival.time) return <>{arrival.time}</>;
+  return <>{mins}<span className={cn("font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}> min</span></>;
+}
+
 export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive, expandable = true }: ArrivalItemProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);

@@ -138,7 +138,8 @@
     "emojiMarket": "Рынок",
     "emojiAirport": "Аэропорт",
     "emojiBus": "Автобус",
-    "emojiHeart": "Сердце"
+    "emojiHeart": "Сердце",
+    "routeChanges": "изменений маршрутов"
   },
   "stops": {
     "searchPlaceholder": "Поиск остановок...",

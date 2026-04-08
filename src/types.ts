@@ -95,4 +95,5 @@ export interface ServiceAlert {
   effectiveStartDate?: number; // unix seconds
   effectiveEndDate?: number;   // unix seconds
   routes: { shortName: string; mode: string }[];
+  type?: 'interruption' | 'announcement';
 }

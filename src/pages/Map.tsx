@@ -1323,12 +1323,12 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                 </div>
               ) : (
                 serviceAlerts.map(alert => (
-                  <div key={alert.id} className="bg-red-50 border border-red-200/50 rounded-[20px] p-4 space-y-2">
+                  <div key={alert.id} className={`${alert.type === 'interruption' ? 'bg-red-50 border-red-200/50' : 'bg-amber-50 border-amber-200/50'} border rounded-[20px] p-4 space-y-2`}>
                     <div className="flex items-start gap-3">
                       {alert.routes.length > 0 && (
                         <div className="flex flex-wrap gap-1 shrink-0">
                           {alert.routes.map((r, i) => (
-                            <span key={i} className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                            <span key={i} className={`${alert.type === 'interruption' ? 'bg-red-500' : 'bg-amber-500'} text-white text-xs font-bold rounded-full px-2 py-0.5`}>
                               {r.shortName}
                             </span>
                           ))}
@@ -1337,11 +1337,13 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                       <p className="font-label font-bold text-sm text-on-surface leading-snug">{alert.headerText}</p>
                     </div>
                     {alert.descriptionText && alert.descriptionText !== alert.headerText && (
-                      <p className="font-body text-xs text-secondary leading-relaxed">{alert.descriptionText}</p>
+                      <p className="font-body text-xs text-secondary leading-relaxed line-clamp-3">{alert.descriptionText}</p>
                     )}
-                    {alert.effectiveEndDate && (
+                    {(alert.effectiveStartDate || alert.effectiveEndDate) && (
                       <p className="font-label text-[10px] text-secondary uppercase tracking-wider">
-                        Until {new Date(alert.effectiveEndDate * 1000).toLocaleDateString()}
+                        {alert.effectiveStartDate && `${new Date(alert.effectiveStartDate * 1000).toLocaleDateString()}`}
+                        {alert.effectiveStartDate && alert.effectiveEndDate && ' – '}
+                        {alert.effectiveEndDate && `${new Date(alert.effectiveEndDate * 1000).toLocaleDateString()}`}
                       </p>
                     )}
                   </div>

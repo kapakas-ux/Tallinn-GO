@@ -138,7 +138,8 @@
     "emojiMarket": "Turg",
     "emojiAirport": "Lennujaam",
     "emojiBus": "Buss",
-    "emojiHeart": "Süda"
+    "emojiHeart": "Süda",
+    "routeChanges": "marsruudimuudatust"
   },
   "stops": {
     "searchPlaceholder": "Otsi peatusi...",

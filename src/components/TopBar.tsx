@@ -185,7 +185,7 @@ export const TopBar = () => {
                   {t('topbar.privacy')}
                 </button>
                 <a
-                  href="https://ko-fi.com/tallinngo"
+                  href="https://ko-fi.com/gonow"
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setIsMenuOpen(false)}

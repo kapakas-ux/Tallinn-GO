@@ -380,6 +380,36 @@ async function startServer() {
     }
   });
 
+  // Proxy for transport.tallinn.ee service alerts (interruptions + announcements)
+  app.get("/api/transport/alerts", async (req, res) => {
+    try {
+      const [interruptionsRes, announcementsRes] = await Promise.all([
+        axios.get("https://transport.tallinn.ee/interruptions.json", {
+          timeout: 8000,
+          responseType: 'text',
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://transport.tallinn.ee/' }
+        }).catch(() => ({ data: '[]' })),
+        axios.get("https://transport.tallinn.ee/announcements.json", {
+          timeout: 8000,
+          responseType: 'text',
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://transport.tallinn.ee/' }
+        }).catch(() => ({ data: '[]' })),
+      ]);
+
+      let interruptions = [];
+      let announcements = [];
+      try { interruptions = JSON.parse(typeof interruptionsRes.data === 'string' ? interruptionsRes.data : JSON.stringify(interruptionsRes.data)); } catch {}
+      try { announcements = JSON.parse(typeof announcementsRes.data === 'string' ? announcementsRes.data : JSON.stringify(announcementsRes.data)); } catch {}
+
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=120');
+      res.json({ interruptions, announcements });
+    } catch (error: any) {
+      console.error("Error fetching transport alerts:", error.message);
+      res.status(500).json({ error: "Failed to fetch transport alerts" });
+    }
+  });
+
   // Proxy for Estonian weather observations
   app.get("/api/weather", async (req, res) => {
     try {

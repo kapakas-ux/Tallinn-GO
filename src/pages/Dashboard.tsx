@@ -8,7 +8,7 @@ import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportS
 import { getFavorites, isFavorite, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
-import { ArrivalItem, getLiveMinutes } from '../components/ArrivalItem';
+import { ArrivalItem, getLiveMinutes, CompactTime } from '../components/ArrivalItem';
 import { Stop, Arrival } from '../types';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { NotificationSelector } from '../components/NotificationSelector';
@@ -398,7 +398,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                               </span>
                             </div>
                             <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                              {arr.status === 'departed' ? '–' : getLiveMinutes(arr) === 0 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
+                              <CompactTime arrival={arr} nowLabel={t('arrivals.now')} />
                             </span>
                           </div>
                         ))}
@@ -572,7 +572,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                             </span>
                           </div>
                           <span className={cn("font-headline font-black text-[11px] shrink-0 ml-1", arr.status === 'departed' ? "text-secondary/40" : "text-primary")}>
-                            {arr.status === 'departed' ? '–' : getLiveMinutes(arr) === 0 ? t('arrivals.now') : `${getLiveMinutes(arr)}m`}
+                            <CompactTime arrival={arr} nowLabel={t('arrivals.now')} />
                           </span>
                         </div>
                       ))}
