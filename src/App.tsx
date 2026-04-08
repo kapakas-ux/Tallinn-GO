@@ -109,7 +109,7 @@ function AppContent() {
           </div>
           {/* Map stays mounted but hidden to preserve tile cache and state */}
           <div className={location.pathname === '/map' ? 'h-full' : 'hidden'}>
-            <Map />
+            <Map active={location.pathname === '/map'} />
           </div>
         </main>
         <BottomNav />

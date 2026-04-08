@@ -31,7 +31,7 @@ const isValidLngLat = (lng: number, lat: number) => {
   return !isNaN(lng) && !isNaN(lat) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 };
 
-export const Map = () => {
+export const Map = ({ active = true }: { active?: boolean }) => {
   const { t } = useTranslation();
   console.log('Map component rendering');
   const location = useLocation();
@@ -146,8 +146,9 @@ export const Map = () => {
     };
   }, []);
 
-  // Geolocation tracking
+  // Geolocation tracking (only when active tab)
   useEffect(() => {
+    if (!active) return;
     const cleanup = watchLocation((location, simulated) => {
       setUserLocation([location.lng, location.lat]);
       setIsSimulated(simulated);
@@ -155,7 +156,13 @@ export const Map = () => {
     });
 
     return cleanup;
-  }, []);
+  }, [active]);
+
+  // Fly to user location when tab becomes active
+  useEffect(() => {
+    if (!active || !map.current || !userLocation || isSimulated) return;
+    map.current.flyTo({ center: userLocation, zoom: 15, essential: true });
+  }, [active]);
 
   // Service alerts polling
   useEffect(() => {
