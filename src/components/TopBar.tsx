@@ -189,9 +189,10 @@ export const TopBar = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setIsMenuOpen(false)}
-                  className="topbar-menu-item block w-full text-left px-4 py-3 text-sm font-headline font-bold text-amber-500 hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                  className="topbar-menu-item block w-full text-left px-4 py-3 text-sm hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
                 >
-                  {t('topbar.coffee')}
+                  <span className="font-headline font-bold text-amber-500">{t('topbar.coffee')}</span>
+                  <p className="text-[10px] text-secondary font-normal mt-0.5">{t('topbar.coffeeDesc')}</p>
                 </a>
               </div>
         </div>
@@ -303,6 +304,12 @@ export const TopBar = () => {
                   <li><a href="https://peatus.ee" target="_blank" rel="noopener noreferrer" className="text-primary underline">peatus.ee</a> — National Public Transport Stop Register</li>
                   <li><a href="https://www.mnt.ee" target="_blank" rel="noopener noreferrer" className="text-primary underline">mnt.ee</a> — Estonian Road Administration</li>
                 </ul>
+              </div>
+
+              <div className="text-center">
+                <a href="https://raw.githubusercontent.com/kapakas-ux/Tallinn-GO/main/privacypolicy.txt" target="_blank" rel="noopener noreferrer" className="text-xs text-primary/60 underline">
+                  {t('privacy.publicPolicyUrl')}
+                </a>
               </div>
             </div>
             <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">

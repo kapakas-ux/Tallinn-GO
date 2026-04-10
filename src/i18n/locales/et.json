@@ -30,7 +30,8 @@
     "settings": "⚙️ Seaded",
     "terms": "Kasutustingimused",
     "privacy": "Privaatsuspoliitika",
-    "coffee": "☕ Osta mulle kohv"
+    "coffee": "☕ Toeta arendust",
+    "coffeeDesc": "Vabatahtlik annetus — ühtegi funktsiooni ei ole lukustatud"
   },
   "terms": {
     "title": "Kasutustingimused",
@@ -71,7 +72,8 @@
     "disclaimerTitle": "Vastutusest loobumine",
     "disclaimer": "GO NOW on sõltumatu mitteametlik rakendus, mis ei ole seotud ühegi riigiasutuse ega ühistranspordi ametiga ega esinda neid.",
     "sourcesTitle": "Andmeallikad",
-    "sources": "Transporditeave pärineb järgmistest ametlikest avalikest allikatest:"
+    "sources": "Transporditeave pärineb järgmistest ametlikest avalikest allikatest:",
+    "publicPolicyUrl": "Vaata täielikku privaatsuspoliitikat veebis"
   },
   "gettingStarted": {
     "title": "Alustamine",

@@ -30,7 +30,8 @@
     "settings": "⚙️ Settings",
     "terms": "Terms & Conditions",
     "privacy": "Privacy Policy",
-    "coffee": "☕ Buy me a coffee"
+    "coffee": "☕ Support Development",
+    "coffeeDesc": "Optional voluntary donation — no features are locked"
   },
   "terms": {
     "title": "Terms & Conditions",
@@ -71,7 +72,8 @@
     "disclaimerTitle": "Disclaimer",
     "disclaimer": "GO NOW is an independent, unofficial app and is not affiliated with, endorsed by, or representing any government entity or public transport authority.",
     "sourcesTitle": "Data Sources",
-    "sources": "Transit data is sourced from the following official public sources:"
+    "sources": "Transit data is sourced from the following official public sources:",
+    "publicPolicyUrl": "View full privacy policy online"
   },
   "gettingStarted": {
     "title": "Getting Started",
