@@ -67,7 +67,11 @@
     "changesTitle": "Changes to This Policy",
     "changes": "We may update this policy. Continued use of the app after changes means you accept them. Check this page periodically.",
     "contactTitle": "Contact Us",
-    "contact": "Questions? Email to us at gonowestonia@gmail.com."
+    "contact": "Questions? Email to us at gonowestonia@gmail.com.",
+    "disclaimerTitle": "Disclaimer",
+    "disclaimer": "GO NOW is an independent, unofficial app and is not affiliated with, endorsed by, or representing any government entity or public transport authority.",
+    "sourcesTitle": "Data Sources",
+    "sources": "Transit data is sourced from the following official public sources:"
   },
   "gettingStarted": {
     "title": "Getting Started",

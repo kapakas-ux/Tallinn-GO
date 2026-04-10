@@ -289,6 +289,21 @@ export const TopBar = () => {
                 <h3 className="font-bold text-primary mb-1">{t('privacy.contactTitle')}</h3>
                 <p>{t('privacy.contact')}</p>
               </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/60">
+                <h3 className="font-bold text-amber-700 mb-1">{t('privacy.disclaimerTitle')}</h3>
+                <p className="text-amber-800">{t('privacy.disclaimer')}</p>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-primary mb-1">{t('privacy.sourcesTitle')}</h3>
+                <p className="mb-2">{t('privacy.sources')}</p>
+                <ul className="space-y-1">
+                  <li><a href="https://transport.tallinn.ee" target="_blank" rel="noopener noreferrer" className="text-primary underline">transport.tallinn.ee</a> — Tallinn City Transport (TLT)</li>
+                  <li><a href="https://peatus.ee" target="_blank" rel="noopener noreferrer" className="text-primary underline">peatus.ee</a> — National Public Transport Stop Register</li>
+                  <li><a href="https://www.mnt.ee" target="_blank" rel="noopener noreferrer" className="text-primary underline">mnt.ee</a> — Estonian Road Administration</li>
+                </ul>
+              </div>
             </div>
             <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">
               <button 

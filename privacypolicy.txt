@@ -16,3 +16,12 @@ We may update this policy. Continued use of the app after changes means you acce
 
 Contact Us
 Questions? Email to us at gonowestonia@gmail.com.
+
+Disclaimer
+GO NOW is an independent, unofficial app and is not affiliated with, endorsed by, or representing any government entity or public transport authority.
+
+Data Sources
+Transit data is sourced from the following official public sources:
+- transport.tallinn.ee — Tallinn City Transport (TLT)
+- peatus.ee — National Public Transport Stop Register
+- mnt.ee — Estonian Road Administration
