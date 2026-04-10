@@ -8,8 +8,8 @@ We request permission to access your device's location solely to provide real-ti
 How We Use Information
 Location access is used only during active app sessions for core functionality. No data is retained after you close the app, and we do not track you across sessions or devices.
 
-No Data Sharing or Storage
-We do not sell, share, or disclose any information to third parties. No user data is saved on our servers or elsewhere.
+Third-Party Services
+When you use the Journey Planner, address search queries are sent to Photon (by Komoot, photon.komoot.io), a free open-source geocoding service, to look up locations. No personal data or device identifiers are included. We do not sell or disclose your data. No user data is saved on our servers.
 
 Changes to This Policy
 We may update this policy. Continued use of the app after changes means you accept them. Check this page periodically.

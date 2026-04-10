@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   android: {
   },
   server: {
-    cleartext: true,
+    cleartext: false,
   },
   plugins: {
     SplashScreen: {
