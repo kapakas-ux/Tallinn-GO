@@ -18,7 +18,7 @@
   "dependencies": {
     "@capacitor/android": "^6.0.0",
     "@capacitor/app": "^6.0.0",
-    "@capacitor/browser": "^6.0.6",
+"@capacitor/browser": "^6.0.6",
     "@capacitor/cli": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "@capacitor/geolocation": "^6.0.0",
@@ -59,8 +59,9 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
-    "@types/react": "^19.2.14",
+"@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vercel/node": "^5.7.0",
     "autoprefixer": "^10.4.21",
     "jsdom": "^29.0.1",
     "tailwindcss": "^4.1.14",
