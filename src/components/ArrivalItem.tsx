@@ -185,7 +185,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
               </div>
               
               <div 
-                className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-2 relative" 
+                className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-2 relative bg-surface rounded-xl p-2" 
                 ref={(el) => {
                   if (el) {
                     setTimeout(() => {
@@ -200,7 +200,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                   }
                 }}
               >
-                <div className="text-xs font-bold text-secondary uppercase tracking-wider mb-1 sticky top-0 bg-surface-container-lowest z-10 py-1">{t('arrivals.routeStops')}</div>
+                <div className="text-xs font-bold text-secondary uppercase tracking-wider mb-1 sticky top-0 bg-surface z-10 py-1">{t('arrivals.routeStops')}</div>
                 {tripStoptimes.length > 0 ? (
                   /* Use trip stoptimes (has schedule times) */
                   tripStoptimes.map((st, i) => {

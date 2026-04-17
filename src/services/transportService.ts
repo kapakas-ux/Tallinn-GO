@@ -897,6 +897,14 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
         directionId
         headsign
         stops { gtfsId name }
+        trips {
+          gtfsId
+          stoptimes {
+            stop { gtfsId name }
+            scheduledArrival
+            scheduledDeparture
+          }
+        }
       }
     }
   }`;
@@ -996,14 +1004,60 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
 
     const patternStops = pattern?.stops || stops;
 
-    const result = patternStops.map((s: any) => ({
-      stopName: s.name ?? '',
-      stopId: (s.gtfsId ?? '').replace('estonia:', ''),
-      scheduledArrival: 0,
-      scheduledDeparture: 0,
-      arrivalTime: '',
-      departureTime: '',
-    }));
+    // Try to get scheduled times from a trip in this pattern
+    const fmtTime = (s: number) => {
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    // Find the best trip: closest upcoming departure based on current time
+    const nowSec = new Date().getHours() * 3600 + new Date().getMinutes() * 60 + new Date().getSeconds();
+    let bestTrip: any = null;
+    const trips = pattern?.trips || [];
+    if (trips.length > 0) {
+      let bestDiff = Infinity;
+      for (const trip of trips) {
+        const st0 = trip.stoptimes?.[0];
+        if (!st0) continue;
+        const dep = st0.scheduledDeparture ?? 0;
+        const diff = dep - nowSec;
+        // Prefer trips that haven't ended yet (first stop departure within reasonable range)
+        if (diff > -3600 && diff < bestDiff) {
+          bestDiff = diff;
+          bestTrip = trip;
+        }
+      }
+      // If no upcoming trip found, just use the first trip with stoptimes
+      if (!bestTrip) {
+        bestTrip = trips.find((t: any) => t.stoptimes?.length > 0);
+      }
+    }
+
+    let result: TripStoptime[];
+    if (bestTrip?.stoptimes?.length > 0) {
+      result = bestTrip.stoptimes.map((st: any) => {
+        const arrSec = st.scheduledArrival ?? 0;
+        const depSec = st.scheduledDeparture ?? 0;
+        return {
+          stopName: st.stop?.name ?? '',
+          stopId: (st.stop?.gtfsId ?? '').replace('estonia:', ''),
+          scheduledArrival: arrSec,
+          scheduledDeparture: depSec,
+          arrivalTime: fmtTime(arrSec),
+          departureTime: fmtTime(depSec),
+        };
+      });
+    } else {
+      result = patternStops.map((s: any) => ({
+        stopName: s.name ?? '',
+        stopId: (s.gtfsId ?? '').replace('estonia:', ''),
+        scheduledArrival: 0,
+        scheduledDeparture: 0,
+        arrivalTime: '',
+        departureTime: '',
+      }));
+    }
     tripStoptimesCache.set(cacheKey, { data: result, ts: Date.now() });
     return result;
   } catch (error) {
