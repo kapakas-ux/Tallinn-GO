@@ -1008,20 +1008,52 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
     const tripIds = (pattern?.trips || []).map((t: any) => t.gtfsId).filter(Boolean);
     let tripStoptimes: any[] = [];
     if (tripIds.length > 0) {
-      // Pick the first available trip and fetch its stoptimes in a lightweight query
-      const tripId = tripIds[0];
+      // Sample up to 8 evenly-spaced trips and pick the one closest to current time
+      const sampleSize = Math.min(8, tripIds.length);
+      const step = Math.max(1, Math.floor(tripIds.length / sampleSize));
+      const sampledIds: string[] = [];
+      for (let i = 0; i < tripIds.length && sampledIds.length < sampleSize; i += step) {
+        sampledIds.push(tripIds[i]);
+      }
+
       try {
-        const tripQuery = `{
-          trip(id: "${tripId}") {
-            stoptimes {
-              stop { gtfsId name }
-              scheduledArrival
-              scheduledDeparture
-            }
+        // Build a single query with aliases to fetch stoptimes for all sampled trips
+        const aliases = sampledIds.map((id, i) =>
+          `t${i}: trip(id: "${id}") { stoptimes { stop { gtfsId name } scheduledArrival scheduledDeparture } }`
+        ).join('\n');
+        const batchData = await fetchGql(`{ ${aliases} }`);
+
+        // Find the trip whose schedule best matches the current time
+        const now = new Date();
+        const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+        let bestStoptimes: any[] = [];
+        let bestDiff = Infinity;
+
+        for (let i = 0; i < sampledIds.length; i++) {
+          const st = batchData?.data?.[`t${i}`]?.stoptimes;
+          if (!st || st.length === 0) continue;
+
+          const firstDep = st[0]?.scheduledDeparture ?? 0;
+          const lastArr = st[st.length - 1]?.scheduledArrival ?? 0;
+
+          // Current time falls within this trip's schedule — use it immediately
+          if (nowSeconds >= firstDep && nowSeconds <= lastArr) {
+            tripStoptimes = st;
+            bestDiff = 0;
+            break;
           }
-        }`;
-        const tripData = await fetchGql(tripQuery);
-        tripStoptimes = tripData?.data?.trip?.stoptimes || [];
+
+          // Otherwise track the closest trip
+          const diff = Math.min(Math.abs(nowSeconds - firstDep), Math.abs(nowSeconds - lastArr));
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestStoptimes = st;
+          }
+        }
+
+        if (tripStoptimes.length === 0 && bestStoptimes.length > 0) {
+          tripStoptimes = bestStoptimes;
+        }
       } catch {
         // fall through — will return stops without times
       }
