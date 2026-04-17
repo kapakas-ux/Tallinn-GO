@@ -164,15 +164,17 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     map.current.flyTo({ center: userLocation, zoom: 15, essential: true });
   }, [active]);
 
-  // Service alerts polling
+  // Service alerts polling — only show when user is in Tallinn area
+  const isInTallinn = userLocation && userLocation[1] > 59.3 && userLocation[1] < 59.55 && userLocation[0] > 24.4 && userLocation[0] < 25.0;
   useEffect(() => {
+    if (!isInTallinn) { setServiceAlerts([]); return; }
     const loadAlerts = () => {
       fetchServiceAlerts().then(setServiceAlerts).catch(() => {});
     };
     loadAlerts();
     const interval = setInterval(loadAlerts, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isInTallinn]);
 
   // Update user marker
   useEffect(() => {
@@ -1315,7 +1317,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3">
+            <div className="overflow-y-auto flex-1 px-4 py-3 space-y-2">
               {serviceAlerts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-secondary">
                   <Construction className="w-12 h-12 mb-3 opacity-30" />
@@ -1323,28 +1325,36 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                 </div>
               ) : (
                 serviceAlerts.map(alert => (
-                  <div key={alert.id} className={`${alert.type === 'interruption' ? 'bg-red-50 border-red-200/50' : 'bg-amber-50 border-amber-200/50'} border rounded-[20px] p-4 space-y-2`}>
-                    <div className="flex items-start gap-3">
+                  <div key={alert.id} className={cn(
+                    "rounded-2xl p-3 border",
+                    alert.type === 'interruption'
+                      ? "bg-red-500/10 border-red-500/20"
+                      : "bg-amber-500/10 border-amber-500/20"
+                  )}>
+                    <div className="flex items-center gap-2 mb-1.5">
                       {alert.routes.length > 0 && (
                         <div className="flex flex-wrap gap-1 shrink-0">
                           {alert.routes.map((r, i) => (
-                            <span key={i} className={`${alert.type === 'interruption' ? 'bg-red-500' : 'bg-amber-500'} text-white text-xs font-bold rounded-full px-2 py-0.5`}>
+                            <span key={i} className={cn(
+                              "text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none",
+                              alert.type === 'interruption' ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+                            )}>
                               {r.shortName}
                             </span>
                           ))}
                         </div>
                       )}
-                      <p className="font-label font-bold text-sm text-on-surface leading-snug">{alert.headerText}</p>
+                      {(alert.effectiveStartDate || alert.effectiveEndDate) && (
+                        <span className="font-label text-[9px] text-secondary/60 ml-auto shrink-0">
+                          {alert.effectiveStartDate && new Date(alert.effectiveStartDate * 1000).toLocaleDateString()}
+                          {alert.effectiveStartDate && alert.effectiveEndDate && ' – '}
+                          {alert.effectiveEndDate && new Date(alert.effectiveEndDate * 1000).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
+                    <p className="font-headline font-bold text-xs text-on-surface leading-snug">{alert.headerText}</p>
                     {alert.descriptionText && alert.descriptionText !== alert.headerText && (
-                      <p className="font-body text-xs text-secondary leading-relaxed line-clamp-3">{alert.descriptionText}</p>
-                    )}
-                    {(alert.effectiveStartDate || alert.effectiveEndDate) && (
-                      <p className="font-label text-[10px] text-secondary uppercase tracking-wider">
-                        {alert.effectiveStartDate && `${new Date(alert.effectiveStartDate * 1000).toLocaleDateString()}`}
-                        {alert.effectiveStartDate && alert.effectiveEndDate && ' – '}
-                        {alert.effectiveEndDate && `${new Date(alert.effectiveEndDate * 1000).toLocaleDateString()}`}
-                      </p>
+                      <p className="font-body text-[11px] text-secondary leading-relaxed mt-1 line-clamp-2">{alert.descriptionText}</p>
                     )}
                   </div>
                 ))
