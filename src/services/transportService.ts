@@ -997,92 +997,86 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
 
     const patternStops = pattern?.stops || stops;
 
-    // Try to get scheduled times by fetching stoptimes for one trip in this pattern
-    const fmtTime = (s: number) => {
-      const h = Math.floor(s / 3600);
-      const m = Math.floor((s % 3600) / 60);
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    };
+    // Find the active trip by querying a mid-route stop for current departures
+    // (same approach the dashboard uses to get tripIds from stop arrivals)
+    const tripIdsSet = new Set((pattern?.trips || []).map((t: any) => t.gtfsId).filter(Boolean));
 
-    // Get a trip ID from today's trips for this pattern, then fetch its stoptimes separately
-    const tripIds = (pattern?.trips || []).map((t: any) => t.gtfsId).filter(Boolean);
-    let tripStoptimes: any[] = [];
-    if (tripIds.length > 0) {
-      // Sample up to 8 evenly-spaced trips and pick the one closest to current time
-      const sampleSize = Math.min(8, tripIds.length);
-      const step = Math.max(1, Math.floor(tripIds.length / sampleSize));
-      const sampledIds: string[] = [];
-      for (let i = 0; i < tripIds.length && sampledIds.length < sampleSize; i += step) {
-        sampledIds.push(tripIds[i]);
-      }
+    if (patternStops.length > 0 && tripIdsSet.size > 0) {
+      // Pick a stop near the middle of the route for the best chance of catching an active trip
+      const midStop = patternStops[Math.floor(patternStops.length / 2)];
+      const midStopId = midStop?.gtfsId;
 
-      try {
-        // Build a single query with aliases to fetch stoptimes for all sampled trips
-        const aliases = sampledIds.map((id, i) =>
-          `t${i}: trip(id: "${id}") { stoptimes { stop { gtfsId name } scheduledArrival scheduledDeparture } }`
-        ).join('\n');
-        const batchData = await fetchGql(`{ ${aliases} }`);
+      if (midStopId) {
+        try {
+          // Query this stop's upcoming stoptimes and find the trip belonging to our pattern
+          const stopQuery = `{
+            stop(id: "${midStopId}") {
+              stoptimesWithoutPatterns(numberOfDepartures: 20) {
+                trip { gtfsId }
+                scheduledDeparture
+                realtimeDeparture
+                serviceDay
+              }
+            }
+          }`;
+          const stopData = await fetchGql(stopQuery);
+          const stopTimes = stopData?.data?.stop?.stoptimesWithoutPatterns || [];
 
-        // Find the trip whose schedule best matches the current time
-        const now = new Date();
-        const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-        let bestStoptimes: any[] = [];
-        let bestDiff = Infinity;
+          // Find a departure at this stop whose trip belongs to our pattern
+          const nowEpoch = Math.floor(Date.now() / 1000);
+          let bestTripId = '';
+          let bestDiff = Infinity;
 
-        for (let i = 0; i < sampledIds.length; i++) {
-          const st = batchData?.data?.[`t${i}`]?.stoptimes;
-          if (!st || st.length === 0) continue;
+          for (const st of stopTimes) {
+            const tid = st.trip?.gtfsId;
+            if (!tid || !tripIdsSet.has(tid)) continue;
 
-          const firstDep = st[0]?.scheduledDeparture ?? 0;
-          const lastArr = st[st.length - 1]?.scheduledArrival ?? 0;
-
-          // Current time falls within this trip's schedule — use it immediately
-          if (nowSeconds >= firstDep && nowSeconds <= lastArr) {
-            tripStoptimes = st;
-            bestDiff = 0;
-            break;
+            const depEpoch = (st.serviceDay || 0) + (st.realtimeDeparture ?? st.scheduledDeparture ?? 0);
+            const diff = Math.abs(depEpoch - nowEpoch);
+            if (diff < bestDiff) {
+              bestDiff = diff;
+              bestTripId = tid;
+            }
           }
 
-          // Otherwise track the closest trip
-          const diff = Math.min(Math.abs(nowSeconds - firstDep), Math.abs(nowSeconds - lastArr));
-          if (diff < bestDiff) {
-            bestDiff = diff;
-            bestStoptimes = st;
+          // Fetch the full stoptimes for the matched trip
+          if (bestTripId) {
+            const stoptimes = await fetchTripStoptimes(bestTripId);
+            if (stoptimes.length > 0) {
+              const result = stoptimes;
+              tripStoptimesCache.set(cacheKey, { data: result, ts: Date.now() });
+              return result;
+            }
           }
+        } catch {
+          // fall through to tripIds fallback
         }
+      }
+    }
 
-        if (tripStoptimes.length === 0 && bestStoptimes.length > 0) {
-          tripStoptimes = bestStoptimes;
+    // Fallback: if stop query didn't find a match, use the first trip ID
+    const tripIds = [...tripIdsSet];
+    if (tripIds.length > 0) {
+      try {
+        const stoptimes = await fetchTripStoptimes(tripIds[0]);
+        if (stoptimes.length > 0) {
+          tripStoptimesCache.set(cacheKey, { data: stoptimes, ts: Date.now() });
+          return stoptimes;
         }
       } catch {
-        // fall through — will return stops without times
+        // fall through
       }
     }
 
-    let result: TripStoptime[];
-    if (tripStoptimes.length > 0) {
-      result = tripStoptimes.map((st: any) => {
-        const arrSec = st.scheduledArrival ?? 0;
-        const depSec = st.scheduledDeparture ?? 0;
-        return {
-          stopName: st.stop?.name ?? '',
-          stopId: (st.stop?.gtfsId ?? '').replace('estonia:', ''),
-          scheduledArrival: arrSec,
-          scheduledDeparture: depSec,
-          arrivalTime: fmtTime(arrSec),
-          departureTime: fmtTime(depSec),
-        };
-      });
-    } else {
-      result = patternStops.map((s: any) => ({
-        stopName: s.name ?? '',
-        stopId: (s.gtfsId ?? '').replace('estonia:', ''),
-        scheduledArrival: 0,
-        scheduledDeparture: 0,
-        arrivalTime: '',
-        departureTime: '',
-      }));
-    }
+    // No trip stoptimes found — return pattern stops without scheduled times
+    const result: TripStoptime[] = patternStops.map((s: any) => ({
+      stopName: s.name ?? '',
+      stopId: (s.gtfsId ?? '').replace('estonia:', ''),
+      scheduledArrival: 0,
+      scheduledDeparture: 0,
+      arrivalTime: '',
+      departureTime: '',
+    }));
     tripStoptimesCache.set(cacheKey, { data: result, ts: Date.now() });
     return result;
   } catch (error) {
