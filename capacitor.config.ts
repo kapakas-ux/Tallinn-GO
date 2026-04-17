@@ -6,6 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   android: {
   },
+  ios: {
+  },
   server: {
     cleartext: true,
   },
