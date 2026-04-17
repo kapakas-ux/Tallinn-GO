@@ -288,6 +288,52 @@ export async function fetchRoutes(): Promise<void> {
   return routesPromise;
 }
 
+// Estonian county centroids for nearest-county lookup when stop metadata is missing
+const COUNTY_CENTROIDS: { name: string; lat: number; lng: number }[] = [
+  { name: 'Tallinn', lat: 59.437, lng: 24.753 },
+  { name: 'Tartu', lat: 58.378, lng: 26.729 },
+  { name: 'Pärnu', lat: 58.385, lng: 24.510 },
+  { name: 'Narva', lat: 59.379, lng: 28.179 },
+  { name: 'Harjumaa', lat: 59.33, lng: 24.80 },
+  { name: 'Ida-Virumaa', lat: 59.25, lng: 27.40 },
+  { name: 'Lääne-Virumaa', lat: 59.10, lng: 26.20 },
+  { name: 'Tartumaa', lat: 58.40, lng: 26.50 },
+  { name: 'Pärnumaa', lat: 58.30, lng: 24.60 },
+  { name: 'Järvamaa', lat: 58.88, lng: 25.55 },
+  { name: 'Valgamaa', lat: 57.90, lng: 26.05 },
+  { name: 'Põlvamaa', lat: 58.05, lng: 27.05 },
+  { name: 'Võrumaa', lat: 57.84, lng: 27.00 },
+  { name: 'Läänemaa', lat: 58.93, lng: 23.55 },
+  { name: 'Hiiumaa', lat: 58.92, lng: 22.60 },
+  { name: 'Saaremaa', lat: 58.42, lng: 22.50 },
+  { name: 'Raplamaa', lat: 59.00, lng: 24.80 },
+  { name: 'Viljandimaa', lat: 58.36, lng: 25.60 },
+  { name: 'Jõgevamaa', lat: 58.75, lng: 26.40 },
+];
+
+function getCountyFromCoords(lat: number, lng: number): string {
+  // First try specific city bounding boxes
+  if (lat > 59.35 && lat < 59.50 && lng > 24.55 && lng < 24.95) return 'Tallinn';
+  if (lat > 58.33 && lat < 58.42 && lng > 26.62 && lng < 26.80) return 'Tartu';
+  if (lat > 58.35 && lat < 58.41 && lng > 24.44 && lng < 24.58) return 'Pärnu';
+  if (lat > 59.34 && lat < 59.42 && lng > 28.10 && lng < 28.25) return 'Narva';
+  
+  // Island counties (explicit, before centroid check)
+  if (lat > 57.9 && lat < 58.75 && lng > 21.5 && lng < 23.5) return 'Saaremaa'; // includes Muhu, Ruhnu
+  if (lat > 58.75 && lat < 59.1 && lng > 21.8 && lng < 23.2) return 'Hiiumaa';
+  
+  // Then find nearest county centroid for mainland
+  let best = '';
+  let bestDist = Infinity;
+  for (const c of COUNTY_CENTROIDS) {
+    const dlat = lat - c.lat;
+    const dlng = (lng - c.lng) * Math.cos(lat * Math.PI / 180); // adjust for latitude
+    const d = dlat * dlat + dlng * dlng;
+    if (d < bestDist) { bestDist = d; best = c.name; }
+  }
+  return best;
+}
+
 export async function fetchStops(): Promise<Stop[]> {
   if (stopsPromise) return stopsPromise;
   
@@ -423,14 +469,19 @@ async function fetchStopsFresh(): Promise<Stop[]> {
           else if (isNaN(Number(zoneId))) county = zoneId.replace(/[0-9]/g, '').trim();
         }
         
+        // Fallback: use raw.desc from peatus.ee if county is empty
+        if (!county && raw.desc) {
+          county = raw.desc;
+        }
+        
+        // Fallback: estimate county from coordinates using nearest county centroid
+        if (!county) {
+          county = getCountyFromCoords(lat, lng);
+        }
+        
         let finalDesc = county;
         if (parentName && parentName !== name && parentName !== county) {
           finalDesc = finalDesc ? `${finalDesc}, ${parentName}` : parentName;
-        }
-        
-        // If it's still empty and we are in Tallinn (based on coordinates), use Tallinn
-        if (!finalDesc && lat > 59.35 && lat < 59.50 && lng > 24.55 && lng < 24.95) {
-          finalDesc = 'Tallinn';
         }
         
         // Populate stopsMap for vehicle destination resolution
@@ -962,10 +1013,28 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
 }
 
 export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]> {
+  await fetchStops(); // Ensure stops are fetched and maps are populated
+
+  // Primary: try peatus.ee trip stoptimes if tripId is available (works for all cities)
+  if (arrival.tripId) {
+    try {
+      const stoptimes = await fetchTripStoptimes(arrival.tripId);
+      if (stoptimes.length > 0) {
+        const stops = stoptimes.map(st => {
+          const stop = stopsByIdMap?.get(st.stopId) || stopsByBaseIdMap?.get(st.stopId.split('-')[0]);
+          return stop || { id: st.stopId, name: st.stopName, lat: 0, lng: 0 };
+        }).filter(s => s.lat !== 0 && s.lng !== 0);
+        if (stops.length > 0) return stops;
+      }
+    } catch {
+      // fall through to routeStopsMap
+    }
+  }
+
+  // Fallback: routeStopsMap from routes.txt (Tallinn city routes only)
   if (Object.keys(routeStopsMap).length === 0) {
     await fetchRoutes();
   }
-  await fetchStops(); // Ensure stops are fetched and maps are populated
   const normArrivalLine = arrival.line.replace(/^0+/, '');
   const routes = routeStopsMap[normArrivalLine];
   if (!routes || routes.length === 0) return [];

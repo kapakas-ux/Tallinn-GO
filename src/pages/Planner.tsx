@@ -559,7 +559,7 @@ export const Planner = () => {
       <h1 className="font-headline font-black text-2xl mb-6 px-2 gradient-text">{t('planner.title')}</h1>
 
       {/* Search inputs */}
-      <section className="relative bg-surface-container-low p-4 rounded-[20px] mb-6 shadow-sm">
+      <section className={cn("relative bg-surface-container-low p-4 rounded-[20px] mb-6 shadow-sm", activeInput && "z-20")}>
         <div className="flex flex-col gap-3 relative">
           {/* FROM */}
           <div className={cn(
