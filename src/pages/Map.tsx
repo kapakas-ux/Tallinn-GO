@@ -1229,7 +1229,11 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                     {selectedVehicle.vehicle.destination || t('map.unknownDestination')}
                   </h3>
                   <p className="font-label text-xs text-secondary font-bold uppercase tracking-widest mt-0.5">
-                    {selectedVehicle.vehicle.type}{selectedVehicle.vehicle.speed && selectedVehicle.vehicle.speed > 0 && selectedVehicle.vehicle.speed <= 120 ? ` • ${Math.round(selectedVehicle.vehicle.speed)} km/h` : ''}
+                    {selectedVehicle.vehicle.type}{(() => {
+                      const spd = selectedVehicle.vehicle.speed;
+                      const maxSpd = selectedVehicle.vehicle.type === 'train' || selectedVehicle.vehicle.type === 'regional' ? 120 : 70;
+                      return spd && spd > 0 && spd <= maxSpd ? ` • ${Math.round(spd)} km/h` : '';
+                    })()}
                   </p>
                 </div>
               </div>
