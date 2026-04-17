@@ -1,6 +1,5 @@
 package com.tallinngo.app.widget;
 
-import android.app.Activity;
 import android.appwidget.AppWidgetManager;
 import android.content.Intent;
 import android.os.Bundle;
@@ -10,13 +9,15 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
+
+import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.tallinngo.app.R;
 
@@ -34,7 +35,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class WidgetConfigActivity extends Activity {
+public class WidgetConfigActivity extends AppCompatActivity {
 
     private static final String PEATUS_URL =
             "https://api.peatus.ee/routing/v1/routers/estonia/index/graphql";
@@ -60,10 +61,8 @@ public class WidgetConfigActivity extends Activity {
         super.onCreate(savedInstanceState);
         setResult(RESULT_CANCELED);
 
-        // Theme the status and navigation bar to match
-        Window window = getWindow();
-        window.setStatusBarColor(getColor(R.color.config_background));
-        window.setNavigationBarColor(getColor(R.color.config_background));
+        // Enable edge-to-edge display
+        EdgeToEdge.enable(this);
 
         Intent intent = getIntent();
         if (intent != null) {
