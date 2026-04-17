@@ -896,7 +896,7 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
       patterns {
         directionId
         headsign
-        stops { gtfsId name }
+        stops { gtfsId name lat lon }
         trips { gtfsId }
       }
     }
@@ -997,21 +997,35 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
 
     const patternStops = pattern?.stops || stops;
 
-    // Find the active trip by querying a mid-route stop for current departures
-    // (same approach the dashboard uses to get tripIds from stop arrivals)
+    // Find the active trip by querying the stop nearest the vehicle's current position.
+    // We include recently-departed trips (past 30 min) so a bus that just left its last stop
+    // is still matched by its realtime departure at that stop.
     const tripIdsSet = new Set((pattern?.trips || []).map((t: any) => t.gtfsId).filter(Boolean));
 
     if (patternStops.length > 0 && tripIdsSet.size > 0) {
-      // Pick a stop near the middle of the route for the best chance of catching an active trip
-      const midStop = patternStops[Math.floor(patternStops.length / 2)];
-      const midStopId = midStop?.gtfsId;
+      // Find the pattern stop closest to the vehicle's GPS position
+      let nearestStop: any = null;
+      let nearestDist = Infinity;
+      for (const s of patternStops) {
+        if (typeof s.lat !== 'number' || typeof s.lon !== 'number') continue;
+        const d = getDistance(vehicle.lat, vehicle.lng, s.lat, s.lon);
+        if (d < nearestDist) {
+          nearestDist = d;
+          nearestStop = s;
+        }
+      }
+      // Fallback to mid-stop if no coords available
+      const queryStop = nearestStop || patternStops[Math.floor(patternStops.length / 2)];
+      const queryStopId = queryStop?.gtfsId;
 
-      if (midStopId) {
+      if (queryStopId) {
         try {
-          // Query this stop's upcoming stoptimes and find the trip belonging to our pattern
+          const nowEpoch = Math.floor(Date.now() / 1000);
+          const startTime = nowEpoch - 1800; // include trips that departed up to 30 min ago
+          // Query this stop's stoptimes and find the trip belonging to our pattern
           const stopQuery = `{
-            stop(id: "${midStopId}") {
-              stoptimesWithoutPatterns(numberOfDepartures: 20) {
+            stop(id: "${queryStopId}") {
+              stoptimesWithoutPatterns(numberOfDepartures: 30, startTime: ${startTime}, timeRange: 7200) {
                 trip { gtfsId }
                 scheduledDeparture
                 realtimeDeparture
@@ -1022,8 +1036,7 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
           const stopData = await fetchGql(stopQuery);
           const stopTimes = stopData?.data?.stop?.stoptimesWithoutPatterns || [];
 
-          // Find a departure at this stop whose trip belongs to our pattern
-          const nowEpoch = Math.floor(Date.now() / 1000);
+          // Find the departure at this stop (for a trip in our pattern) closest to now
           let bestTripId = '';
           let bestDiff = Infinity;
 
