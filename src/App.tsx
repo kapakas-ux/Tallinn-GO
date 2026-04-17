@@ -56,6 +56,14 @@ function AppContent() {
         const currentTheme = getSettings().theme;
         const isLightTheme = currentTheme === 'daylight' || currentTheme === 'latte';
         StatusBar.setStyle({ style: isLightTheme ? Style.Light : Style.Dark });
+        StatusBar.setOverlaysWebView({ overlay: false });
+        const bgColors: Record<string, string> = {
+          daylight: '#f5f8fb',
+          latte: '#faf6ef',
+          plum: '#0c0718',
+          havgra: '#060e18',
+        };
+        StatusBar.setBackgroundColor({ color: bgColors[currentTheme] || '#020617' });
       };
 
       updateStatusBar();
