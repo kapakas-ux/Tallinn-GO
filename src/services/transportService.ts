@@ -853,7 +853,7 @@ export async function fetchTripStoptimes(tripId: string): Promise<TripStoptime[]
       const arrSec = st.scheduledArrival ?? 0;
       const depSec = st.scheduledDeparture ?? 0;
       const fmtTime = (s: number) => {
-        const h = Math.floor(s / 3600);
+        const h = Math.floor(s / 3600) % 24;
         const m = Math.floor((s % 3600) / 60);
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       };

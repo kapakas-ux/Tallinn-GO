@@ -687,7 +687,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           departuresHtml = `<div class="py-4 text-center text-secondary font-label text-xs uppercase tracking-wider">${i18next.t('map.noDepartures')}</div>`;
         }
 
-        const lastUpdated = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const lastUpdated = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
         const isFav = isFavorite(id);
 
         let distanceHtml = '';
@@ -928,7 +928,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       const allCoords: [number, number][] = [];
 
       const fmtTime = (ms: number) =>
-        new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
 
       const fmtDur = (sec: number) => {
         const h = Math.floor(sec / 3600);
