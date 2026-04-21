@@ -1,6 +1,7 @@
 import { Stop } from '../types';
 
 const FAVORITES_KEY = 'transport_favorites';
+const FAVORITES_CHANGED_EVENT = 'favorites_changed';
 
 export const getFavorites = (): Stop[] => {
   const stored = localStorage.getItem(FAVORITES_KEY);
@@ -15,6 +16,38 @@ export const getFavorites = (): Stop[] => {
 
 export const saveFavorites = (favorites: Stop[]) => {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent<Stop[]>(FAVORITES_CHANGED_EVENT, { detail: favorites }));
+  }
+};
+
+export const subscribeFavorites = (onChange: (favorites: Stop[]) => void): (() => void) => {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const handleFavoritesChanged = (event: Event) => {
+    const customEvent = event as CustomEvent<Stop[]>;
+    if (Array.isArray(customEvent.detail)) {
+      onChange(customEvent.detail);
+      return;
+    }
+    onChange(getFavorites());
+  };
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === FAVORITES_KEY || event.key === null) {
+      onChange(getFavorites());
+    }
+  };
+
+  window.addEventListener(FAVORITES_CHANGED_EVENT, handleFavoritesChanged as EventListener);
+  window.addEventListener('storage', handleStorage);
+
+  return () => {
+    window.removeEventListener(FAVORITES_CHANGED_EVENT, handleFavoritesChanged as EventListener);
+    window.removeEventListener('storage', handleStorage);
+  };
 };
 
 export const addFavorite = (stop: Stop) => {

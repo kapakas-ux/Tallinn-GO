@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleColorClass } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
-import { getFavorites, isFavorite, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
+import { getFavorites, isFavorite, subscribeFavorites, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { ArrivalItem, getLiveMinutes, CompactTime } from '../components/ArrivalItem';
@@ -91,6 +91,10 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   useEffect(() => {
     setFavorites(getFavorites());
     setScheduledAlerts(getActiveAlerts());
+    const unsubscribe = subscribeFavorites((nextFavorites) => {
+      setFavorites(nextFavorites);
+    });
+    return unsubscribe;
   }, []);
 
   // Auto-fetch departures for favorite stops

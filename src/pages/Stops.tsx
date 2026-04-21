@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, Star, Navigation as NearMe, ChevronRight, Loader2, X, Trash2, Map as MapIcon, MapPin, ChevronDown, ChevronUp, Footprints, Edit, X as CloseIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
-import { getFavorites, toggleFavorite as toggleFavService, isFavorite, updateFavorite } from '../services/favoritesService';
+import { getFavorites, subscribeFavorites, toggleFavorite as toggleFavService, isFavorite, updateFavorite } from '../services/favoritesService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { MiniMap } from '../components/MiniMap';
@@ -51,6 +51,13 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
 
   useEffect(() => {
     setScheduledAlerts(getActiveAlerts());
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeFavorites((nextFavorites) => {
+      setFavorites(nextFavorites);
+    });
+    return unsubscribe;
   }, []);
 
   const [favDepartures, setFavDepartures] = useState({} as { [key: string]: Arrival[] });
