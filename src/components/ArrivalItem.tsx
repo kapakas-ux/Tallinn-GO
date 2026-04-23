@@ -24,6 +24,36 @@ export function getLiveMinutes(arrival: Arrival): number {
   return arrival.minutes;
 }
 
+// Walking speed ≈ 5 km/h matches formatWalkingTime in lib/utils.ts
+const WALK_METERS_PER_SECOND = 83.33 / 60;
+
+type CatchTier = 'walk' | 'jog' | 'sprint' | 'missed';
+
+/** Decide how fast the user would need to move to catch this arrival. */
+function computeCatchTier(distanceKm: number, arrival: Arrival): { tier: CatchTier; bufferSec: number } | null {
+  if (!distanceKm || distanceKm <= 0) return null;
+  const distanceM = distanceKm * 1000;
+  // If the stop is practically underfoot, nothing to show.
+  if (distanceM < 30) return null;
+  const walkSec = distanceM / WALK_METERS_PER_SECOND;
+  const secondsUntil = arrival.departureTimeSeconds
+    ? arrival.departureTimeSeconds - Date.now() / 1000
+    : arrival.minutes * 60;
+  const buffer = secondsUntil - walkSec;
+  if (buffer >= 60) return { tier: 'walk', bufferSec: buffer };
+  if (buffer >= 15) return { tier: 'jog', bufferSec: buffer };
+  if (buffer >= -15) return { tier: 'sprint', bufferSec: buffer };
+  return { tier: 'missed', bufferSec: buffer };
+}
+
+const CATCH_TIER_STYLES: Record<CatchTier, { emoji: string; labelKey: string; className: string }> = {
+  walk:   { emoji: '🚶', labelKey: 'arrivals.catchWalk',   className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/20' },
+  jog:    { emoji: '🏃', labelKey: 'arrivals.catchJog',    className: 'bg-amber-500/10  text-amber-600  dark:text-amber-400  ring-1 ring-amber-500/20' },
+  sprint: { emoji: '⚡', labelKey: 'arrivals.catchSprint', className: 'bg-red-500/10    text-red-600    dark:text-red-400    ring-1 ring-red-500/30 animate-pulse' },
+  missed: { emoji: '⏳', labelKey: 'arrivals.catchMissed', className: 'bg-surface-container-high text-on-surface-variant line-through' },
+};
+
+
 /** Compact time label: "Now", "5 min", or "14:35" for >59 min */
 export function CompactTime({ arrival, nowLabel }: { arrival: Arrival; nowLabel: string }) {
   const mins = getLiveMinutes(arrival);
@@ -101,6 +131,10 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
   }, [expanded, arrival, hasFetched]);
 
   const isCompact = variant === 'compact';
+  const catchInfo = (arrival.status !== 'departed' && stop?.distance !== undefined)
+    ? computeCatchTier(stop.distance, arrival)
+    : null;
+  const showLastChip = arrival.isLastOfDay && arrival.status !== 'departed' && liveMinutes < 180;
 
   return (
     <div className="flex flex-col gap-2">
@@ -134,6 +168,30 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
               <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-widest">
                 {(arrival.type === 'regional' ? 'Bus' : arrival.type.charAt(0).toUpperCase() + arrival.type.slice(1))} • {arrival.type === 'regional' ? t('arrivals.regional') : t('arrivals.local')}
               </span>
+            )}
+            {(catchInfo || showLastChip) && (
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                {catchInfo && (
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-label font-bold uppercase tracking-wider",
+                      CATCH_TIER_STYLES[catchInfo.tier].className
+                    )}
+                    title={t('arrivals.catchTooltip', {
+                      minutes: Math.max(0, Math.round(catchInfo.bufferSec / 60)),
+                    })}
+                  >
+                    <span aria-hidden>{CATCH_TIER_STYLES[catchInfo.tier].emoji}</span>
+                    {t(CATCH_TIER_STYLES[catchInfo.tier].labelKey)}
+                  </span>
+                )}
+                {showLastChip && (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-label font-bold uppercase tracking-wider bg-primary/10 text-primary ring-1 ring-primary/20">
+                    <span aria-hidden>🌙</span>
+                    {t('arrivals.lastOfDay')}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>

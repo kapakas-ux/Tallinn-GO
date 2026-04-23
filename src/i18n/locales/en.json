@@ -250,7 +250,8 @@
     "departure": "Departure",
     "destination": "Destination",
     "walkLeg": "Walk {{distance}} · {{duration}} min",
-    "walkTotal": "{{distance}} walk total"
+    "walkTotal": "{{distance}} walk total",
+    "walkInDarkness": "{{distance}} in the dark"
   },
   "arrivals": {
     "now": "Now",
@@ -260,7 +261,13 @@
     "regional": "Regional",
     "loadingRoute": "Loading route...",
     "routeNotAvailable": "Route data not available",
-    "routeStops": "Route Stops"
+    "routeStops": "Route Stops",
+    "catchWalk": "Walk",
+    "catchJog": "Jog",
+    "catchSprint": "Sprint",
+    "catchMissed": "Missed",
+    "catchTooltip": "{{minutes}} min buffer at walking pace",
+    "lastOfDay": "Last today"
   },
   "alerts": {
     "title": "Active Alerts",

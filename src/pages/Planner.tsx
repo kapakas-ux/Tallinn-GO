@@ -11,6 +11,7 @@ import { cn } from '../lib/utils';
 import { fetchStops, planJourney } from '../services/transportService';
 import { watchLocation } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
+import { darknessOverlapMs } from '../services/sunTimesService';
 import type { Stop, PlanItinerary, LegMode } from '../types';
 
 // ─── geocoding ──────────────────────────────────────────────────
@@ -355,9 +356,26 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
                       {leg.headsign ? ` â†’ ${leg.headsign}` : ''}
                     </p>
                   ) : (
-                    <p className="text-xs text-secondary mt-0.5">
-                      {t('planner.walkLeg', { distance: fmtDistance(leg.distance), duration: Math.ceil(leg.duration / 60) })}
-                    </p>
+                    <>
+                      <p className="text-xs text-secondary mt-0.5">
+                        {t('planner.walkLeg', { distance: fmtDistance(leg.distance), duration: Math.ceil(leg.duration / 60) })}
+                      </p>
+                      {(() => {
+                        // Darkness warning — show when ≥25% of the walk crosses civil twilight and leg ≥100 m
+                        if (leg.distance < 100) return null;
+                        const darkMs = darknessOverlapMs(leg.startTime, leg.endTime, leg.from.lat, leg.from.lon);
+                        if (darkMs <= 0) return null;
+                        const totalMs = Math.max(1, leg.endTime - leg.startTime);
+                        if (darkMs / totalMs < 0.25) return null;
+                        const darkMeters = Math.round((darkMs / totalMs) * leg.distance);
+                        return (
+                          <span className="inline-flex items-center gap-1 mt-1 rounded-full px-2 py-0.5 text-[10px] font-label font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-1 ring-indigo-500/20">
+                            <span aria-hidden>🌙</span>
+                            {t('planner.walkInDarkness', { distance: fmtDistance(darkMeters) })}
+                          </span>
+                        );
+                      })()}
+                    </>
                   )}
                 </div>
               </div>

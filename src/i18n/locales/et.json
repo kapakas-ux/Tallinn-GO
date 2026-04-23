@@ -250,7 +250,8 @@
     "departure": "Väljumine",
     "destination": "Sihtkoht",
     "walkLeg": "Kõnni {{distance}} · {{duration}} min",
-    "walkTotal": "{{distance}} kõndimist kokku"
+    "walkTotal": "{{distance}} kõndimist kokku",
+    "walkInDarkness": "{{distance}} pimedas"
   },
   "arrivals": {
     "now": "Kohe",
@@ -260,7 +261,13 @@
     "regional": "Maakond",
     "loadingRoute": "Marsruudi laadimine...",
     "routeNotAvailable": "Marsruudiandmed pole saadaval",
-    "routeStops": "Marsruudi peatused"
+    "routeStops": "Marsruudi peatused",
+    "catchWalk": "Kõnni",
+    "catchJog": "Sörgi",
+    "catchSprint": "Sprint",
+    "catchMissed": "Kadunud",
+    "catchTooltip": "{{minutes}} min varu jalgsi",
+    "lastOfDay": "Täna viimane"
   },
   "alerts": {
     "title": "Aktiivsed teavitused",

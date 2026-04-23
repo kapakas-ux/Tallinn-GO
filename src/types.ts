@@ -25,6 +25,8 @@ export interface Arrival {
   vehicleId?: string;
   vehicleIndex?: number;
   tripId?: string;
+  /** True when this is the final departure of this line/destination for today (best-effort). */
+  isLastOfDay?: boolean;
 }
 
 export interface Vehicle {

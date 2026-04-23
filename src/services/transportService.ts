@@ -3,6 +3,7 @@ import { CapacitorHttp, Capacitor } from '@capacitor/core';
 import { getDistance, getBearing } from '../lib/geo';
 import { getRidangoVehicles, isRidangoConnected } from './ridangoWebSocket';
 import { getTartuVehicles, isTartuConnected } from './tartuWebSocket';
+import { getLastOfDayMap, annotateLastOfDay } from './scheduleAwarenessService';
 
 const getApiBaseUrl = () => {
   // 1. Check for environment variable (set during build)
@@ -1982,7 +1983,22 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
       return true;
     });
 
-    return deduped.slice(0, time === '0' ? 50 : 10);
+    const limited = deduped.slice(0, time === '0' ? 50 : 10);
+
+    // Annotate "last of day" — best-effort, fire-and-forget cache lookup.
+    // Skip when the caller already asked for the full day (time === '0') to avoid recursion.
+    if (time !== '0') {
+      try {
+        const lastMap = await getLastOfDayMap(stopId, siriId, () =>
+          fetchDepartures(stopId, siriId, '0'),
+        );
+        return annotateLastOfDay(limited, lastMap);
+      } catch (e) {
+        // Non-fatal — return arrivals unannotated
+      }
+    }
+
+    return limited;
   } catch (error) {
     console.error('Error fetching departures:', error);
     return [];
