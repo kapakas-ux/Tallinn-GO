@@ -250,14 +250,13 @@
     "tram": "Трамвай",
     "train": "Поезд",
     "bus": "Автобус",
+    "ferry": "Паром",
     "origin": "Начало",
     "departure": "Отправление",
     "destination": "Направление",
     "walkLeg": "Пешком {{distance}} · {{duration}} мин",
     "walkTotal": "{{distance}} пешком всего",
-    "walkInDarkness": "{{distance}} в темноте",
-    "fareEstimate": "примерно",
-    "fareApproxHint": "Приблизительная сумма — тарифы операторов не удалось полностью объединить"
+    "walkInDarkness": "{{distance}} в темноте"
   },
   "arrivals": {
     "now": "Сейчас",

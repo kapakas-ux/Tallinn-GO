@@ -246,14 +246,13 @@
     "tram": "Tram",
     "train": "Train",
     "bus": "Bus",
+    "ferry": "Ferry",
     "origin": "Origin",
     "departure": "Departure",
     "destination": "Destination",
     "walkLeg": "Walk {{distance}} · {{duration}} min",
     "walkTotal": "{{distance}} walk total",
-    "walkInDarkness": "{{distance}} in the dark",
-    "fareEstimate": "estimate",
-    "fareApproxHint": "Estimated total — operator tariffs could not be fully combined"
+    "walkInDarkness": "{{distance}} in the dark"
   },
   "arrivals": {
     "now": "Now",

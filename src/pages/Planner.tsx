@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import {
-  MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram, TrainFront,
+  MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram, TrainFront, Ship,
   Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon, Route as RouteIcon,
   CalendarDays
 } from 'lucide-react';
@@ -96,17 +96,19 @@ const fmtFare = (cents: number, currency: string) => {
 
 function modeColor(mode: LegMode): string {
   switch (mode) {
-    case 'TRAM': return '#DC143C';
-    case 'RAIL': return '#f37021';
-    case 'BUS':  return '#003571';
-    default:     return '#6b7280';
+    case 'TRAM':  return '#DC143C';
+    case 'RAIL':  return '#f37021';
+    case 'BUS':   return '#003571';
+    case 'FERRY': return '#0891b2';
+    default:      return '#6b7280';
   }
 }
 
 function ModeIcon({ mode, className }: { mode: LegMode; className?: string }) {
-  if (mode === 'WALK') return <Footprints className={className} />;
-  if (mode === 'TRAM') return <Tram className={className} />;
-  if (mode === 'RAIL') return <TrainFront className={className} />;
+  if (mode === 'WALK')  return <Footprints className={className} />;
+  if (mode === 'TRAM')  return <Tram className={className} />;
+  if (mode === 'RAIL')  return <TrainFront className={className} />;
+  if (mode === 'FERRY') return <Ship className={className} />;
   return <Bus className={className} />;
 }
 
@@ -327,18 +329,9 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
 
         {itinerary.fare && itinerary.fare.cents > 0 && (
           <div className="mt-2 flex items-center gap-1.5">
-            <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-label font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20"
-              title={itinerary.fare.approximate ? t('planner.fareApproxHint') : undefined}
-            >
-              {itinerary.fare.approximate ? '≈ ' : ''}
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-label font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20">
               {fmtFare(itinerary.fare.cents, itinerary.fare.currency)}
             </span>
-            {itinerary.fare.approximate && (
-              <span className="font-label text-[9px] text-secondary uppercase tracking-wide">
-                {t('planner.fareEstimate')}
-              </span>
-            )}
           </div>
         )}
       </div>
@@ -377,7 +370,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
                   </div>
                   {leg.mode !== 'WALK' ? (
                     <p className="text-xs text-secondary mt-0.5">
-                      {leg.mode === 'TRAM' ? t('planner.tram') : leg.mode === 'RAIL' ? t('planner.train') : t('planner.bus')} {leg.routeShortName}
+                      {leg.mode === 'TRAM' ? t('planner.tram') : leg.mode === 'RAIL' ? t('planner.train') : leg.mode === 'FERRY' ? t('planner.ferry') : t('planner.bus')} {leg.routeShortName}
                       {leg.headsign ? ` â†’ ${leg.headsign}` : ''}
                     </p>
                   ) : (

@@ -246,14 +246,13 @@
     "tram": "Tramm",
     "train": "Rong",
     "bus": "Buss",
+    "ferry": "Praam",
     "origin": "Alguspunkt",
     "departure": "Väljumine",
     "destination": "Sihtkoht",
     "walkLeg": "Kõnni {{distance}} · {{duration}} min",
     "walkTotal": "{{distance}} kõndimist kokku",
-    "walkInDarkness": "{{distance}} pimedas",
-    "fareEstimate": "ligikaudne",
-    "fareApproxHint": "Ligikaudne kogusumma — operaatorite tariife ei saanud täielikult kombineerida"
+    "walkInDarkness": "{{distance}} pimedas"
   },
   "arrivals": {
     "now": "Kohe",

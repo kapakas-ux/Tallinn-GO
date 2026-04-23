@@ -2034,6 +2034,7 @@ export async function planJourney(
           { mode: BUS }
           { mode: TRAM }
           { mode: RAIL }
+          { mode: FERRY }
         ]
       ) {
         itineraries {
@@ -2093,21 +2094,31 @@ export async function planJourney(
     }));
     const transitLegs = legs.filter((l: any) => l.mode !== 'WALK').length;
 
-    // Parse fares: prefer "regular" total if > 0; otherwise sum components.
-    // OTP returns cents: -1 as "unknown total"; null fares = no data available.
+    // Parse fares: only trust OTP fare data for Tallinn city routes.
+    // peatus.ee returns partial/incorrect fares for intercity operators (commercial
+    // pricing not in GTFS), so we gate on the Tallinn bounding box: every transit
+    // leg's endpoints must be inside ~Tallinn metro area. Also require a concrete
+    // total (cents >= 0) — we don't trust component-summed estimates outside city.
+    const TLN_MIN_LAT = 59.35, TLN_MAX_LAT = 59.52;
+    const TLN_MIN_LON = 24.55, TLN_MAX_LON = 24.95;
+    const inTallinn = (lat?: number, lon?: number) =>
+      typeof lat === 'number' && typeof lon === 'number' &&
+      lat >= TLN_MIN_LAT && lat <= TLN_MAX_LAT &&
+      lon >= TLN_MIN_LON && lon <= TLN_MAX_LON;
+    const allTransitInTallinn = legs
+      .filter((l: any) => l.mode !== 'WALK')
+      .every((l: any) => inTallinn(l.from.lat, l.from.lon) && inTallinn(l.to.lat, l.to.lon));
+
     let fare: PlanItinerary['fare'] = null;
-    const fares = Array.isArray(it.fares) ? it.fares : [];
-    const regular = fares.find((f: any) => f?.type === 'regular') ?? fares[0];
-    if (regular) {
-      const currency = regular.currency ?? 'EUR';
-      if (typeof regular.cents === 'number' && regular.cents >= 0) {
-        fare = { cents: regular.cents, currency, approximate: false };
-      } else if (Array.isArray(regular.components) && regular.components.length > 0) {
-        const sum = regular.components.reduce(
-          (acc: number, c: any) => acc + (typeof c?.cents === 'number' && c.cents >= 0 ? c.cents : 0),
-          0,
-        );
-        if (sum > 0) fare = { cents: sum, currency, approximate: true };
+    if (allTransitInTallinn && transitLegs > 0) {
+      const fares = Array.isArray(it.fares) ? it.fares : [];
+      const regular = fares.find((f: any) => f?.type === 'regular') ?? fares[0];
+      if (regular && typeof regular.cents === 'number' && regular.cents >= 0) {
+        fare = {
+          cents: regular.cents,
+          currency: regular.currency ?? 'EUR',
+          approximate: false,
+        };
       }
     }
 
