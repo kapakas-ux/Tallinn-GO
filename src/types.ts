@@ -79,6 +79,12 @@ export interface PlanLeg {
   realTime?: boolean;
 }
 
+export interface ItineraryFare {
+  cents: number;            // total fare in cents
+  currency: string;         // e.g. "EUR"
+  approximate: boolean;     // true if summed from components (OTP couldn't compute total)
+}
+
 export interface PlanItinerary {
   duration: number;         // seconds
   startTime: number;        // ms epoch
@@ -87,6 +93,7 @@ export interface PlanItinerary {
   walkDistance: number;     // metres
   transfers: number;
   legs: PlanLeg[];
+  fare?: ItineraryFare | null;
 }
 
 export interface ServiceAlert {

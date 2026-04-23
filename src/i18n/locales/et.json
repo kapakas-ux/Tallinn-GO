@@ -251,7 +251,9 @@
     "destination": "Sihtkoht",
     "walkLeg": "Kõnni {{distance}} · {{duration}} min",
     "walkTotal": "{{distance}} kõndimist kokku",
-    "walkInDarkness": "{{distance}} pimedas"
+    "walkInDarkness": "{{distance}} pimedas",
+    "fareEstimate": "ligikaudne",
+    "fareApproxHint": "Ligikaudne kogusumma — operaatorite tariife ei saanud täielikult kombineerida"
   },
   "arrivals": {
     "now": "Kohe",

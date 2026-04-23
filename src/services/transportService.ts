@@ -2054,6 +2054,15 @@ export async function planJourney(
             route { shortName }
             legGeometry { points length }
           }
+          fares {
+            type
+            cents
+            currency
+            components {
+              cents
+              currency
+            }
+          }
         }
       }
     }
@@ -2083,6 +2092,25 @@ export async function planJourney(
       legGeometry: { points: leg.legGeometry?.points ?? '', length: leg.legGeometry?.length ?? 0 },
     }));
     const transitLegs = legs.filter((l: any) => l.mode !== 'WALK').length;
+
+    // Parse fares: prefer "regular" total if > 0; otherwise sum components.
+    // OTP returns cents: -1 as "unknown total"; null fares = no data available.
+    let fare: PlanItinerary['fare'] = null;
+    const fares = Array.isArray(it.fares) ? it.fares : [];
+    const regular = fares.find((f: any) => f?.type === 'regular') ?? fares[0];
+    if (regular) {
+      const currency = regular.currency ?? 'EUR';
+      if (typeof regular.cents === 'number' && regular.cents >= 0) {
+        fare = { cents: regular.cents, currency, approximate: false };
+      } else if (Array.isArray(regular.components) && regular.components.length > 0) {
+        const sum = regular.components.reduce(
+          (acc: number, c: any) => acc + (typeof c?.cents === 'number' && c.cents >= 0 ? c.cents : 0),
+          0,
+        );
+        if (sum > 0) fare = { cents: sum, currency, approximate: true };
+      }
+    }
+
     return {
       duration: it.duration,
       startTime: it.startTime,
@@ -2091,6 +2119,7 @@ export async function planJourney(
       walkDistance: it.walkDistance,
       transfers: Math.max(0, transitLegs - 1),
       legs,
+      fare,
     };
   });
 

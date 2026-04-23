@@ -87,6 +87,13 @@ const fmtDuration = (seconds: number) => {
 const fmtDistance = (metres: number) =>
   metres < 1000 ? `${Math.round(metres)}m` : `${(metres / 1000).toFixed(1)}km`;
 
+const fmtFare = (cents: number, currency: string) => {
+  const euros = cents / 100;
+  const symbol = currency === 'EUR' ? '€' : currency + ' ';
+  // Use comma as decimal separator (Estonian/European convention)
+  return `${symbol}${euros.toFixed(2).replace('.', ',')}`;
+};
+
 function modeColor(mode: LegMode): string {
   switch (mode) {
     case 'TRAM': return '#DC143C';
@@ -317,6 +324,23 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
             </span>
           )}
         </div>
+
+        {itinerary.fare && itinerary.fare.cents > 0 && (
+          <div className="mt-2 flex items-center gap-1.5">
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-label font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20"
+              title={itinerary.fare.approximate ? t('planner.fareApproxHint') : undefined}
+            >
+              {itinerary.fare.approximate ? '≈ ' : ''}
+              {fmtFare(itinerary.fare.cents, itinerary.fare.currency)}
+            </span>
+            {itinerary.fare.approximate && (
+              <span className="font-label text-[9px] text-secondary uppercase tracking-wide">
+                {t('planner.fareEstimate')}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {expanded && (

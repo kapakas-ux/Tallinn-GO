@@ -251,7 +251,9 @@
     "destination": "Destination",
     "walkLeg": "Walk {{distance}} · {{duration}} min",
     "walkTotal": "{{distance}} walk total",
-    "walkInDarkness": "{{distance}} in the dark"
+    "walkInDarkness": "{{distance}} in the dark",
+    "fareEstimate": "estimate",
+    "fareApproxHint": "Estimated total — operator tariffs could not be fully combined"
   },
   "arrivals": {
     "now": "Now",

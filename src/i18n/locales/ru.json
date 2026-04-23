@@ -255,7 +255,9 @@
     "destination": "Направление",
     "walkLeg": "Пешком {{distance}} · {{duration}} мин",
     "walkTotal": "{{distance}} пешком всего",
-    "walkInDarkness": "{{distance}} в темноте"
+    "walkInDarkness": "{{distance}} в темноте",
+    "fareEstimate": "примерно",
+    "fareApproxHint": "Приблизительная сумма — тарифы операторов не удалось полностью объединить"
   },
   "arrivals": {
     "now": "Сейчас",
