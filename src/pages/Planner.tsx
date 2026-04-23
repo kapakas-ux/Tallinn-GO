@@ -104,6 +104,14 @@ function modeColor(mode: LegMode): string {
   }
 }
 
+// Color override by service tier so commercial intercity and county regional
+// buses stand out from the default city-bus navy.
+function legColor(leg: { mode: LegMode; tier?: 'city' | 'regional' | 'commercial' }): string {
+  if (leg.mode === 'BUS' && leg.tier === 'commercial') return '#7c3aed'; // violet-600
+  if (leg.mode === 'BUS' && leg.tier === 'regional')   return '#0d9488'; // teal-600
+  return modeColor(leg.mode);
+}
+
 function ModeIcon({ mode, className }: { mode: LegMode; className?: string }) {
   if (mode === 'WALK')  return <Footprints className={className} />;
   if (mode === 'TRAM')  return <Tram className={className} />;
@@ -235,7 +243,7 @@ const ItineraryMap: React.FC<{ itinerary: PlanItinerary }> = ({ itinerary }) => 
             paint: { 'line-color': '#ffffff', 'line-width': 6 } });
           map.addLayer({ id: `${id}-line`, type: 'line', source: id,
             layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': modeColor(leg.mode), 'line-width': 4 } });
+            paint: { 'line-color': legColor(leg), 'line-width': 4 } });
         }
       });
 
@@ -311,10 +319,18 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
               ) : (
                 <div
                   className="h-6 px-2 rounded-full flex items-center gap-1 text-white text-[10px] font-label font-bold"
-                  style={{ backgroundColor: modeColor(leg.mode) }}
+                  style={{ backgroundColor: legColor(leg) }}
                 >
                   <ModeIcon mode={leg.mode} className="w-3 h-3" />
                   {leg.routeShortName}
+                  {(leg.tier === 'commercial' || leg.tier === 'regional') && (
+                    <span
+                      className="ml-0.5 px-1 rounded-sm bg-white/20 text-[8px] leading-none py-0.5"
+                      title={leg.tier === 'commercial' ? t('planner.commercialBusHint') : t('planner.regionalBusHint')}
+                    >
+                      {leg.tier === 'commercial' ? t('planner.commercialBusTag') : t('planner.regionalBusTag')}
+                    </span>
+                  )}
                 </div>
               )}
               {i < itinerary.legs.length - 1 && <div className="w-2 h-px bg-outline-variant" />}
@@ -351,7 +367,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
                 <div className="flex flex-col items-center">
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white"
-                    style={{ backgroundColor: modeColor(leg.mode) }}
+                    style={{ backgroundColor: legColor(leg) }}
                   >
                     <ModeIcon mode={leg.mode} className="w-4 h-4" />
                   </div>
@@ -370,8 +386,14 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
                   </div>
                   {leg.mode !== 'WALK' ? (
                     <p className="text-xs text-secondary mt-0.5">
-                      {leg.mode === 'TRAM' ? t('planner.tram') : leg.mode === 'RAIL' ? t('planner.train') : leg.mode === 'FERRY' ? t('planner.ferry') : t('planner.bus')} {leg.routeShortName}
-                      {leg.headsign ? ` â†’ ${leg.headsign}` : ''}
+                      {leg.tier === 'commercial' ? t('planner.commercialBus')
+                        : leg.tier === 'regional' ? t('planner.regionalBus')
+                        : leg.mode === 'TRAM' ? t('planner.tram')
+                        : leg.mode === 'RAIL' ? t('planner.train')
+                        : leg.mode === 'FERRY' ? t('planner.ferry')
+                        : t('planner.bus')} {leg.routeShortName}
+                      {leg.agencyName ? ` · ${leg.agencyName}` : ''}
+                      {leg.headsign ? ` → ${leg.headsign}` : ''}
                     </p>
                   ) : (
                     <>

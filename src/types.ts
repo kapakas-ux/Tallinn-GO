@@ -77,6 +77,14 @@ export interface PlanLeg {
   headsign?: string;
   legGeometry: { points: string; length: number }; // encoded polyline
   realTime?: boolean;
+  agencyName?: string;      // operator name from GTFS
+  competentAuthority?: string; // GTFS competent authority (e.g. "Tallinna linn", "Harjumaa", "REM")
+  /** Service tier derived from competentAuthority + agency:
+   *  - 'city': municipal transit (Tallinn, Tartu, etc.)
+   *  - 'regional': county-subsidized bus ("Harjumaa", "Tartumaa", …)
+   *  - 'commercial': intercity commercial carrier (Lux Express, GoBus intercity, …)
+   *  Only set for transit legs (mode !== WALK). */
+  tier?: 'city' | 'regional' | 'commercial';
 }
 
 export interface ItineraryFare {

@@ -2052,7 +2052,8 @@ export async function planJourney(
             realTime
             from { name lat lon }
             to   { name lat lon }
-            route { shortName }
+            route { shortName competentAuthority }
+            agency { name }
             legGeometry { points length }
           }
           fares {
@@ -2079,38 +2080,56 @@ export async function planJourney(
 
   const json = await res.json();
   const itineraries: PlanItinerary[] = (json?.data?.plan?.itineraries ?? []).map((it: any): PlanItinerary => {
-    const legs = (it.legs ?? []).map((leg: any) => ({
-      startTime: leg.startTime,
-      endTime: leg.endTime,
-      mode: leg.mode,
-      distance: leg.distance,
-      duration: leg.duration,
-      realTime: leg.realTime ?? false,
-      from: { name: leg.from?.name ?? '', lat: leg.from?.lat, lon: leg.from?.lon },
-      to:   { name: leg.to?.name   ?? '', lat: leg.to?.lat,   lon: leg.to?.lon   },
-      routeShortName: leg.route?.shortName ?? undefined,
-      headsign: undefined,
-      legGeometry: { points: leg.legGeometry?.points ?? '', length: leg.legGeometry?.length ?? 0 },
-    }));
+    const legs = (it.legs ?? []).map((leg: any) => {
+      const agencyName: string | undefined = leg.agency?.name ?? undefined;
+      const competentAuthority: string | undefined = leg.route?.competentAuthority ?? undefined;
+
+      // Classify service tier for buses (rail/tram/ferry have their own styling).
+      //   city      — municipal transit (e.g. "Tallinna linn", "Tartu linn")
+      //   regional  — county-subsidized ("Harjumaa", "Tartumaa", "Pärnumaa", …)
+      //   commercial — intercity commercial ("REM" = state commercial register,
+      //                or missing authority — Lux Express, GoBus intercity, Tpilet, …)
+      let tier: 'city' | 'regional' | 'commercial' | undefined;
+      if (leg.mode === 'BUS' || leg.mode === 'TRAM') {
+        const ca = competentAuthority ?? '';
+        if (/\blinn\b/i.test(ca) || /Tallinna Linnatransport/i.test(agencyName ?? '')) {
+          tier = 'city';
+        } else if (/maa$/i.test(ca.trim())) {
+          tier = 'regional';
+        } else {
+          tier = 'commercial';
+        }
+      }
+
+      return {
+        startTime: leg.startTime,
+        endTime: leg.endTime,
+        mode: leg.mode,
+        distance: leg.distance,
+        duration: leg.duration,
+        realTime: leg.realTime ?? false,
+        from: { name: leg.from?.name ?? '', lat: leg.from?.lat, lon: leg.from?.lon },
+        to:   { name: leg.to?.name   ?? '', lat: leg.to?.lat,   lon: leg.to?.lon   },
+        routeShortName: leg.route?.shortName ?? undefined,
+        headsign: undefined,
+        legGeometry: { points: leg.legGeometry?.points ?? '', length: leg.legGeometry?.length ?? 0 },
+        agencyName,
+        competentAuthority,
+        tier,
+      };
+    });
     const transitLegs = legs.filter((l: any) => l.mode !== 'WALK').length;
 
-    // Parse fares: only trust OTP fare data for Tallinn city routes.
-    // peatus.ee returns partial/incorrect fares for intercity operators (commercial
-    // pricing not in GTFS), so we gate on the Tallinn bounding box: every transit
-    // leg's endpoints must be inside ~Tallinn metro area. Also require a concrete
-    // total (cents >= 0) — we don't trust component-summed estimates outside city.
-    const TLN_MIN_LAT = 59.35, TLN_MAX_LAT = 59.52;
-    const TLN_MIN_LON = 24.55, TLN_MAX_LON = 24.95;
-    const inTallinn = (lat?: number, lon?: number) =>
-      typeof lat === 'number' && typeof lon === 'number' &&
-      lat >= TLN_MIN_LAT && lat <= TLN_MAX_LAT &&
-      lon >= TLN_MIN_LON && lon <= TLN_MAX_LON;
-    const allTransitInTallinn = legs
+    // Parse fares: only trust OTP fare data when every transit leg is a
+    // Tallinn city-tier service. Regional (county-subsidized) and commercial
+    // intercity buses have pricing that OTP can't compute correctly from
+    // GTFS alone.
+    const allTransitCity = legs
       .filter((l: any) => l.mode !== 'WALK')
-      .every((l: any) => inTallinn(l.from.lat, l.from.lon) && inTallinn(l.to.lat, l.to.lon));
+      .every((l: any) => l.tier === 'city');
 
     let fare: PlanItinerary['fare'] = null;
-    if (allTransitInTallinn && transitLegs > 0) {
+    if (allTransitCity && transitLegs > 0) {
       const fares = Array.isArray(it.fares) ? it.fares : [];
       const regular = fares.find((f: any) => f?.type === 'regular') ?? fares[0];
       if (regular && typeof regular.cents === 'number' && regular.cents >= 0) {
