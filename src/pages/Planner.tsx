@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import {
-  MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram,
+  MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram, TrainFront,
   Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon, Route as RouteIcon,
   CalendarDays
 } from 'lucide-react';
@@ -99,6 +99,7 @@ function modeColor(mode: LegMode): string {
 function ModeIcon({ mode, className }: { mode: LegMode; className?: string }) {
   if (mode === 'WALK') return <Footprints className={className} />;
   if (mode === 'TRAM') return <Tram className={className} />;
+  if (mode === 'RAIL') return <TrainFront className={className} />;
   return <Bus className={className} />;
 }
 

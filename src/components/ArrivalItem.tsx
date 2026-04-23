@@ -131,7 +131,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
   }, [expanded, arrival, hasFetched]);
 
   const isCompact = variant === 'compact';
-  const catchInfo = (arrival.status !== 'departed' && stop?.distance !== undefined)
+  const catchInfo = (arrival.status !== 'departed' && stop?.distance !== undefined && liveMinutes < 60)
     ? computeCatchTier(stop.distance, arrival)
     : null;
   const showLastChip = arrival.isLastOfDay && arrival.status !== 'departed' && liveMinutes < 180;
