@@ -40,7 +40,7 @@ export const MiniMap = ({ userLocation, stops, onStopClick }: MiniMapProps) => {
               } else {
                 const currentFilter = map.current.getFilter(layer.id);
                 if (currentFilter) {
-                  map.current.setFilter(layer.id, ['all', currentFilter, ['!=', ['get', 'class'], 'bus']]);
+                  map.current.setFilter(layer.id, ['all', currentFilter, ['!=', ['get', 'class'], 'bus']] as any);
                 } else {
                   map.current.setFilter(layer.id, ['!=', ['get', 'class'], 'bus']);
                 }

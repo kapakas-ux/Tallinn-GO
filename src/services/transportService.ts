@@ -1001,7 +1001,7 @@ export async function fetchVehicleTripStoptimes(vehicle: Vehicle): Promise<TripS
     // Find the active trip by querying the stop nearest the vehicle's current position.
     // We include recently-departed trips (past 30 min) so a bus that just left its last stop
     // is still matched by its realtime departure at that stop.
-    const tripIdsSet = new Set((pattern?.trips || []).map((t: any) => t.gtfsId).filter(Boolean));
+    const tripIdsSet = new Set<string>((pattern?.trips || []).map((t: any) => t.gtfsId as string).filter(Boolean));
 
     if (patternStops.length > 0 && tripIdsSet.size > 0) {
       // Find the pattern stop closest to the vehicle's GPS position

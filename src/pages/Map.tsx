@@ -276,7 +276,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                 } else {
                   const currentFilter = map.current.getFilter(layer.id);
                   if (currentFilter) {
-                    map.current.setFilter(layer.id, ['all', currentFilter, ['!=', ['get', 'class'], 'bus']]);
+                    map.current.setFilter(layer.id, ['all', currentFilter, ['!=', ['get', 'class'], 'bus']] as any);
                   } else {
                     map.current.setFilter(layer.id, ['!=', ['get', 'class'], 'bus']);
                   }
@@ -342,7 +342,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
         
         // Use the previous target as the new start point to avoid jumping
         // or drifting when the map moves.
-        const startPos = prevData ? prevData.target : [vehicle.lng, vehicle.lat];
+        const startPos: [number, number] = prevData ? prevData.target : [vehicle.lng, vehicle.lat];
         
         vehicleInterpolation.current[vehicle.id] = {
           current: startPos,
