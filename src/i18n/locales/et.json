@@ -264,8 +264,8 @@
     "routeStops": "Marsruudi peatused",
     "catchWalk": "Kõnni",
     "catchJog": "Sörgi",
-    "catchSprint": "Sprint",
-    "catchMissed": "Kadunud",
+    "catchSprint": "Sprindi",
+    "catchMissed": "Jäid hiljaks",
     "catchTooltip": "{{minutes}} min varu jalgsi",
     "lastOfDay": "Täna viimane"
   },
