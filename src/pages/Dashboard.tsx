@@ -186,7 +186,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       setLoading(true);
       
       fetchDepartures(nearest.id, nearest.siriId).then(deps => {
-        setDepartures(deps.slice(0, 6));
+        setDepartures(deps.slice(0, 10));
         setLoading(false);
       }).catch(() => {
         setLoading(false);
@@ -278,7 +278,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       // Refresh closest stop
       if (closestStop) {
         fetchDepartures(closestStop.id, closestStop.siriId).then(deps => {
-          setDepartures(deps.slice(0, 6));
+          setDepartures(deps.slice(0, 10));
         }).catch(err => console.error("Failed to refresh closest stop departures", err));
       }
 
