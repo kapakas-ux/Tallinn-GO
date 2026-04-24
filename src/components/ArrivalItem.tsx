@@ -40,21 +40,16 @@ function computeCatchTier(distanceKm: number, arrival: Arrival): { tier: CatchTi
     ? arrival.departureTimeSeconds - Date.now() / 1000
     : arrival.minutes * 60;
   const buffer = secondsUntil - walkSec;
+  // Note: no late-bus bonus here. `secondsUntil` is derived from
+  // `departureTimeSeconds`, which the service layer has already adjusted for
+  // realtime delays (see transportService.computeEtaToStop). Adding a delay
+  // bonus would double-count and falsely promote unreachable stops (e.g. a
+  // 40-min walk with the bus 5 min away) out of "missed".
   let tier: CatchTier;
   if (buffer >= 60) tier = 'walk';
   else if (buffer >= 15) tier = 'jog';
   else if (buffer >= -15) tier = 'sprint';
   else tier = 'missed';
-
-  // Late-bus bonus: if the tracked bus is running ≥2 min late, the user has
-  // that much extra runway. Upgrade the tier accordingly so we don't scare
-  // people with a "MISSED" label when the bus hasn't even arrived at the stop
-  // yet. Never downgrade — only relax.
-  if (tier !== 'walk' && (arrival.delaySeconds ?? 0) >= 120) {
-    if (tier === 'missed') tier = 'sprint';
-    else if (tier === 'sprint') tier = 'jog';
-    else if (tier === 'jog') tier = 'walk';
-  }
   return { tier, bufferSec: buffer };
 }
 
