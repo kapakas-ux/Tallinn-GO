@@ -46,11 +46,12 @@ function computeCatchTier(distanceKm: number, arrival: Arrival): { tier: CatchTi
   else if (buffer >= -15) tier = 'sprint';
   else tier = 'missed';
 
-  // Late-bus bonus: if the tracked bus is running ≥2 min late, the user has
-  // that much extra runway. Upgrade the tier accordingly so we don't scare
-  // people with a "MISSED" label when the bus hasn't even arrived at the stop
-  // yet. Never downgrade — only relax.
-  if (tier !== 'walk' && (arrival.delaySeconds ?? 0) >= 120) {
+  // Late-bus bonus: if the tracked bus is running ≥2 min late, OR the arrival
+  // is marked overdue (schedule passed but we have no GPS yet), the user has
+  // extra runway. Upgrade the tier so we don't scare people with a "MISSED"
+  // label when the bus hasn't even reached the stop. Never downgrade.
+  const isOverdue = arrival.status === 'overdue';
+  if (tier !== 'walk' && ((arrival.delaySeconds ?? 0) >= 120 || isOverdue)) {
     if (tier === 'missed') tier = 'sprint';
     else if (tier === 'sprint') tier = 'jog';
     else if (tier === 'jog') tier = 'walk';
