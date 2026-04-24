@@ -272,7 +272,7 @@
     "catchWalk": "Walk",
     "catchJog": "Jog",
     "catchSprint": "Sprint",
-    "catchMissed": "Will miss",
+    "catchMissed": "Missed",
     "catchTooltip": "{{minutes}} min buffer at walking pace",
     "lastOfDay": "Last today",
     "due": "Due",
