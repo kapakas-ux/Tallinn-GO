@@ -274,7 +274,9 @@
     "catchSprint": "Sprindi",
     "catchMissed": "Jäid hiljaks",
     "catchTooltip": "{{minutes}} min varu jalgsi",
-    "lastOfDay": "Täna viimane"
+    "lastOfDay": "Täna viimane",
+    "due": "Kohe saabumas",
+    "delayedBy": "+{{min}} min hilinenud"
   },
   "alerts": {
     "title": "Aktiivsed teavitused",

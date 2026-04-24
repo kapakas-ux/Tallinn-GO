@@ -274,7 +274,9 @@
     "catchSprint": "Sprint",
     "catchMissed": "Missed",
     "catchTooltip": "{{minutes}} min buffer at walking pace",
-    "lastOfDay": "Last today"
+    "lastOfDay": "Last today",
+    "due": "Due",
+    "delayedBy": "+{{min}} min late"
   },
   "alerts": {
     "title": "Active Alerts",

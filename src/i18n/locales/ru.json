@@ -278,7 +278,9 @@
     "catchSprint": "Спринт",
     "catchMissed": "Упущен",
     "catchTooltip": "Запас {{minutes}} мин пешком",
-    "lastOfDay": "Последний сегодня"
+    "lastOfDay": "Последний сегодня",
+    "due": "Вот-вот",
+    "delayedBy": "+{{min}} мин опоздание"
   },
   "alerts": {
     "title": "Активные уведомления",

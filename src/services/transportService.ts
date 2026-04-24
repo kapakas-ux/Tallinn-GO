@@ -1489,21 +1489,21 @@ export async function getVehicleForArrival(arrival: Arrival, stop?: Stop): Promi
 export async function computeEtaToStop(
   arrival: Arrival,
   stop: Stop
-): Promise<{ etaMinutes: number; source: 'gps' | 'schedule' | 'blended' }> {
+): Promise<{ etaMinutes: number; source: 'gps' | 'schedule' | 'blended'; delaySeconds: number }> {
   const scheduleEta = arrival.minutes; // Fallback: peatus.ee realtime/scheduled minutes
-  
+
   // 1. Try to find the matching vehicle on the map
   const vehicle = await getVehicleForArrival(arrival, stop);
   if (!vehicle) {
-    return { etaMinutes: scheduleEta, source: 'schedule' };
+    return { etaMinutes: scheduleEta, source: 'schedule', delaySeconds: 0 };
   }
-  
+
   // 2. Get the ordered route stops for this vehicle
   const routeStops = await getRouteStopsForVehicle(vehicle, arrival.destination);
   if (routeStops.length === 0) {
-    return { etaMinutes: scheduleEta, source: 'schedule' };
+    return { etaMinutes: scheduleEta, source: 'schedule', delaySeconds: 0 };
   }
-  
+
   // 3. Find the vehicle's closest stop index on the route
   let vehicleClosestIdx = -1;
   let minVehicleDist = Infinity;
@@ -1514,51 +1514,44 @@ export async function computeEtaToStop(
       vehicleClosestIdx = i;
     }
   }
-  
+
   // 4. Find the target stop index on the route
   let targetIdx = routeStops.findIndex(s => s.id === stop.id);
   if (targetIdx === -1) {
     const baseId = stop.id.split('-')[0];
     targetIdx = routeStops.findIndex(s => s.id.split('-')[0] === baseId);
   }
-  
+
   if (vehicleClosestIdx === -1 || targetIdx === -1) {
-    return { etaMinutes: scheduleEta, source: 'schedule' };
+    return { etaMinutes: scheduleEta, source: 'schedule', delaySeconds: 0 };
   }
-  
+
   if (vehicleClosestIdx > targetIdx) {
     // Vehicle has passed the target stop — fall back to schedule.
-    // The schedule will naturally stop showing this departure once
-    // the scheduled time passes, avoiding false "Now" at multiple stops.
-    return { etaMinutes: scheduleEta, source: 'schedule' };
+    return { etaMinutes: scheduleEta, source: 'schedule', delaySeconds: 0 };
   }
-  
+
   if (vehicleClosestIdx === targetIdx) {
     // Vehicle is at the target stop — keep schedule ETA (bus is here or about to depart)
-    return { etaMinutes: scheduleEta, source: 'schedule' };
+    return { etaMinutes: scheduleEta, source: 'schedule', delaySeconds: 0 };
   }
 
   // 4b. If the vehicle is more than 500m from its closest route stop it is
   // almost certainly parked at a depot and not currently in service.
-  // Fall back to schedule so we don't produce fake GPS ETAs at night.
   if (minVehicleDist > 0.5) {
-    return { etaMinutes: scheduleEta, source: 'schedule' };
+    return { etaMinutes: scheduleEta, source: 'schedule', delaySeconds: 0 };
   }
-  
+
   // 5. Compute path distance: vehicle -> closest stop -> ... -> target stop
-  // First leg: vehicle to its closest stop (partial segment)
   let totalDistKm = getDistance(vehicle.lat, vehicle.lng, routeStops[vehicleClosestIdx].lat, routeStops[vehicleClosestIdx].lng);
-  
-  // Middle legs: stop-to-stop along the route
   for (let i = vehicleClosestIdx; i < targetIdx; i++) {
     totalDistKm += getDistance(
       routeStops[i].lat, routeStops[i].lng,
       routeStops[i + 1].lat, routeStops[i + 1].lng
     );
   }
-  
+
   // 6. Estimate speed
-  // Use the vehicle's GPS speed if meaningful, else use type-based defaults
   const AVG_SPEED_KMH: Record<string, number> = {
     tram: 15,
     trolley: 20,
@@ -1566,48 +1559,53 @@ export async function computeEtaToStop(
     regional: 45,
     train: 60,
   };
-  
   const speedKmh = AVG_SPEED_KMH[vehicle.type] ?? 22;
-  
+
   // 7. GPS-derived ETA
   const gpsEtaMinutes = (totalDistKm / speedKmh) * 60;
-
-  // 8. Sanity check: if the GPS ETA differs wildly from the schedule ETA the
-  // matched vehicle almost certainly belongs to a different trip (e.g. it just
-  // finished its previous run and is near the route start, or is a wrong match).
-  // Only trust GPS when it is within a reasonable band around the schedule.
-  //
-  // Special case: if the schedule says >=5 min but GPS says ~0, the bus is
-  // probably still at/near a depot and hasn't started service yet. Fall back.
-  // (Tallinn stops can be <1 min apart, so only distrust big discrepancies.)
-  if (gpsEtaMinutes <= 1 && scheduleEta >= 5) {
-    return { etaMinutes: scheduleEta, source: 'schedule' };
-  }
-  const lowerBound = Math.max(0, scheduleEta - Math.max(5, scheduleEta * 0.5));
-  const upperBound = scheduleEta + Math.max(5, scheduleEta * 0.5);
-  if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
-    return { etaMinutes: scheduleEta, source: 'schedule' };
-  }
-
-  // 9. Blend: how many stops away is the vehicle?
   const stopsAway = targetIdx - vehicleClosestIdx;
-  
-  // Trust GPS more when vehicle is close (1-3 stops away),
-  // blend equally when 4-6 stops, lean on schedule beyond that.
+
+  // 8. Asymmetric sanity window.
+  //   - Lower bound (bus arriving earlier than scheduled) is TIGHT: early arrival
+  //     usually means we matched the wrong trip (a different run of the same line).
+  //   - Upper bound (bus running LATE) is GENEROUS: a real late bus is exactly the
+  //     scenario the user cares about. Allow up to +30 min or +150% over schedule.
+  //
+  // Special case unchanged: GPS ~0 but schedule says the bus is 5+ minutes out →
+  // vehicle is likely at a depot, not en route. Fall back.
+  if (gpsEtaMinutes <= 1 && scheduleEta >= 5) {
+    return { etaMinutes: scheduleEta, source: 'schedule', delaySeconds: 0 };
+  }
+  const lowerBound = Math.max(0, scheduleEta - Math.max(3, scheduleEta * 0.3));
+  const upperBound = scheduleEta + Math.min(30, Math.max(15, scheduleEta * 1.5));
+  if (gpsEtaMinutes < lowerBound || gpsEtaMinutes > upperBound) {
+    return { etaMinutes: scheduleEta, source: 'schedule', delaySeconds: 0 };
+  }
+
+  // 9. Blend. When GPS signals a meaningful delay (> schedule + 2 min) we trust
+  // GPS almost exclusively — the schedule is definitionally out of date at that
+  // point. Otherwise keep the proximity-weighted blend as before.
+  const delayDetected = gpsEtaMinutes > scheduleEta + 2;
   let gpsWeight: number;
-  if (stopsAway <= 2) {
+  if (delayDetected) {
+    gpsWeight = 0.9;
+  } else if (stopsAway <= 2) {
     gpsWeight = 0.85;
   } else if (stopsAway <= 5) {
     gpsWeight = 0.60;
   } else {
     gpsWeight = 0.35;
   }
-  
+
   const blendedEta = gpsWeight * gpsEtaMinutes + (1 - gpsWeight) * scheduleEta;
-  const finalEta = Math.max(1, Math.round(blendedEta));
-  
+
+  // 10. Floor rule: if the tracked vehicle is strictly before the target stop,
+  // never display "Now" — it is physically still on the way.
+  const finalEtaMinutes = Math.max(1, Math.round(blendedEta));
+
+  const delaySeconds = Math.max(0, Math.round((finalEtaMinutes - scheduleEta) * 60));
   const source = gpsWeight >= 0.75 ? 'gps' : 'blended';
-  return { etaMinutes: finalEta, source };
+  return { etaMinutes: finalEtaMinutes, source, delaySeconds };
 }
 
 async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: string, allModes: boolean = false): Promise<Arrival[]> {
@@ -1945,14 +1943,23 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
     if (targetStop) {
       const etaBatch = arrivals.slice(0, 5);
       await Promise.all(etaBatch.map(async (arrival) => {
-        const { etaMinutes, source } = await computeEtaToStop(arrival, targetStop);
-        
+        // Snapshot the original schedule before any GPS adjustment so the
+        // UI can report "+N min late" even after we mutate arrival.minutes.
+        if (arrival.scheduledDepartureSeconds === undefined) {
+          arrival.scheduledDepartureSeconds =
+            arrival.departureTimeSeconds ??
+            Math.floor(Date.now() / 1000) + arrival.minutes * 60;
+        }
+
+        const { etaMinutes, source, delaySeconds } = await computeEtaToStop(arrival, targetStop);
+
         arrival.minutes = etaMinutes;
-        
+
         // Update departureTimeSeconds to match the new GPS-based minutes
         const nowUnixSeconds = Math.floor(Date.now() / 1000);
         arrival.departureTimeSeconds = nowUnixSeconds + (etaMinutes * 60);
-        
+        arrival.delaySeconds = delaySeconds;
+
         if (source === 'gps') {
           arrival.info = 'Live GPS';
           arrival.isRealtime = true;
@@ -1961,6 +1968,22 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
           arrival.isRealtime = true;
         }
       }));
+    }
+
+    // Mark untracked arrivals whose scheduled time has already passed by >90s
+    // as "overdue" so the UI can show "Due" instead of a stale "Now".
+    // Drop arrivals whose schedule passed more than 5 min ago — we have no
+    // real info about where the bus is and the SIRI feed has given up too.
+    const nowSec = Math.floor(Date.now() / 1000);
+    for (const a of arrivals) {
+      if (a.status === 'departed') continue;
+      if (a.isRealtime) continue; // we have GPS/SIRI truth, leave as-is
+      const scheduled = a.scheduledDepartureSeconds ?? a.departureTimeSeconds;
+      if (!scheduled) continue;
+      const overdueSec = nowSec - scheduled;
+      if (overdueSec > 90) {
+        a.status = 'overdue';
+      }
     }
 
     // Re-sort by updated minutes
@@ -1983,7 +2006,18 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
       return true;
     });
 
-    const limited = deduped.slice(0, time === '0' ? 50 : 10);
+    // Drop arrivals whose original schedule passed > 5 min ago and which we
+    // were never able to track (no GPS/SIRI confirmation). At that point the
+    // bus has either long gone or was cancelled — either way we have no data.
+    const trimmed = deduped.filter(a => {
+      if (a.status === 'departed') return true; // SIRI explicitly said departed — leave it for the UI to show
+      if (a.isRealtime) return true;
+      const scheduled = a.scheduledDepartureSeconds ?? a.departureTimeSeconds;
+      if (!scheduled) return true;
+      return (nowSec - scheduled) <= 300; // keep if ≤ 5 min late
+    });
+
+    const limited = trimmed.slice(0, time === '0' ? 50 : 10);
 
     // Annotate "last of day" — best-effort, fire-and-forget cache lookup.
     // Skip when the caller already asked for the full day (time === '0') to avoid recursion.

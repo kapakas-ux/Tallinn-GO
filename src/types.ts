@@ -19,7 +19,7 @@ export interface Arrival {
   minutes: number;
   departureTimeSeconds?: number; // Unix seconds — used to compute live countdown
   time?: string;
-  status: 'on-time' | 'delayed' | 'expected' | 'departed';
+  status: 'on-time' | 'delayed' | 'expected' | 'departed' | 'overdue';
   isRealtime?: boolean;
   info?: string;
   vehicleId?: string;
@@ -27,6 +27,10 @@ export interface Arrival {
   tripId?: string;
   /** True when this is the final departure of this line/destination for today (best-effort). */
   isLastOfDay?: boolean;
+  /** Seconds the bus is running behind its original schedule. Positive = late. */
+  delaySeconds?: number;
+  /** Original scheduled departure as Unix seconds (before any GPS/realtime adjustment). */
+  scheduledDepartureSeconds?: number;
 }
 
 export interface Vehicle {

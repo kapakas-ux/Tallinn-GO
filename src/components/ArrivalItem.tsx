@@ -40,10 +40,22 @@ function computeCatchTier(distanceKm: number, arrival: Arrival): { tier: CatchTi
     ? arrival.departureTimeSeconds - Date.now() / 1000
     : arrival.minutes * 60;
   const buffer = secondsUntil - walkSec;
-  if (buffer >= 60) return { tier: 'walk', bufferSec: buffer };
-  if (buffer >= 15) return { tier: 'jog', bufferSec: buffer };
-  if (buffer >= -15) return { tier: 'sprint', bufferSec: buffer };
-  return { tier: 'missed', bufferSec: buffer };
+  let tier: CatchTier;
+  if (buffer >= 60) tier = 'walk';
+  else if (buffer >= 15) tier = 'jog';
+  else if (buffer >= -15) tier = 'sprint';
+  else tier = 'missed';
+
+  // Late-bus bonus: if the tracked bus is running ≥2 min late, the user has
+  // that much extra runway. Upgrade the tier accordingly so we don't scare
+  // people with a "MISSED" label when the bus hasn't even arrived at the stop
+  // yet. Never downgrade — only relax.
+  if (tier !== 'walk' && (arrival.delaySeconds ?? 0) >= 120) {
+    if (tier === 'missed') tier = 'sprint';
+    else if (tier === 'sprint') tier = 'jog';
+    else if (tier === 'jog') tier = 'walk';
+  }
+  return { tier, bufferSec: buffer };
 }
 
 const CATCH_TIER_STYLES: Record<CatchTier, { emoji: string; labelKey: string; className: string }> = {
@@ -56,8 +68,10 @@ const CATCH_TIER_STYLES: Record<CatchTier, { emoji: string; labelKey: string; cl
 
 /** Compact time label: "Now", "5 min", or "14:35" for >59 min */
 export function CompactTime({ arrival, nowLabel }: { arrival: Arrival; nowLabel: string }) {
+  const { t } = useTranslation();
   const mins = getLiveMinutes(arrival);
   if (arrival.status === 'departed') return <>–</>;
+  if (arrival.status === 'overdue') return <>{t('arrivals.due')}</>;
   if (mins === 0) return <>{nowLabel}</>;
   if (mins >= 60 && arrival.time) return <>{arrival.time}</>;
   return <>{mins}<span className={cn("font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}> min</span></>;
@@ -135,6 +149,10 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
     ? computeCatchTier(stop.distance, arrival)
     : null;
   const showLastChip = arrival.isLastOfDay && arrival.status !== 'departed' && liveMinutes < 180;
+  const delayMinutes = (arrival.delaySeconds ?? 0) >= 120
+    ? Math.round((arrival.delaySeconds ?? 0) / 60)
+    : 0;
+  const showDelayChip = delayMinutes > 0 && arrival.status !== 'departed';
 
   return (
     <div className="flex flex-col gap-2">
@@ -169,7 +187,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                 {(arrival.type === 'regional' ? 'Bus' : arrival.type.charAt(0).toUpperCase() + arrival.type.slice(1))} • {arrival.type === 'regional' ? t('arrivals.regional') : t('arrivals.local')}
               </span>
             )}
-            {(catchInfo || showLastChip) && (
+            {(catchInfo || showLastChip || showDelayChip) && (
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 {catchInfo && (
                   <span
@@ -183,6 +201,12 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
                   >
                     <span aria-hidden>{CATCH_TIER_STYLES[catchInfo.tier].emoji}</span>
                     {t(CATCH_TIER_STYLES[catchInfo.tier].labelKey)}
+                  </span>
+                )}
+                {showDelayChip && (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-label font-bold uppercase tracking-wider bg-amber-500/15 text-amber-600 ring-1 ring-amber-500/30 dark:text-amber-400">
+                    <span aria-hidden>⏱️</span>
+                    {t('arrivals.delayedBy', { min: delayMinutes })}
                   </span>
                 )}
                 {showLastChip && (
@@ -218,7 +242,13 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
               )}
               <div className="flex items-baseline gap-1">
                 <span className={cn("font-headline font-black text-primary flex items-baseline gap-1", isCompact ? "text-lg" : "text-xl")}>
-                  {liveMinutes === 0 ? t('arrivals.now') : (liveMinutes <= 59 ? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></> : (arrival.time ?? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></>))}
+                  {arrival.status === 'overdue'
+                    ? t('arrivals.due')
+                    : liveMinutes === 0
+                      ? t('arrivals.now')
+                      : (liveMinutes <= 59
+                        ? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></>
+                        : (arrival.time ?? <>{liveMinutes}<span className={cn("text-sm font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}>{t('arrivals.min')}</span></>))}
                 </span>
               </div>
               {expandable && (expanded ? <ChevronUp className="w-4 h-4 text-secondary" /> : <ChevronDown className="w-4 h-4 text-secondary" />)}
