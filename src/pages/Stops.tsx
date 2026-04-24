@@ -229,7 +229,8 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
 
   useEffect(() => {
     if (!active) return;
-    const interval = setInterval(() => {
+
+    const refreshAll = () => {
       // Refresh favorites
       if (favorites.length > 0) {
         favorites.forEach(async (fav) => {
@@ -258,9 +259,21 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
           setDepartures(deps);
         }).catch(err => console.error("Failed to refresh selected stop departures", err));
       }
-    }, 10000);
+    };
 
-    return () => clearInterval(interval);
+    const interval = setInterval(refreshAll, 10000);
+
+    // Immediate refresh on app resume / tab visibility so cached
+    // departureTimeSeconds don't render as "Now" until the next tick.
+    const onVisible = () => {
+      if (!document.hidden) refreshAll();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [active, favorites, expandedNearby, selectedStop, allStops]);
 
   const handleSaveEdit = () => {

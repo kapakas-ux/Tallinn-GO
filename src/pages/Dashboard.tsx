@@ -274,7 +274,8 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
   useEffect(() => {
     if (!active) return;
-    const interval = setInterval(() => {
+
+    const refreshAll = () => {
       // Refresh closest stop
       if (closestStop) {
         fetchDepartures(closestStop.id, closestStop.siriId).then(deps => {
@@ -289,7 +290,17 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         }).catch(err => console.error("Failed to refresh nearby departures", err));
       });
 
-      // Refresh expanded favorite
+      // Refresh favorites (which have their own rows in the dashboard)
+      favorites.forEach(fav => {
+        // Skip if this favorite is already covered as the closest or a nearby stop
+        if (closestStop?.id === fav.id) return;
+        if (nearbyStops.some(s => s.id === fav.id)) return;
+        fetchDepartures(fav.id, fav.siriId).then(deps => {
+          setNearbyDepartures(prev => ({ ...prev, [fav.id]: deps.slice(0, 6) }));
+        }).catch(err => console.error("Failed to refresh favorite departures", err));
+      });
+
+      // Refresh expanded favorite (3 rows when expanded)
       if (expandedNearby && !nearbyStops.some(s => s.id === expandedNearby)) {
         const stop = favorites.find(f => f.id === expandedNearby);
         if (stop) {
@@ -298,9 +309,23 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
           }).catch(err => console.error("Failed to refresh favorite departures", err));
         }
       }
-    }, 10000);
+    };
 
-    return () => clearInterval(interval);
+    const interval = setInterval(refreshAll, 10000);
+
+    // Force an immediate refresh whenever the app comes back from the
+    // background. Android WebView pauses setInterval while backgrounded, and
+    // cached departureTimeSeconds are now in the past, so every row would
+    // otherwise render as "Now" until the next interval tick.
+    const onVisible = () => {
+      if (!document.hidden) refreshAll();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [active, closestStop, expandedNearby, allStops, favorites, nearbyStops]);
 
   const handleSaveEdit = () => {
