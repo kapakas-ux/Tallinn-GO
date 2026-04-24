@@ -574,6 +574,7 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
                                   arrival={arr}
                                   stop={stop}
                                   variant="compact"
+                                  userLocation={userLocation}
                                   isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
                                   onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
                                 />
@@ -708,6 +709,7 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
                               stop={stop}
                               variant="compact"
                               expandable={false}
+                              userLocation={userLocation}
                               isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
                               onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
                             />
@@ -847,6 +849,7 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
                       <ArrivalItem
                         arrival={arr}
                         stop={selectedStop}
+                        userLocation={userLocation}
                         onAlertClick={() => setAlertingArrival({ stop: selectedStop, arrival: arr })}
                         isAlertActive={isAlertActive(selectedStop.id, arr.line, arr.minutes)}
                       />

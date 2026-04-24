@@ -452,6 +452,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                             arrival={arr} 
                             stop={stop} 
                             variant="compact"
+                            userLocation={userLocation}
                             isAlertActive={isAlertActive(stop.id, arr.line, arr.minutes)}
                             onAlertClick={() => setAlertingArrival({ stop, arrival: arr })}
                           />
@@ -626,6 +627,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                           arrival={arr}
                           stop={fav}
                           variant="compact"
+                          userLocation={userLocation}
                           isAlertActive={isAlertActive(fav.id, arr.line, arr.minutes)}
                           onAlertClick={() => setAlertingArrival({ stop: fav, arrival: arr })}
                         />
@@ -890,6 +892,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                 <ArrivalItem
                   arrival={arrival}
                   stop={closestStop ?? undefined}
+                  userLocation={userLocation}
                   onAlertClick={closestStop ? () => setAlertingArrival({ stop: closestStop, arrival }) : undefined}
                   isAlertActive={closestStop ? isAlertActive(closestStop.id, arrival.line, arrival.minutes) : false}
                 />

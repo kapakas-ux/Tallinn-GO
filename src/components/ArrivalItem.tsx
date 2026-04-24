@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Arrival, Stop, Vehicle } from '../types';
 import { getRouteStopsForArrival, fetchTripStoptimes, TripStoptime, getVehicleForArrival } from '../services/transportService';
 import { cn, getVehicleColorClass } from '../lib/utils';
+import { getDistance } from '../lib/geo';
 import { CheckCircle2, ChevronDown, ChevronUp, MapPin, Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { VehicleMap } from './VehicleMap';
@@ -14,6 +15,12 @@ interface ArrivalItemProps {
   onAlertClick?: (e: React.MouseEvent) => void;
   isAlertActive?: boolean;
   expandable?: boolean;
+  /**
+   * Current user location. When provided, distance to `stop` is computed
+   * live from this rather than trusting `stop.distance` (which may be stale
+   * if it was persisted with a favorite).
+   */
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 export function getLiveMinutes(arrival: Arrival): number {
@@ -72,7 +79,7 @@ export function CompactTime({ arrival, nowLabel }: { arrival: Arrival; nowLabel:
   return <>{mins}<span className={cn("font-medium", arrival.isRealtime ? "text-emerald-500 animate-pulse" : "text-secondary")}> min</span></>;
 }
 
-export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive, expandable = true }: ArrivalItemProps) {
+export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isAlertActive, expandable = true, userLocation }: ArrivalItemProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [routeStops, setRouteStops] = useState<Stop[]>([]);
@@ -140,8 +147,15 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
   }, [expanded, arrival, hasFetched]);
 
   const isCompact = variant === 'compact';
-  const catchInfo = (arrival.status !== 'departed' && stop?.distance !== undefined && liveMinutes < 60)
-    ? computeCatchTier(stop.distance, arrival)
+  // Prefer a live distance computed from the current user location over any
+  // cached `stop.distance`, which may have been persisted alongside a
+  // favorite (see favoritesService) and is almost certainly stale.
+  const liveDistanceKm = userLocation && stop
+    ? getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng)
+    : undefined;
+  const effectiveDistanceKm = liveDistanceKm ?? stop?.distance;
+  const catchInfo = (arrival.status !== 'departed' && effectiveDistanceKm !== undefined && liveMinutes < 60)
+    ? computeCatchTier(effectiveDistanceKm, arrival)
     : null;
   const showLastChip = arrival.isLastOfDay && arrival.status !== 'departed' && liveMinutes < 180;
   const delayMinutes = (arrival.delaySeconds ?? 0) >= 120

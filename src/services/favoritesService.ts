@@ -15,9 +15,13 @@ export const getFavorites = (): Stop[] => {
 };
 
 export const saveFavorites = (favorites: Stop[]) => {
-  localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  // Strip `distance` before persisting: it is a run-time computed field
+  // relative to the user's current location and would be stale/wrong when
+  // restored on a future session from localStorage.
+  const clean = favorites.map(({ distance: _omit, ...rest }) => rest);
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(clean));
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent<Stop[]>(FAVORITES_CHANGED_EVENT, { detail: favorites }));
+    window.dispatchEvent(new CustomEvent<Stop[]>(FAVORITES_CHANGED_EVENT, { detail: clean }));
   }
 };
 
