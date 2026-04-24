@@ -276,7 +276,7 @@
     "catchWalk": "Идти",
     "catchJog": "Бегом",
     "catchSprint": "Спринт",
-    "catchMissed": "Упущен",
+    "catchMissed": "Не успеете",
     "catchTooltip": "Запас {{minutes}} мин пешком",
     "lastOfDay": "Последний сегодня",
     "due": "Вот-вот",
