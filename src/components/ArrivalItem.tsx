@@ -60,6 +60,13 @@ function computeCatchTier(distanceKm: number, arrival: Arrival): { tier: CatchTi
   else if (buffer >= 15) tier = 'jog';
   else if (buffer >= -15) tier = 'sprint';
   else tier = 'missed';
+  // Only label an arrival as truly "missed" once the bus has actually passed
+  // the stop. Until then it may just be running late (e.g. leaving the depot
+  // a few minutes behind schedule), in which case the user can still catch
+  // it — downgrade to "sprint" to signal urgency without claiming defeat.
+  if (tier === 'missed' && arrival.status !== 'departed') {
+    tier = 'sprint';
+  }
   return { tier, bufferSec: buffer };
 }
 
