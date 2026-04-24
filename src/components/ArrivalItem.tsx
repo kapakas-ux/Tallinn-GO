@@ -38,14 +38,17 @@ type CatchTier = 'walk' | 'jog' | 'sprint' | 'missed';
 
 /** Decide how fast the user would need to move to catch this arrival. */
 function computeCatchTier(distanceKm: number, arrival: Arrival): { tier: CatchTier; bufferSec: number } | null {
-  if (!distanceKm || distanceKm <= 0) return null;
+  if (!distanceKm || distanceKm < 0) return null;
   const distanceM = distanceKm * 1000;
-  // If the stop is practically underfoot, nothing to show.
-  if (distanceM < 30) return null;
-  const walkSec = distanceM / WALK_METERS_PER_SECOND;
   const secondsUntil = arrival.departureTimeSeconds
     ? arrival.departureTimeSeconds - Date.now() / 1000
     : arrival.minutes * 60;
+  // If the user is practically at the stop, always show "walk" — they can
+  // comfortably catch the bus without rushing.
+  if (distanceM < 30) {
+    return { tier: 'walk', bufferSec: secondsUntil };
+  }
+  const walkSec = distanceM / WALK_METERS_PER_SECOND;
   const buffer = secondsUntil - walkSec;
   // Note: no late-bus bonus here. `secondsUntil` is derived from
   // `departureTimeSeconds`, which the service layer has already adjusted for
