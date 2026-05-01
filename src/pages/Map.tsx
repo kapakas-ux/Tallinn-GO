@@ -1348,9 +1348,9 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                       ? "bg-red-500/10 border-red-500/20"
                       : "bg-amber-500/10 border-amber-500/20"
                   )}>
-                    <div className="flex items-center gap-2 mb-1.5">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
                       {alert.routes.length > 0 && (
-                        <div className="flex flex-wrap gap-1 shrink-0">
+                        <div className="flex flex-wrap gap-1 min-w-0">
                           {alert.routes.map((r, i) => (
                             <span key={i} className={cn(
                               "text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none",
