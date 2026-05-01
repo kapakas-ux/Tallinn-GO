@@ -182,7 +182,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
           isCompact ? "py-2" : "p-3 rounded-[20px]",
           !isCompact && arrival.status === 'departed' 
             ? "bg-surface-container-high/30 opacity-60" 
-            : !isCompact ? "bg-surface-container-lowest editorial-shadow hover:translate-x-2" : "hover:bg-surface-container-lowest/50 rounded-lg px-2 -mx-2"
+            : !isCompact ? "bg-surface-container-lowest editorial-shadow active:translate-x-2" : "hover:bg-surface-container-lowest/50 rounded-lg px-2 -mx-2"
         )}
       >
         <div className="flex items-center gap-3">

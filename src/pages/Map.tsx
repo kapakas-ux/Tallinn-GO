@@ -2,15 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
 import { Capacitor } from '@capacitor/core';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes, fetchServiceAlerts } from '../services/transportService';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
-import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
+import { getHome, subscribeHome, type HomeLocation } from '../services/homeService';
 import { decodePolyline } from '../lib/geo';
 import { Stop, Arrival, Vehicle, PlanItinerary, LegMode, ServiceAlert } from '../types';
-import { Bus, Loader2, Navigation, Footprints, Bell, X, Construction, TriangleAlert, Sun, Moon } from 'lucide-react';
+import { Bus, Loader2, Navigation, Footprints, Bell, X, Construction, TriangleAlert, Sun, Moon, Home } from 'lucide-react';
 import { getDistance } from '../lib/geo';
 import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
 import { fetchDarkMapStyle } from '../lib/mapStyles';
@@ -34,6 +34,7 @@ const isValidLngLat = (lng: number, lat: number) => {
 export const Map = ({ active = true }: { active?: boolean }) => {
   const { t } = useTranslation();
   console.log('Map component rendering');
+  const navigate = useNavigate();
   const location = useLocation();
   const mapContainer = useRef(null as HTMLDivElement | null);
   const map = useRef(null as maplibregl.Map | null);
@@ -48,6 +49,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
   const journeySourceIds = useRef<string[]>([]);
   const [loadingDepartures, setLoadingDepartures] = useState(false);
   const [userLocation, setUserLocation] = useState(null as [number, number] | null);
+  const [home, setHome] = useState<HomeLocation | null>(getHome());
   const [isSimulated, setIsSimulated] = useState(false);
   const [locationError, setLocationError] = useState(null as string | null);
   const [pulsatingStopId, setPulsatingStopId] = useState(null as string | null);
@@ -157,6 +159,8 @@ export const Map = ({ active = true }: { active?: boolean }) => {
 
     return cleanup;
   }, [active]);
+
+  useEffect(() => subscribeHome(setHome), []);
 
   // Fly to user location when tab becomes active
   useEffect(() => {
@@ -1189,6 +1193,14 @@ export const Map = ({ active = true }: { active?: boolean }) => {
         title={t('map.locateMe')}
       >
         <Navigation className={`w-5 h-5 ${userLocation ? 'text-blue-600 fill-blue-600' : 'text-primary'}`} />
+      </button>
+
+      <button
+        onClick={() => navigate('/plan?to=home')}
+        className="absolute bottom-[calc(9.5rem+env(safe-area-inset-bottom))] right-4 z-10 bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors"
+        title={t('home.takeMeHome')}
+      >
+        <Home className={`w-5 h-5 ${home ? 'text-primary' : 'text-secondary'}`} />
       </button>
 
       <div ref={mapContainer} className="w-full h-full" />

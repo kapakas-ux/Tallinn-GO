@@ -760,41 +760,6 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       {/* Active Alerts Section */}
       <ActiveAlerts onAlertsChange={() => setScheduledAlerts(getActiveAlerts())} />
 
-      {/* Take me home chip */}
-      {(() => {
-        if (!userLocation) return null;
-        const atHome = home
-          ? getDistance(userLocation.lat, userLocation.lng, home.lat, home.lon) * 1000 < 200
-          : false;
-        if (atHome) return null;
-        return (
-          <section className="mb-6">
-            <button
-              onClick={() => {
-                if (home) {
-                  navigate('/plan?to=home');
-                } else {
-                  setHomePickerOpen(true);
-                }
-              }}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-surface-container-lowest editorial-shadow border border-primary/15 hover:border-primary/30 transition-colors text-left active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                  <Home className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-headline font-black text-sm text-primary">{t('home.takeMeHome')}</p>
-                  <p className="font-label text-[10px] text-secondary uppercase tracking-widest truncate">
-                    {home ? home.label : t('home.tapToSet')}
-                  </p>
-                </div>
-              </div>
-              <Navigation className="w-4 h-4 text-secondary shrink-0" />
-            </button>
-          </section>
-        );
-      })()}
 
       {/* Hero Section: Stop Identity */}
       {/* Daily Fact */}
@@ -869,6 +834,30 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
             )}
           </div>
           <div className="flex gap-2">
+            {closestStop && !isSimulated && (
+              <button
+                onClick={() => {
+                  if (home && userLocation && getDistance(userLocation.lat, userLocation.lng, home.lat, home.lon) * 1000 < 200) return;
+                  if (home) { navigate('/plan?to=home'); } else { setHomePickerOpen(true); }
+                }}
+                className={cn(
+                  "bg-surface-container-lowest editorial-shadow h-12 w-12 rounded-full flex items-center justify-center active:scale-90 transition-all",
+                  home ? "text-primary" : "text-secondary hover:text-primary"
+                )}
+                title={t('home.takeMeHome')}
+              >
+                <Home className="w-5 h-5" />
+              </button>
+            )}
+            {!closestStop && userLocation && !isSimulated && (
+              <button
+                onClick={() => { if (home) { navigate('/plan?to=home'); } else { setHomePickerOpen(true); } }}
+                className="bg-surface-container-lowest editorial-shadow h-12 w-12 rounded-full flex items-center justify-center active:scale-90 transition-all text-secondary hover:text-primary"
+                title={t('home.takeMeHome')}
+              >
+                <Home className="w-5 h-5" />
+              </button>
+            )}
             {closestStop && !isSimulated && (
               <Link
                 to={`/map?lat=${closestStop.lat}&lng=${closestStop.lng}&zoom=20&stopId=${closestStop.id}`}
