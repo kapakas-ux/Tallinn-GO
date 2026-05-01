@@ -8,6 +8,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes, fetchServiceAlerts } from '../services/transportService';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
 import { getHome, subscribeHome, type HomeLocation } from '../services/homeService';
+import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
 import { Stop, Arrival, Vehicle, PlanItinerary, LegMode, ServiceAlert } from '../types';
 import { Bus, Loader2, Navigation, Footprints, Bell, X, Construction, TriangleAlert, Sun, Moon, Home } from 'lucide-react';
