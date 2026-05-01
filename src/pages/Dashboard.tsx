@@ -806,32 +806,6 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                 </>
               ) : t('dashboard.locating')}
             </h2>
-            {closestStop?.distance !== undefined && !isSimulated && (
-              <div className="flex flex-wrap items-center gap-2 pt-1.5">
-                <div className="font-label text-secondary text-[11px] uppercase tracking-wider font-bold whitespace-nowrap">
-                  {formatDistance(closestStop.distance * 1000)}
-                </div>
-                <div className="flex items-center gap-1 px-2 py-0.5 bg-secondary/5 rounded-full border border-secondary/10 whitespace-nowrap">
-                  <Footprints className="w-3 h-3 text-secondary/60" />
-                  <span className="font-label text-secondary text-[10px] uppercase tracking-wider font-bold">
-                    {formatWalkingTime(closestStop.distance * 1000)}
-                  </span>
-                </div>
-                {weather && (
-                  <div className="flex items-center gap-1 px-2 py-0.5 bg-secondary/5 rounded-full border border-secondary/10 whitespace-nowrap">
-                    <span className="text-sm leading-none">{weatherIcon(weather.phenomenon)}</span>
-                    <span className="font-label text-secondary text-[10px] uppercase tracking-wider font-bold">
-                      {Math.round(weather.temperature)}°C
-                    </span>
-                    {weather.windSpeed !== null && (
-                      <span className="font-label text-secondary/50 text-[9px] uppercase tracking-wider font-bold">
-                        {weather.windSpeed} m/s
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
           <div className="flex gap-2">
             {closestStop && !isSimulated && (
@@ -880,6 +854,32 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
             )}
           </div>
         </div>
+        {closestStop?.distance !== undefined && !isSimulated && (
+          <div className="flex items-center gap-1.5 pt-3 flex-nowrap overflow-x-auto no-scrollbar">
+            <div className="font-label text-secondary text-[11px] uppercase tracking-wider font-bold whitespace-nowrap shrink-0">
+              {formatDistance(closestStop.distance * 1000)}
+            </div>
+            <div className="flex items-center gap-1 px-2 py-0.5 bg-secondary/5 rounded-full border border-secondary/10 whitespace-nowrap shrink-0">
+              <Footprints className="w-3 h-3 text-secondary/60" />
+              <span className="font-label text-secondary text-[10px] uppercase tracking-wider font-bold">
+                {formatWalkingTime(closestStop.distance * 1000)}
+              </span>
+            </div>
+            {weather && (
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-secondary/5 rounded-full border border-secondary/10 whitespace-nowrap shrink-0">
+                <span className="text-sm leading-none">{weatherIcon(weather.phenomenon)}</span>
+                <span className="font-label text-secondary text-[10px] uppercase tracking-wider font-bold">
+                  {Math.round(weather.temperature)}°C
+                </span>
+                {weather.windSpeed !== null && (
+                  <span className="font-label text-secondary/50 text-[9px] uppercase tracking-wider font-bold">
+                    {weather.windSpeed} m/s
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Real-Time Arrivals Section */}
