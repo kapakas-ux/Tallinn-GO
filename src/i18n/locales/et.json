@@ -90,6 +90,8 @@
     "location": "Lubage GPS, et näha automaatselt lähimat peatust ja selle reaalajas väljumisi kohe rakenduse avamisel.",
     "plannerTitle": "Reisiplaneerija",
     "planner": "Planeerige oma reis punktist A punkti B! Valige \"Välju kohe\", \"Välju kell\" või \"Saabu kell\" ning valige kuupäev ja kellaaeg, et leida parimad marsruudid samm-sammuliste juhistega.",
+    "takeMeHomeTitle": "Vii mind koju",
+    "takeMeHome": "Salvesta oma koduaadress seadetes ning puuduta avalehel või kaardil kodu ikooni, et kohe planeerida marsruut praegusest asukohast koju.",
     "recentTitle": "Hiljutised otsingud",
     "recent": "Teie viimased 6 reisiotsingut salvestatakse planeerija lehel, et saaksite kiirelt korduvat marsruuti ühe puudutusega uuesti planeerida.",
     "widgetTitle": "Avakuva vidin",

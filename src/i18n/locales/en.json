@@ -90,6 +90,8 @@
     "location": "Enable GPS to automatically see the closest stop and its live departures right when you open the app.",
     "plannerTitle": "Journey Planner",
     "planner": "Plan your trip from A to B! Choose \"Leave now\", \"Leave at\", or \"Arrive by\" and pick a date and time to find the best routes with step-by-step directions.",
+    "takeMeHomeTitle": "Take Me Home",
+    "takeMeHome": "Save your home address in Settings, then tap the home icon on the dashboard or map to instantly plan a route from your current location to home.",
     "recentTitle": "Recent Searches",
     "recent": "Your last 6 journey searches are saved on the planner page so you can quickly re-plan a frequent route with a single tap.",
     "widgetTitle": "Home Screen Widget",

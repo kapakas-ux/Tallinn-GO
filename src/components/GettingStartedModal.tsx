@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Star, Bell, MapPin, Navigation, Clock, Route, History, Smartphone } from 'lucide-react';
+import { X, Star, Bell, MapPin, Navigation, Clock, Route, History, Smartphone, Home } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface GettingStartedModalProps {
@@ -99,6 +99,18 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
                 <h3 className="font-bold text-primary text-base mb-1">{t('gettingStarted.plannerTitle')}</h3>
                 <p>
                   {t('gettingStarted.planner')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="w-10 h-10 rounded-full bg-sky-500/10 flex items-center justify-center shrink-0 mt-1">
+                <Home className="w-5 h-5 text-sky-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-primary text-base mb-1">{t('gettingStarted.takeMeHomeTitle')}</h3>
+                <p>
+                  {t('gettingStarted.takeMeHome')}
                 </p>
               </div>
             </div>
