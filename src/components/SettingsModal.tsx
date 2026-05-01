@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { X, Play, Check } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Play, Check, Home, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ALARM_SOUNDS, getSettings, saveSettings, previewSound, stopPreview } from '../services/settingsService';
 import type { AppTheme } from '../services/settingsService';
+import { getHome, subscribeHome, type HomeLocation } from '../services/homeService';
+import { HomeAddressPicker } from './HomeAddressPicker';
 
 interface Props { onClose: () => void; }
 
@@ -20,6 +22,10 @@ export const SettingsModal = ({ onClose }: Props) => {
   const [showFact, setShowFact] = useState(getSettings().showDailyFact);
   const [showFavoritesFirst, setShowFavoritesFirst] = useState(getSettings().showFavoritesFirst);
   const [activeTheme, setActiveTheme] = useState<AppTheme>(getSettings().theme);
+  const [home, setHome] = useState<HomeLocation | null>(getHome());
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => subscribeHome(setHome), []);
 
   const handleSelect = (id: string) => {
     setSelectedSound(id);
@@ -156,6 +162,25 @@ export const SettingsModal = ({ onClose }: Props) => {
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showFavoritesFirst ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
+
+          {/* Home address */}
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-black/8 bg-black/4 hover:bg-black/8 transition-colors text-left"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <Home className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-headline font-bold text-sm text-primary">{t('settings.homeAddress')}</p>
+                <p className="font-label text-[10px] text-secondary mt-0.5 truncate">
+                  {home ? home.label : t('settings.homeAddressUnset')}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-secondary shrink-0" />
+          </button>
         </div>
 
         {/* Footer */}
@@ -165,6 +190,7 @@ export const SettingsModal = ({ onClose }: Props) => {
           </button>
         </div>
       </div>
+      {pickerOpen && <HomeAddressPicker onClose={() => setPickerOpen(false)} />}
     </div>
   );
 };

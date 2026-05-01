@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon } from 'lucide-react';
+import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleColorClass } from '../lib/utils';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
 import { getFavorites, isFavorite, subscribeFavorites, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
 import { watchLocation } from '../services/locationService';
@@ -17,9 +17,12 @@ import { AnimatePresence } from 'motion/react';
 import { getDailyFact, dismissDailyFact } from '../services/dailyFactService';
 import { getSettings } from '../services/settingsService';
 import { getWeatherForLocation, weatherIcon, WeatherData } from '../services/weatherService';
+import { getHome, subscribeHome, type HomeLocation } from '../services/homeService';
+import { HomeAddressPicker } from '../components/HomeAddressPicker';
 
 export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [closestStop, setClosestStop] = useState(null as Stop | null);
   const [nearbyStops, setNearbyStops] = useState([] as Stop[]);
   const [userLocation, setUserLocation] = useState(null as { lat: number; lng: number } | null);
@@ -31,6 +34,8 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const dailyFact = getDailyFact();
   const [factDismissed, setFactDismissed] = useState(dailyFact.dismissed);
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [home, setHome] = useState<HomeLocation | null>(getHome());
+  const [homePickerOpen, setHomePickerOpen] = useState(false);
   
   const [expandedNearby, setExpandedNearby] = useState(null as string | null);
   const [nearbyDepartures, setNearbyDepartures] = useState({} as { [key: string]: Arrival[] });
@@ -96,6 +101,8 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => subscribeHome(setHome), []);
 
   // Auto-fetch departures for favorite stops
   useEffect(() => {
@@ -753,6 +760,42 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       {/* Active Alerts Section */}
       <ActiveAlerts onAlertsChange={() => setScheduledAlerts(getActiveAlerts())} />
 
+      {/* Take me home chip */}
+      {(() => {
+        if (!userLocation) return null;
+        const atHome = home
+          ? getDistance(userLocation.lat, userLocation.lng, home.lat, home.lon) * 1000 < 200
+          : false;
+        if (atHome) return null;
+        return (
+          <section className="mb-6">
+            <button
+              onClick={() => {
+                if (home) {
+                  navigate('/plan?to=home');
+                } else {
+                  setHomePickerOpen(true);
+                }
+              }}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-surface-container-lowest editorial-shadow border border-primary/15 hover:border-primary/30 transition-colors text-left active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                  <Home className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-headline font-black text-sm text-primary">{t('home.takeMeHome')}</p>
+                  <p className="font-label text-[10px] text-secondary uppercase tracking-widest truncate">
+                    {home ? home.label : t('home.tapToSet')}
+                  </p>
+                </div>
+              </div>
+              <Navigation className="w-4 h-4 text-secondary shrink-0" />
+            </button>
+          </section>
+        );
+      })()}
+
       {/* Hero Section: Stop Identity */}
       {/* Daily Fact */}
       {getSettings().showDailyFact && !factDismissed && (
@@ -925,6 +968,12 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         </>
       )}
 
+      {homePickerOpen && (
+        <HomeAddressPicker
+          onClose={() => setHomePickerOpen(false)}
+          onSaved={() => navigate('/plan?to=home')}
+        />
+      )}
     </div>
   );
 };

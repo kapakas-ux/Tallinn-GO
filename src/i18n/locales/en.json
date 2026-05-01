@@ -112,7 +112,24 @@
     "dailyFact": "Daily Transit Fact",
     "dailyFactDesc": "Show a fun fact on the dashboard each day",
     "showFavoritesFirst": "Show Favorites First",
-    "showFavoritesFirstDesc": "Display favorites above nearby stops"
+    "showFavoritesFirstDesc": "Display favorites above nearby stops",
+    "homeAddress": "Home address",
+    "homeAddressUnset": "Tap to set"
+  },
+  "home": {
+    "takeMeHome": "Take me home",
+    "tapToSet": "Tap to set your home address",
+    "pickerTitle": "Set home address",
+    "pickerSubtitle": "Used by Take me home",
+    "searchPlaceholder": "Search address or stop",
+    "quickPicks": "Quick picks",
+    "useCurrent": "Use current location",
+    "useCurrentDesc": "Save my current GPS position",
+    "waitingForGps": "Waiting for GPS…",
+    "fromFavorites": "From favorites",
+    "currentHome": "Current home",
+    "clear": "Clear",
+    "currentLocation": "My location"
   },
   "dashboard": {
     "closestStop": "Closest stop",

@@ -112,7 +112,24 @@
     "dailyFact": "Ежедневный транспортный факт",
     "dailyFactDesc": "Показывать интересный факт на главной странице каждый день",
     "showFavoritesFirst": "Показывать избранное первым",
-    "showFavoritesFirstDesc": "Отображать избранное над ближайшими остановками"
+    "showFavoritesFirstDesc": "Отображать избранное над ближайшими остановками",
+    "homeAddress": "Домашний адрес",
+    "homeAddressUnset": "Нажмите, чтобы задать"
+  },
+  "home": {
+    "takeMeHome": "Отвези меня домой",
+    "tapToSet": "Нажмите, чтобы задать домашний адрес",
+    "pickerTitle": "Задать домашний адрес",
+    "pickerSubtitle": "Используется функцией «Отвези меня домой»",
+    "searchPlaceholder": "Поиск адреса или остановки",
+    "quickPicks": "Быстрый выбор",
+    "useCurrent": "Использовать текущее местоположение",
+    "useCurrentDesc": "Сохранить мою текущую GPS-позицию",
+    "waitingForGps": "Ожидание GPS…",
+    "fromFavorites": "Из избранного",
+    "currentHome": "Текущий дом",
+    "clear": "Очистить",
+    "currentLocation": "Моё местоположение"
   },
   "dashboard": {
     "closestStop": "Ближайшая остановка",

@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import maplibregl from 'maplibre-gl';
 import {
   MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram, TrainFront, Ship,
@@ -12,6 +12,7 @@ import { fetchStops, planJourney } from '../services/transportService';
 import { watchLocation } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
 import { darknessOverlapMs } from '../services/sunTimesService';
+import { getHome } from '../services/homeService';
 import type { Stop, PlanItinerary, LegMode } from '../types';
 
 // ─── geocoding ──────────────────────────────────────────────────
@@ -461,6 +462,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
 export const Planner = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [from, setFrom] = useState(t('planner.currentLocation'));
   const [to, setTo] = useState('');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -611,6 +613,29 @@ export const Planner = () => {
     sessionStorage.setItem('planner_journey', JSON.stringify(itinerary));
     navigate('/map?journey=1');
   };
+
+  // Auto-plan "take me home" when invoked from Dashboard with ?to=home.
+  // Waits until both stops and a usable user location are available, then
+  // pre-fills the To field with the saved home and triggers the search once.
+  const homeAutoPlanned = useRef(false);
+  useEffect(() => {
+    if (homeAutoPlanned.current) return;
+    if (searchParams.get('to') !== 'home') return;
+    const home = getHome();
+    if (!home) {
+      // No home configured — drop the flag and let the user enter manually.
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    if (!userCoords || stops.length === 0) return; // wait for prerequisites
+    homeAutoPlanned.current = true;
+    setTo(home.label);
+    selectedToPlace.current = { name: home.label, address: home.label, lat: home.lat, lon: home.lon };
+    selectedToStop.current = null;
+    setSearchParams({}, { replace: true });
+    findRoutes(t('planner.currentLocation'), home.label);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, userCoords, stops]);
 
   return (
     <div className="max-w-2xl mx-auto px-4 pb-8 pt-4" ref={containerRef}>

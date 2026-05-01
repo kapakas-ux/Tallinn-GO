@@ -112,7 +112,24 @@
     "dailyFact": "Igapäevane transpordifakt",
     "dailyFactDesc": "Näita lõbusat fakti avalehel iga päev",
     "showFavoritesFirst": "Näita lemmikuid esimesena",
-    "showFavoritesFirstDesc": "Kuva lemmikud lähedalasuvate peatuste kohal"
+    "showFavoritesFirstDesc": "Kuva lemmikud lähedalasuvate peatuste kohal",
+    "homeAddress": "Koduaadress",
+    "homeAddressUnset": "Vajuta määramiseks"
+  },
+  "home": {
+    "takeMeHome": "Vii mind koju",
+    "tapToSet": "Vajuta, et määrata oma koduaadress",
+    "pickerTitle": "Määra koduaadress",
+    "pickerSubtitle": "Kasutab \"Vii mind koju\"",
+    "searchPlaceholder": "Otsi aadressi või peatust",
+    "quickPicks": "Kiirvalikud",
+    "useCurrent": "Kasuta praegust asukohta",
+    "useCurrentDesc": "Salvesta minu praegune GPS-asukoht",
+    "waitingForGps": "Ootan GPS-i…",
+    "fromFavorites": "Lemmikutest",
+    "currentHome": "Praegune kodu",
+    "clear": "Kustuta",
+    "currentLocation": "Minu asukoht"
   },
   "dashboard": {
     "closestStop": "Lähim peatus",
