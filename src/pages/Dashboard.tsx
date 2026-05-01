@@ -788,7 +788,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
               {t('dashboard.closestStop')}
             </div>
             <div className={cn(
-              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-widest mb-1 max-w-fit",
+              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider mb-1 max-w-fit whitespace-nowrap",
               !userLocation ? "bg-blue-50 border-blue-100 text-blue-600 animate-pulse" : (isSimulated ? "bg-error/10 border-error/20 text-error" : "bg-blue-50 border-blue-100 text-blue-600")
             )}>
               <Navigation className={cn("w-2.5 h-2.5 shrink-0", userLocation && "fill-current")} />
