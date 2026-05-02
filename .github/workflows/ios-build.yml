@@ -117,16 +117,13 @@ jobs:
             <key>teamID</key>
             <string>${{ secrets.IOS_TEAM_ID }}</string>
             <key>signingStyle</key>
-            <string>manual</string>
-            <key>signingCertificate</key>
-            <string>Apple Distribution</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>${{ secrets.IOS_BUNDLE_ID }}</key>
-              <string>GO NOW</string>
-            </dict>
+            <string>automatic</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
             <key>uploadSymbols</key>
             <true/>
+            <key>compileBitcode</key>
+            <false/>
           </dict>
           </plist>
           EOF
@@ -134,7 +131,8 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/App.xcarchive \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/export
+            -exportPath $RUNNER_TEMP/export \
+            -allowProvisioningUpdates
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
