@@ -219,6 +219,9 @@ jobs:
           # Location permission
           /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'GO NOW uses your location to find the nearest stops and show relevant transit information.'" "$PLIST" 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :NSLocationWhenInUseUsageDescription 'GO NOW uses your location to find the nearest stops and show relevant transit information.'" "$PLIST"
+          # Export compliance: app only uses standard HTTPS / iOS-provided encryption -> exempt
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" "$PLIST"
 
       - name: Install Apple certificate and provisioning profile
         if: env.BUILD_CERTIFICATE_BASE64 != ''
