@@ -13,6 +13,8 @@
     "cap:sync": "npx cap sync",
     "cap:open:android": "npx cap open android",
     "build:android": "npm run build && npx cap sync",
+    "cap:open:ios": "npx cap open ios",
+    "build:ios": "npm run build && npx cap sync ios",
     "generate-assets": "npx @capacitor/assets generate"
   },
   "dependencies": {
