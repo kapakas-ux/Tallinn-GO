@@ -97,6 +97,11 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           echo -n "$APPSTORE_API_KEY_BASE64" | base64 --decode -o ~/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8
 
+      - name: Bump build number
+        run: |
+          cd ios/App
+          /usr/bin/agvtool new-version -all ${{ github.run_number }}
+
       - name: Archive iOS app
         env:
           IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
