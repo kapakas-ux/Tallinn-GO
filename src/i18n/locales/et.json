@@ -119,6 +119,7 @@
     "homeAddressUnset": "Vajuta määramiseks"
   },
   "home": {
+    "home": "Kodu",
     "takeMeHome": "Vii mind koju",
     "tapToSet": "Vajuta, et määrata oma koduaadress",
     "pickerTitle": "Määra koduaadress",

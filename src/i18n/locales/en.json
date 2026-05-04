@@ -119,6 +119,7 @@
     "homeAddressUnset": "Tap to set"
   },
   "home": {
+    "home": "Home",
     "takeMeHome": "Take me home",
     "tapToSet": "Tap to set your home address",
     "pickerTitle": "Set home address",
