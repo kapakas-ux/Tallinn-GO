@@ -64,10 +64,31 @@ export const HomeAddressPicker = ({ onClose, onSaved }: Props) => {
   const [favorites] = useState<Stop[]>(() => getFavorites());
   const existingHome = getHome();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [viewportHeight, setViewportHeight] = useState<number>(
+    typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 0
+  );
+  const [viewportOffsetTop, setViewportOffsetTop] = useState<number>(
+    typeof window !== 'undefined' ? (window.visualViewport?.offsetTop ?? 0) : 0
+  );
 
   useEffect(() => {
     inputRef.current?.focus();
     const cleanup = watchLocation((loc) => setUserCoords(loc));
+    const vv = window.visualViewport;
+    if (vv) {
+      const update = () => {
+        setViewportHeight(vv.height);
+        setViewportOffsetTop(vv.offsetTop);
+      };
+      vv.addEventListener('resize', update);
+      vv.addEventListener('scroll', update);
+      update();
+      return () => {
+        cleanup();
+        vv.removeEventListener('resize', update);
+        vv.removeEventListener('scroll', update);
+      };
+    }
     return cleanup;
   }, []);
 
@@ -120,11 +141,13 @@ export const HomeAddressPicker = ({ onClose, onSaved }: Props) => {
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-x-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      style={{ top: viewportOffsetTop, height: viewportHeight }}
       onClick={onClose}
     >
       <div
-        className="settings-panel w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] border border-outline-variant/10"
+        className="settings-panel w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-outline-variant/10"
+        style={{ maxHeight: `calc(${viewportHeight}px - 2rem)` }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
