@@ -75,7 +75,109 @@ function classifyPlace(p: any): PlaceKind | null {
 
 let geocodeTimer: ReturnType<typeof setTimeout> | null = null;
 
-async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
+/**
+ * Stop descriptions (e.g. "Saaremaa", "Harjumaa, Lasnamäe") are pre-baked in
+ * Estonian. Re-render the standalone county names in the active UI language.
+ */
+const COUNTY_ET_TO_EN: Record<string, string> = {
+  'Harjumaa': 'Harju County',
+  'Tartumaa': 'Tartu County',
+  'Pärnumaa': 'Pärnu County',
+  'Virumaa': 'Viru County',
+  'Ida-Virumaa': 'Ida-Viru County',
+  'Lääne-Virumaa': 'Lääne-Viru County',
+  'Viljandimaa': 'Viljandi County',
+  'Raplamaa': 'Rapla County',
+  'Saaremaa': 'Saare County',
+  'Jõgevamaa': 'Jõgeva County',
+  'Järvamaa': 'Järva County',
+  'Valgamaa': 'Valga County',
+  'Põlvamaa': 'Põlva County',
+  'Läänemaa': 'Lääne County',
+  'Hiiumaa': 'Hiiu County',
+  'Võrumaa': 'Võru County',
+};
+const COUNTY_ET_TO_RU: Record<string, string> = {
+  'Harjumaa': 'Харьюмаа',
+  'Tartumaa': 'Тартумаа',
+  'Pärnumaa': 'Пярнумаа',
+  'Virumaa': 'Вирумаа',
+  'Ida-Virumaa': 'Ида-Вирумаа',
+  'Lääne-Virumaa': 'Ляэне-Вирумаа',
+  'Viljandimaa': 'Вильяндимаа',
+  'Raplamaa': 'Рапламаа',
+  'Saaremaa': 'Сааремаа',
+  'Jõgevamaa': 'Йыгевамаа',
+  'Järvamaa': 'Ярвамаа',
+  'Valgamaa': 'Валгамаа',
+  'Põlvamaa': 'Пылвамаа',
+  'Läänemaa': 'Ляэнемаа',
+  'Hiiumaa': 'Хийумаа',
+  'Võrumaa': 'Вырумаа',
+};
+
+function localiseStopDesc(desc: string | undefined, uiLang: string): string {
+  if (!desc) return '';
+  const l = uiLang.toLowerCase().split('-')[0];
+  if (l === 'et') return desc;
+  const map = l === 'ru' ? COUNTY_ET_TO_RU : COUNTY_ET_TO_EN;
+  return desc
+    .split(',')
+    .map(part => {
+      const key = part.trim();
+      return map[key] ?? part;
+    })
+    .join(', ');
+}
+
+/**
+ * Photon supports `lang=de|en|fr|it`. It does NOT have an Estonian/Russian
+ * mode, so for those locales we ask for the localised OSM name (which is in
+ * Estonian for Estonian places) by passing `lang=default`. We also re-render
+ * common county / parish suffixes ourselves so output reads natural in each
+ * UI language (e.g. "Saare County" → "Saare maakond" in ET).
+ */
+function photonLang(uiLang: string): string {
+  const l = uiLang.toLowerCase().split('-')[0];
+  if (l === 'en' || l === 'de' || l === 'fr' || l === 'it') return l;
+  return 'default'; // returns name in local language (et)
+}
+
+function localiseAdmin(s: string | undefined, uiLang: string): string {
+  if (!s) return '';
+  const l = uiLang.toLowerCase().split('-')[0];
+  let out = s;
+  if (l === 'et') {
+    out = out
+      .replace(/\bCounty\b/g, 'maakond')
+      .replace(/\bParish\b/g, 'vald')
+      .replace(/\bRural Municipality\b/gi, 'vald')
+      .replace(/\bMunicipality\b/g, 'vald')
+      .replace(/\bCity\b/g, 'linn');
+  } else if (l === 'ru') {
+    out = out
+      .replace(/\bCounty\b/g, 'уезд')
+      .replace(/\bParish\b/g, 'волость')
+      .replace(/\bRural Municipality\b/gi, 'волость')
+      .replace(/\bMunicipality\b/g, 'волость')
+      .replace(/\bCity\b/g, 'город')
+      // Also localise the existing Estonian suffixes that come back via lang=default
+      .replace(/\bmaakond\b/gi, 'уезд')
+      .replace(/\bvald\b/gi, 'волость')
+      .replace(/\bosavald\b/gi, 'район')
+      .replace(/\blinn\b/gi, 'город');
+  } else {
+    // English: turn Estonian suffixes that may arrive via lang=default into English
+    out = out
+      .replace(/\bmaakond\b/gi, 'County')
+      .replace(/\bvald\b/gi, 'Parish')
+      .replace(/\bosavald\b/gi, 'District')
+      .replace(/\blinn\b/gi, 'City');
+  }
+  return out;
+}
+
+async function geocodeAddress(query: string, uiLang = 'en'): Promise<GeocodedPlace[]> {
   if (query.length < 3) return [];
   try {
     const params = new URLSearchParams({
@@ -84,6 +186,7 @@ async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
       lon: '24.745',
       zoom: '12',
       limit: '15',
+      lang: photonLang(uiLang),
     });
     const res = await fetch(`https://photon.komoot.io/api/?${params}`);
     const data = await res.json();
@@ -99,18 +202,22 @@ async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
       const isLocality = kind === 'city' || kind === 'town' || kind === 'village' || kind === 'suburb' || kind === 'place';
       let name: string;
       let address: string;
+      const county = localiseAdmin(p.county, uiLang);
+      const state = localiseAdmin(p.state, uiLang);
+      const district = localiseAdmin(p.district, uiLang);
       if (isLocality) {
         name = p.name || query;
-        address = [p.county, p.state].filter(Boolean).join(', ');
+        // Show parish/district before county for cities/towns/villages.
+        address = [district, county, state].filter(Boolean).join(', ');
       } else if (kind === 'house') {
         // Estonian convention: "Street Number" (e.g. "Õismäe tee 74")
         const street = p.street || p.name || '';
         name = (p.housenumber && street) ? `${street} ${p.housenumber}` : (p.name || street || query);
-        address = [p.city, p.county].filter(Boolean).join(', ');
+        address = [p.city, district, county].filter(Boolean).join(', ');
       } else {
         // street
         name = p.name || p.street || query;
-        address = [p.city, p.county].filter(Boolean).join(', ');
+        address = [p.city, district, county].filter(Boolean).join(', ');
       }
       places.push({
         name,
@@ -571,7 +678,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
 // â”€â”€â”€ main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const Planner = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -659,7 +766,7 @@ export const Planner = () => {
       // Geocode addresses in parallel (debounced)
       if (geocodeTimer) clearTimeout(geocodeTimer);
       geocodeTimer = setTimeout(async () => {
-        const places = await geocodeAddress(query);
+        const places = await geocodeAddress(query, i18n.language);
         setAddressSuggestions(places);
       }, 400);
     } else {
@@ -718,11 +825,11 @@ export const Planner = () => {
     let toCoords = resolveCoords(searchTo, 'to');
     // Auto-geocode typed text that didn't match any stop
     if (!fromCoords && searchFrom !== t('planner.currentLocation')) {
-      const places = await geocodeAddress(searchFrom);
+      const places = await geocodeAddress(searchFrom, i18n.language);
       if (places.length) { fromCoords = { lat: places[0].lat, lon: places[0].lon }; selectedFromPlace.current = places[0]; }
     }
     if (!toCoords) {
-      const places = await geocodeAddress(searchTo);
+      const places = await geocodeAddress(searchTo, i18n.language);
       if (places.length) { toCoords = { lat: places[0].lat, lon: places[0].lon }; selectedToPlace.current = places[0]; }
     }
     if (!fromCoords) { setError(searchFrom === t('planner.currentLocation') ? t('planner.waitingGps') : t('planner.stopNotFound', { name: searchFrom })); return; }
@@ -901,7 +1008,7 @@ export const Planner = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-headline font-bold text-on-surface text-sm truncate">{stop.name}</p>
                     <p className="text-[9px] font-label text-secondary truncate mt-0.5">
-                      {[stop.desc, stop.siriId ? `#${stop.siriId}` : null]
+                      {[localiseStopDesc(stop.desc, i18n.language), stop.siriId ? `#${stop.siriId}` : null]
                         .filter(Boolean).join(' \u00b7 ') || t('planner.stop')}
                     </p>
                   </div>
