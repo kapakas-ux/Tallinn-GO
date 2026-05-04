@@ -153,6 +153,7 @@ function localiseAdmin(s: string | undefined, uiLang: string): string {
       .replace(/\bParish\b/g, 'vald')
       .replace(/\bRural Municipality\b/gi, 'vald')
       .replace(/\bMunicipality\b/g, 'vald')
+      .replace(/\bVillage\b/g, 'küla')
       .replace(/\bCity\b/g, 'linn');
   } else if (l === 'ru') {
     out = out
@@ -160,11 +161,13 @@ function localiseAdmin(s: string | undefined, uiLang: string): string {
       .replace(/\bParish\b/g, 'волость')
       .replace(/\bRural Municipality\b/gi, 'волость')
       .replace(/\bMunicipality\b/g, 'волость')
+      .replace(/\bVillage\b/g, 'деревня')
       .replace(/\bCity\b/g, 'город')
       // Also localise the existing Estonian suffixes that come back via lang=default
       .replace(/\bmaakond\b/gi, 'уезд')
       .replace(/\bvald\b/gi, 'волость')
       .replace(/\bosavald\b/gi, 'район')
+      .replace(/\bküla\b/gi, 'деревня')
       .replace(/\blinn\b/gi, 'город');
   } else {
     // English: turn Estonian suffixes that may arrive via lang=default into English
@@ -172,6 +175,7 @@ function localiseAdmin(s: string | undefined, uiLang: string): string {
       .replace(/\bmaakond\b/gi, 'County')
       .replace(/\bvald\b/gi, 'Parish')
       .replace(/\bosavald\b/gi, 'District')
+      .replace(/\bküla\b/gi, 'Village')
       .replace(/\blinn\b/gi, 'City');
   }
   return out;
@@ -205,6 +209,7 @@ async function geocodeAddress(query: string, uiLang = 'en'): Promise<GeocodedPla
       const county = localiseAdmin(p.county, uiLang);
       const state = localiseAdmin(p.state, uiLang);
       const district = localiseAdmin(p.district, uiLang);
+      const city = localiseAdmin(p.city, uiLang);
       if (isLocality) {
         name = p.name || query;
         // Show parish/district before county for cities/towns/villages.
@@ -213,11 +218,11 @@ async function geocodeAddress(query: string, uiLang = 'en'): Promise<GeocodedPla
         // Estonian convention: "Street Number" (e.g. "Õismäe tee 74")
         const street = p.street || p.name || '';
         name = (p.housenumber && street) ? `${street} ${p.housenumber}` : (p.name || street || query);
-        address = [p.city, district, county].filter(Boolean).join(', ');
+        address = [city, district, county].filter(Boolean).join(', ');
       } else {
         // street
         name = p.name || p.street || query;
-        address = [p.city, district, county].filter(Boolean).join(', ');
+        address = [city, district, county].filter(Boolean).join(', ');
       }
       places.push({
         name,
