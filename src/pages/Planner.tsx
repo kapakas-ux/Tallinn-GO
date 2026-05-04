@@ -903,7 +903,7 @@ export const Planner = () => {
                 onChange={e => handleSearch(e.target.value, 'from')}
                 onFocus={() => {
                   setActiveInput('from');
-                  if (from === t('planner.currentLocation')) { setFrom(''); setSuggestions(stops.slice(0, 6)); }
+                  if (from === t('planner.currentLocation')) { setFrom(''); setSuggestions([]); setAddressSuggestions([]); }
                   else handleSearch(from, 'from');
                 }}
                 placeholder={t('planner.fromPlaceholder')}
@@ -944,7 +944,28 @@ export const Planner = () => {
           </div>
 
           {/* Autocomplete dropdown */}
-          {activeInput && (suggestions.length > 0 || addressSuggestions.length > 0 || activeInput === 'from') && (
+          {activeInput && (() => {
+            const inputValue = activeInput === 'from' ? from : to;
+            const isEmpty =
+              suggestions.length === 0 && addressSuggestions.length === 0 &&
+              (!inputValue || inputValue === t('planner.currentLocation'));
+            // Build empty-state quick picks: home + recent destinations
+            const home = getHome();
+            const recents = isEmpty
+              ? searchHistory
+                  .map(h => activeInput === 'from' ? h.from : h.to)
+                  .filter(v => v && v !== t('planner.currentLocation') && v !== 'Current Location')
+                  .filter((v, i, arr) => arr.indexOf(v) === i)
+                  .slice(0, 5)
+              : [];
+            const showQuickPicks = isEmpty && (home || recents.length > 0);
+            const showDropdown =
+              suggestions.length > 0 ||
+              addressSuggestions.length > 0 ||
+              activeInput === 'from' ||
+              showQuickPicks;
+            if (!showDropdown) return null;
+            return (
             <div className="dropdown-popover absolute left-0 right-0 top-full mt-2 rounded-[16px] shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
               {activeInput === 'from' && from !== t('planner.currentLocation') && (
                 <button
@@ -963,6 +984,57 @@ export const Planner = () => {
                     </p>
                   </div>
                 </button>
+              )}
+              {/* Empty-state quick picks: Home + recent destinations */}
+              {isEmpty && home && (
+                <button
+                  onClick={() => {
+                    if (activeInput === 'from') {
+                      setFrom(home.label);
+                      selectedFromPlace.current = { name: home.label, address: home.label, lat: home.lat, lon: home.lon, kind: 'house' };
+                      selectedFromStop.current = null;
+                    } else {
+                      setTo(home.label);
+                      selectedToPlace.current = { name: home.label, address: home.label, lat: home.lat, lon: home.lon, kind: 'house' };
+                      selectedToStop.current = null;
+                    }
+                    setActiveInput(null); setSuggestions([]); setAddressSuggestions([]);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10"
+                >
+                  <div className="bg-sky-500/10 p-2 rounded-full shrink-0">
+                    <HomeIcon className="w-4 h-4 text-sky-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-headline font-bold text-on-surface text-sm truncate">{t('home.home', { defaultValue: 'Home' })}</p>
+                    <p className="text-[9px] font-label text-secondary truncate mt-0.5">{home.label}</p>
+                  </div>
+                </button>
+              )}
+              {isEmpty && recents.length > 0 && (
+                <>
+                  <div className="px-4 py-1.5 border-t border-outline-variant/10">
+                    <p className="text-[8px] font-label font-bold uppercase tracking-widest text-secondary/60">{t('planner.recentSearches', { defaultValue: 'Recent' })}</p>
+                  </div>
+                  {recents.map((label, idx) => (
+                    <button
+                      key={`recent-${idx}`}
+                      onClick={() => {
+                        if (activeInput === 'from') { setFrom(label); selectedFromStop.current = null; selectedFromPlace.current = null; }
+                        else { setTo(label); selectedToStop.current = null; selectedToPlace.current = null; }
+                        setActiveInput(null); setSuggestions([]); setAddressSuggestions([]);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10 last:border-0"
+                    >
+                      <div className="bg-surface-container-high p-2 rounded-full shrink-0">
+                        <Clock className="w-4 h-4 text-secondary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-headline font-bold text-on-surface text-sm truncate">{label}</p>
+                      </div>
+                    </button>
+                  ))}
+                </>
               )}
               {/* Address suggestions from geocoding (shown first) */}
               {addressSuggestions.map((place, idx) => {
@@ -1025,7 +1097,8 @@ export const Planner = () => {
                 </button>
               ))}
             </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Time chooser */}
