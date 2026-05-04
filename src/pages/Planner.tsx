@@ -30,17 +30,43 @@ const KIND_RANK: Record<PlaceKind, number> = {
   city: 0, town: 1, village: 2, suburb: 3, place: 4, street: 5, house: 6,
 };
 
-function classifyPlace(p: any): PlaceKind {
-  const v = String(p.osm_value ?? '').toLowerCase();
-  const t = String(p.type ?? '').toLowerCase();
-  if (v === 'city' || t === 'city') return 'city';
-  if (v === 'town' || t === 'town') return 'town';
-  if (v === 'village' || v === 'hamlet' || t === 'village') return 'village';
-  if (v === 'suburb' || v === 'neighbourhood' || v === 'borough' || v === 'quarter') return 'suburb';
-  if (t === 'house' || p.housenumber) return 'house';
-  if (p.street && !p.name) return 'street';
-  if (v === 'locality' || t === 'locality') return 'place';
-  return 'place';
+/**
+ * Classify a Photon feature. Returns null when it's not a useful place
+ * (e.g. an administrative boundary like "Elva vald" / "Tallinna linn").
+ */
+function classifyPlace(p: any): PlaceKind | null {
+  const key = String(p.osm_key ?? '').toLowerCase();
+  const val = String(p.osm_value ?? '').toLowerCase();
+  const typ = String(p.type ?? '').toLowerCase();
+
+  // Administrative boundaries (vald, linn-as-municipality, county, region, etc.)
+  // are NOT settlements. Drop them entirely so we don't show "Elva vald" as a city.
+  if (key === 'boundary') return null;
+  if (val === 'administrative' || val === 'region' || val === 'county' || val === 'municipality' || val === 'state') return null;
+
+  // Real settlements (osm_key=place)
+  if (key === 'place') {
+    if (val === 'city') return 'city';
+    if (val === 'town') return 'town';
+    if (val === 'village' || val === 'hamlet' || val === 'isolated_dwelling') return 'village';
+    if (val === 'suburb' || val === 'neighbourhood' || val === 'borough' || val === 'quarter') return 'suburb';
+    if (val === 'locality') return 'place';
+    return 'place';
+  }
+
+  // Streets / addresses
+  if (key === 'highway' || (p.street && !p.housenumber)) return 'street';
+  if (typ === 'house' || p.housenumber) return 'house';
+
+  // Type-only fallback (older Photon responses)
+  if (typ === 'city') return 'city';
+  if (typ === 'town') return 'town';
+  if (typ === 'village') return 'village';
+  if (typ === 'locality') return 'place';
+
+  // Anything else (POIs, amenities, etc.) — skip; we want planner destinations,
+  // not random shops named "Elva".
+  return null;
 }
 
 let geocodeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -53,46 +79,47 @@ async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
       lat: '59.437',
       lon: '24.745',
       zoom: '12',
-      limit: '12',
+      limit: '15',
     });
     const res = await fetch(`https://photon.komoot.io/api/?${params}`);
     const data = await res.json();
     if (!data.features) return [];
-    const places: GeocodedPlace[] = data.features
-      .filter((f: any) => {
-        // Only keep results in/near Estonia (lat ~57-60, lon ~21-28)
-        const [lon, lat] = f.geometry.coordinates;
-        return lat >= 57 && lat <= 60.5 && lon >= 21 && lon <= 28.5;
-      })
-      .map((f: any) => {
-        const p = f.properties;
-        const kind = classifyPlace(p);
-        // For cities/towns/villages prefer the place name itself; for streets/houses use street.
-        const isLocality = kind === 'city' || kind === 'town' || kind === 'village' || kind === 'suburb' || kind === 'place';
-        const name = isLocality ? (p.name || p.city || p.county || query) : (p.name || p.street || query);
-        const addrParts = isLocality
-          ? [p.county, p.state].filter(Boolean)
-          : [p.housenumber, p.street, p.city || p.county].filter(Boolean);
-        return {
-          name,
-          address: addrParts.join(', ') || p.label || '',
-          lat: f.geometry.coordinates[1],
-          lon: f.geometry.coordinates[0],
-          kind,
-        };
+    const places: GeocodedPlace[] = [];
+    for (const f of data.features) {
+      const [lon, lat] = f.geometry.coordinates;
+      // Restrict to Estonia
+      if (lat < 57 || lat > 60.5 || lon < 21 || lon > 28.5) continue;
+      const p = f.properties;
+      const kind = classifyPlace(p);
+      if (!kind) continue;
+      const isLocality = kind === 'city' || kind === 'town' || kind === 'village' || kind === 'suburb' || kind === 'place';
+      const name = isLocality ? (p.name || query) : (p.name || p.street || query);
+      const addrParts = isLocality
+        ? [p.county, p.state].filter(Boolean)
+        : [p.housenumber, p.street, p.city || p.county].filter(Boolean);
+      places.push({
+        name,
+        address: addrParts.join(', ') || '',
+        lat,
+        lon,
+        kind,
       });
-    // Sort cities/towns/villages first, then suburbs, then streets, then houses.
-    // De-duplicate by (kind+name+rounded coords) so we don't get the same town twice.
-    const seen = new Set<string>();
-    const sorted = places
-      .sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind])
-      .filter(p => {
-        const key = `${p.kind}|${p.name.toLowerCase()}|${p.lat.toFixed(3)}|${p.lon.toFixed(3)}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    return sorted.slice(0, 8);
+    }
+    // Sort cities/towns/villages first.
+    places.sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind]);
+    // Dedupe: when the same name appears within ~3 km, keep only the best-ranked one
+    // (so Elva-the-city wins over Elva-the-place).
+    const kept: GeocodedPlace[] = [];
+    for (const p of places) {
+      const dup = kept.find(k =>
+        k.name.toLowerCase() === p.name.toLowerCase() &&
+        Math.abs(k.lat - p.lat) < 0.04 &&
+        Math.abs(k.lon - p.lon) < 0.06
+      );
+      if (dup) continue; // already have a better-ranked entry with the same name nearby
+      kept.push(p);
+    }
+    return kept.slice(0, 8);
   } catch {
     return [];
   }

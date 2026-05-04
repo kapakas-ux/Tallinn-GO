@@ -8,6 +8,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes, fetchServiceAlerts } from '../services/transportService';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
 import { getHome, subscribeHome, type HomeLocation } from '../services/homeService';
+import { HomeAddressPicker } from '../components/HomeAddressPicker';
 import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
 import { Stop, Arrival, Vehicle, PlanItinerary, LegMode, ServiceAlert } from '../types';
@@ -51,6 +52,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
   const [loadingDepartures, setLoadingDepartures] = useState(false);
   const [userLocation, setUserLocation] = useState(null as [number, number] | null);
   const [home, setHome] = useState<HomeLocation | null>(getHome());
+  const [homePickerOpen, setHomePickerOpen] = useState(false);
   const [isSimulated, setIsSimulated] = useState(false);
   const [locationError, setLocationError] = useState(null as string | null);
   const [pulsatingStopId, setPulsatingStopId] = useState(null as string | null);
@@ -1197,12 +1199,22 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       </button>
 
       <button
-        onClick={() => navigate('/plan?to=home')}
+        onClick={() => {
+          if (getHome()) navigate('/plan?to=home');
+          else setHomePickerOpen(true);
+        }}
         className="absolute bottom-[calc(9.5rem+env(safe-area-inset-bottom))] right-4 z-10 bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors"
         title={t('home.takeMeHome')}
       >
         <Home className={`w-5 h-5 ${home ? 'text-primary' : 'text-secondary'}`} />
       </button>
+
+      {homePickerOpen && (
+        <HomeAddressPicker
+          onClose={() => setHomePickerOpen(false)}
+          onSaved={() => { setHomePickerOpen(false); navigate('/plan?to=home'); }}
+        />
+      )}
 
       <div ref={mapContainer} className="w-full h-full" />
       
