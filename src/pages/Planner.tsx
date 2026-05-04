@@ -50,8 +50,12 @@ function classifyPlace(p: any): PlaceKind | null {
     if (val === 'town') return 'town';
     if (val === 'village' || val === 'hamlet' || val === 'isolated_dwelling') return 'village';
     if (val === 'suburb' || val === 'neighbourhood' || val === 'borough' || val === 'quarter') return 'suburb';
+    if (val === 'house') return 'house';
     if (val === 'locality') return 'place';
-    return 'place';
+    // Anything else under place=* (square, island, farm, plot, …) is not a
+    // useful planner destination — drop it so we don't show duplicates of a
+    // real street result with the same name.
+    return null;
   }
 
   // Streets / addresses
@@ -93,13 +97,24 @@ async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
       const kind = classifyPlace(p);
       if (!kind) continue;
       const isLocality = kind === 'city' || kind === 'town' || kind === 'village' || kind === 'suburb' || kind === 'place';
-      const name = isLocality ? (p.name || query) : (p.name || p.street || query);
-      const addrParts = isLocality
-        ? [p.county, p.state].filter(Boolean)
-        : [p.housenumber, p.street, p.city || p.county].filter(Boolean);
+      let name: string;
+      let address: string;
+      if (isLocality) {
+        name = p.name || query;
+        address = [p.county, p.state].filter(Boolean).join(', ');
+      } else if (kind === 'house') {
+        // Estonian convention: "Street Number" (e.g. "Õismäe tee 74")
+        const street = p.street || p.name || '';
+        name = (p.housenumber && street) ? `${street} ${p.housenumber}` : (p.name || street || query);
+        address = [p.city, p.county].filter(Boolean).join(', ');
+      } else {
+        // street
+        name = p.name || p.street || query;
+        address = [p.city, p.county].filter(Boolean).join(', ');
+      }
       places.push({
         name,
-        address: addrParts.join(', ') || '',
+        address,
         lat,
         lon,
         kind,
@@ -107,16 +122,21 @@ async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
     }
     // Sort cities/towns/villages first.
     places.sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind]);
-    // Dedupe: when the same name appears within ~3 km, keep only the best-ranked one
-    // (so Elva-the-city wins over Elva-the-place).
+    // Dedupe by coordinates (~100 m): two results pointing at the same spot
+    // are the same address. Keep the better-ranked one (cities beat streets,
+    // streets beat houses). Also dedupe by exact name match within ~3 km so
+    // we don't get "Elva (city)" and "Elva (place)" duplicates.
     const kept: GeocodedPlace[] = [];
     for (const p of places) {
-      const dup = kept.find(k =>
-        k.name.toLowerCase() === p.name.toLowerCase() &&
-        Math.abs(k.lat - p.lat) < 0.04 &&
-        Math.abs(k.lon - p.lon) < 0.06
-      );
-      if (dup) continue; // already have a better-ranked entry with the same name nearby
+      const dup = kept.find(k => {
+        const sameSpot = Math.abs(k.lat - p.lat) < 0.001 && Math.abs(k.lon - p.lon) < 0.0015;
+        const sameNameNearby =
+          k.name.toLowerCase() === p.name.toLowerCase() &&
+          Math.abs(k.lat - p.lat) < 0.04 &&
+          Math.abs(k.lon - p.lon) < 0.06;
+        return sameSpot || sameNameNearby;
+      });
+      if (dup) continue;
       kept.push(p);
     }
     return kept.slice(0, 8);
@@ -658,7 +678,10 @@ export const Planner = () => {
   };
 
   const selectPlace = (place: GeocodedPlace) => {
-    const label = place.address || place.name;
+    // Always show the readable name (e.g. "Õismäe tee 74" or "Elva") in
+    // the input field. Falling back to address would put "Harju County" there,
+    // which is confusing.
+    const label = place.name || place.address;
     if (activeInput === 'from') { setFrom(label); selectedFromPlace.current = place; selectedFromStop.current = null; }
     else { setTo(label); selectedToPlace.current = place; selectedToStop.current = null; }
     setActiveInput(null);
