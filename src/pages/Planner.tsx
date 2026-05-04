@@ -857,6 +857,38 @@ export const Planner = () => {
                   </div>
                 </button>
               )}
+              {/* Address suggestions from geocoding (shown first) */}
+              {addressSuggestions.map((place, idx) => {
+                const isCity = place.kind === 'city' || place.kind === 'town' || place.kind === 'village' || place.kind === 'suburb' || place.kind === 'place';
+                return (
+                  <button
+                    key={`addr-${idx}`}
+                    onClick={() => selectPlace(place)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10 last:border-0"
+                  >
+                    <div className={cn('p-2 rounded-full shrink-0', isCity ? 'bg-amber-500/10' : 'bg-emerald-500/10')}>
+                      {isCity
+                        ? <Building2 className="w-4 h-4 text-amber-500" />
+                        : <Search className="w-4 h-4 text-emerald-600" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-headline font-bold text-on-surface text-sm truncate">{place.name}</p>
+                      <p className="text-[9px] font-label text-secondary truncate mt-0.5">{place.address || t(`planner.placeKind.${place.kind}`, { defaultValue: '' })}</p>
+                    </div>
+                    {isCity && (
+                      <span className="text-[8px] font-label font-bold uppercase px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 shrink-0">
+                        {t(`planner.placeKind.${place.kind}`, { defaultValue: place.kind })}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              {/* Stop suggestions */}
+              {suggestions.length > 0 && addressSuggestions.length > 0 && (
+                <div className="px-4 py-1.5 border-t border-outline-variant/10">
+                  <p className="text-[8px] font-label font-bold uppercase tracking-widest text-secondary/60">{t('planner.stops', { defaultValue: 'Stops' })}</p>
+                </div>
+              )}
               {suggestions.map(stop => (
                 <button
                   key={stop.id}
@@ -885,40 +917,6 @@ export const Planner = () => {
                   )}
                 </button>
               ))}
-              {/* Address suggestions from geocoding */}
-              {addressSuggestions.length > 0 && (
-                <>
-                  {suggestions.length > 0 && (
-                    <div className="px-4 py-1.5 border-t border-outline-variant/10">
-                      <p className="text-[8px] font-label font-bold uppercase tracking-widest text-secondary/60">{t('planner.addresses')}</p>
-                    </div>
-                  )}
-                  {addressSuggestions.map((place, idx) => {
-                    const isCity = place.kind === 'city' || place.kind === 'town' || place.kind === 'village' || place.kind === 'suburb' || place.kind === 'place';
-                    return (
-                    <button
-                      key={`addr-${idx}`}
-                      onClick={() => selectPlace(place)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10 last:border-0"
-                    >
-                      <div className={cn('p-2 rounded-full shrink-0', isCity ? 'bg-amber-500/10' : 'bg-emerald-500/10')}>
-                        {isCity
-                          ? <Building2 className="w-4 h-4 text-amber-500" />
-                          : <Search className="w-4 h-4 text-emerald-600" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-headline font-bold text-on-surface text-sm truncate">{place.name}</p>
-                        <p className="text-[9px] font-label text-secondary truncate mt-0.5">{place.address || t(`planner.placeKind.${place.kind}`, { defaultValue: '' })}</p>
-                      </div>
-                      {isCity && (
-                        <span className="text-[8px] font-label font-bold uppercase px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 shrink-0">
-                          {t(`planner.placeKind.${place.kind}`, { defaultValue: place.kind })}
-                        </span>
-                      )}
-                    </button>
-                  );})}
-                </>
-              )}
             </div>
           )}
         </div>
