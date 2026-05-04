@@ -132,7 +132,7 @@
     "fromFavorites": "Из избранного",
     "currentHome": "Текущий дом",
     "clear": "Очистить",
-    "currentLocation": "Моё местоположение"
+    "currentLocation": "GPS-позиция дома"
   },
   "dashboard": {
     "closestStop": "Ближайшая остановка",

@@ -132,7 +132,7 @@
     "fromFavorites": "Lemmikutest",
     "currentHome": "Praegune kodu",
     "clear": "Kustuta",
-    "currentLocation": "Minu asukoht"
+    "currentLocation": "Kodu GPS-asukoht"
   },
   "dashboard": {
     "closestStop": "Lähim peatus",

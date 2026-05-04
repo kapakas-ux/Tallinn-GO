@@ -132,7 +132,7 @@
     "fromFavorites": "From favorites",
     "currentHome": "Current home",
     "clear": "Clear",
-    "currentLocation": "My location"
+    "currentLocation": "Home GPS position"
   },
   "dashboard": {
     "closestStop": "Closest stop",
