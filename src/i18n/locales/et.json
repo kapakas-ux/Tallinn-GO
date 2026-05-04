@@ -272,6 +272,24 @@
     "regionalBus": "Maakonnaliin",
     "regionalBusTag": "MAAK",
     "regionalBusHint": "Maakondlik liinivedu",
+    "closeResults": "Sulge tulemused",
+    "modeShort": {
+      "bus": "BUSS",
+      "tram": "TRAMM",
+      "trolley": "TROLL",
+      "train": "RONG",
+      "ferry": "PRAAM",
+      "regional": "MAAK"
+    },
+    "placeKind": {
+      "city": "Linn",
+      "town": "Linn",
+      "village": "Küla",
+      "suburb": "Linnaosa",
+      "street": "Tänav",
+      "house": "Aadress",
+      "place": "Koht"
+    },
     "origin": "Alguspunkt",
     "departure": "Väljumine",
     "destination": "Sihtkoht",

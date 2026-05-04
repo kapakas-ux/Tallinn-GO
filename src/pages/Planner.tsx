@@ -5,7 +5,7 @@ import maplibregl from 'maplibre-gl';
 import {
   MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram, TrainFront, Ship,
   Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon, Route as RouteIcon,
-  CalendarDays
+  CalendarDays, Building2, Home as HomeIcon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { fetchStops, planJourney } from '../services/transportService';
@@ -16,11 +16,31 @@ import { getHome } from '../services/homeService';
 import type { Stop, PlanItinerary, LegMode } from '../types';
 
 // ─── geocoding ──────────────────────────────────────────────────
+type PlaceKind = 'city' | 'town' | 'village' | 'suburb' | 'street' | 'house' | 'place';
+
 interface GeocodedPlace {
   name: string;
   address: string;
   lat: number;
   lon: number;
+  kind: PlaceKind;
+}
+
+const KIND_RANK: Record<PlaceKind, number> = {
+  city: 0, town: 1, village: 2, suburb: 3, place: 4, street: 5, house: 6,
+};
+
+function classifyPlace(p: any): PlaceKind {
+  const v = String(p.osm_value ?? '').toLowerCase();
+  const t = String(p.type ?? '').toLowerCase();
+  if (v === 'city' || t === 'city') return 'city';
+  if (v === 'town' || t === 'town') return 'town';
+  if (v === 'village' || v === 'hamlet' || t === 'village') return 'village';
+  if (v === 'suburb' || v === 'neighbourhood' || v === 'borough' || v === 'quarter') return 'suburb';
+  if (t === 'house' || p.housenumber) return 'house';
+  if (p.street && !p.name) return 'street';
+  if (v === 'locality' || t === 'locality') return 'place';
+  return 'place';
 }
 
 let geocodeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -32,13 +52,13 @@ async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
       q: query,
       lat: '59.437',
       lon: '24.745',
-      zoom: '14',
-      limit: '5',
+      zoom: '12',
+      limit: '12',
     });
     const res = await fetch(`https://photon.komoot.io/api/?${params}`);
     const data = await res.json();
     if (!data.features) return [];
-    return data.features
+    const places: GeocodedPlace[] = data.features
       .filter((f: any) => {
         // Only keep results in/near Estonia (lat ~57-60, lon ~21-28)
         const [lon, lat] = f.geometry.coordinates;
@@ -46,15 +66,33 @@ async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
       })
       .map((f: any) => {
         const p = f.properties;
-        const name = p.name || p.street || query;
-        const parts = [p.housenumber, p.street, p.city || p.county].filter(Boolean);
+        const kind = classifyPlace(p);
+        // For cities/towns/villages prefer the place name itself; for streets/houses use street.
+        const isLocality = kind === 'city' || kind === 'town' || kind === 'village' || kind === 'suburb' || kind === 'place';
+        const name = isLocality ? (p.name || p.city || p.county || query) : (p.name || p.street || query);
+        const addrParts = isLocality
+          ? [p.county, p.state].filter(Boolean)
+          : [p.housenumber, p.street, p.city || p.county].filter(Boolean);
         return {
           name,
-          address: parts.join(', ') || p.label || '',
+          address: addrParts.join(', ') || p.label || '',
           lat: f.geometry.coordinates[1],
           lon: f.geometry.coordinates[0],
+          kind,
         };
       });
+    // Sort cities/towns/villages first, then suburbs, then streets, then houses.
+    // De-duplicate by (kind+name+rounded coords) so we don't get the same town twice.
+    const seen = new Set<string>();
+    const sorted = places
+      .sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind])
+      .filter(p => {
+        const key = `${p.kind}|${p.name.toLowerCase()}|${p.lat.toFixed(3)}|${p.lon.toFixed(3)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    return sorted.slice(0, 8);
   } catch {
     return [];
   }
@@ -72,6 +110,32 @@ function saveSearch(from: string, to: string) {
   const history = getSearchHistory().filter(h => !(h.from === from && h.to === to));
   history.unshift({ from, to, timestamp: Date.now() });
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
+}
+
+// ─── persistent planner state (survives navigation) ──────────────
+const PLANNER_STATE_KEY = 'planner_state_v1';
+interface PersistedPlannerState {
+  from: string;
+  to: string;
+  itineraries: PlanItinerary[];
+  expandedIndex: number | null;
+  fromStop: Stop | null;
+  toStop: Stop | null;
+  fromPlace: GeocodedPlace | null;
+  toPlace: GeocodedPlace | null;
+}
+function loadPlannerState(): PersistedPlannerState | null {
+  try {
+    const raw = sessionStorage.getItem(PLANNER_STATE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PersistedPlannerState;
+  } catch { return null; }
+}
+function savePlannerState(s: PersistedPlannerState) {
+  try { sessionStorage.setItem(PLANNER_STATE_KEY, JSON.stringify(s)); } catch { /* ignore */ }
+}
+function clearPlannerState() {
+  try { sessionStorage.removeItem(PLANNER_STATE_KEY); } catch { /* ignore */ }
 }
 
 // â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -463,8 +527,13 @@ export const Planner = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [from, setFrom] = useState(t('planner.currentLocation'));
-  const [to, setTo] = useState('');
+
+  // Hydrate from sessionStorage so search results & inputs survive navigation
+  // (e.g. tapping "View on Map" then returning via the bottom nav).
+  const persisted = useRef<PersistedPlannerState | null>(loadPlannerState());
+
+  const [from, setFrom] = useState(persisted.current?.from ?? t('planner.currentLocation'));
+  const [to, setTo] = useState(persisted.current?.to ?? '');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isSimulated, setIsSimulated] = useState(false);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -472,8 +541,8 @@ export const Planner = () => {
   const [activeInput, setActiveInput] = useState<'from' | 'to' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [itineraries, setItineraries] = useState<PlanItinerary[]>([]);
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [itineraries, setItineraries] = useState<PlanItinerary[]>(persisted.current?.itineraries ?? []);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(persisted.current?.expandedIndex ?? null);
   const [searchHistory, setSearchHistory] = useState<SearchEntry[]>(() => getSearchHistory());
 
   // Time chooser state
@@ -491,11 +560,11 @@ export const Planner = () => {
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Track the exact selected stop objects to avoid ambiguity when names collide
-  const selectedFromStop = useRef<Stop | null>(null);
-  const selectedToStop = useRef<Stop | null>(null);
+  const selectedFromStop = useRef<Stop | null>(persisted.current?.fromStop ?? null);
+  const selectedToStop = useRef<Stop | null>(persisted.current?.toStop ?? null);
   // Track geocoded address selections
-  const selectedFromPlace = useRef<GeocodedPlace | null>(null);
-  const selectedToPlace = useRef<GeocodedPlace | null>(null);
+  const selectedFromPlace = useRef<GeocodedPlace | null>(persisted.current?.fromPlace ?? null);
+  const selectedToPlace = useRef<GeocodedPlace | null>(persisted.current?.toPlace ?? null);
   const [addressSuggestions, setAddressSuggestions] = useState<GeocodedPlace[]>([]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -514,6 +583,25 @@ export const Planner = () => {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Persist results so they survive navigation; clear when closed.
+  useEffect(() => {
+    if (itineraries.length > 0) {
+      savePlannerState({
+        from, to, itineraries, expandedIndex,
+        fromStop: selectedFromStop.current,
+        toStop: selectedToStop.current,
+        fromPlace: selectedFromPlace.current,
+        toPlace: selectedToPlace.current,
+      });
+    }
+  }, [itineraries, expandedIndex, from, to]);
+
+  const closeResults = () => {
+    setItineraries([]);
+    setExpandedIndex(null);
+    clearPlannerState();
+  };
 
   const handleSearch = (query: string, type: 'from' | 'to') => {
     if (type === 'from') { setFrom(query); selectedFromStop.current = null; selectedFromPlace.current = null; }
@@ -740,7 +828,7 @@ export const Planner = () => {
                       {stop.modes.slice(0, 2).map(m => (
                         <span key={m} className="text-[8px] font-label font-bold uppercase px-1.5 py-0.5 rounded-full"
                           style={{ backgroundColor: m === 'tram' ? '#DC143C22' : '#00357122', color: m === 'tram' ? '#DC143C' : '#6BA3E0' }}>
-                          {m === 'regional' ? 'reg' : m}
+                          {t(`planner.modeShort.${m}`, { defaultValue: m === 'regional' ? 'reg' : m })}
                         </span>
                       ))}
                     </div>
@@ -755,21 +843,30 @@ export const Planner = () => {
                       <p className="text-[8px] font-label font-bold uppercase tracking-widest text-secondary/60">{t('planner.addresses')}</p>
                     </div>
                   )}
-                  {addressSuggestions.map((place, idx) => (
+                  {addressSuggestions.map((place, idx) => {
+                    const isCity = place.kind === 'city' || place.kind === 'town' || place.kind === 'village' || place.kind === 'suburb' || place.kind === 'place';
+                    return (
                     <button
                       key={`addr-${idx}`}
                       onClick={() => selectPlace(place)}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-outline-variant/10 last:border-0"
                     >
-                      <div className="bg-emerald-500/10 p-2 rounded-full shrink-0">
-                        <Search className="w-4 h-4 text-emerald-600" />
+                      <div className={cn('p-2 rounded-full shrink-0', isCity ? 'bg-amber-500/10' : 'bg-emerald-500/10')}>
+                        {isCity
+                          ? <Building2 className="w-4 h-4 text-amber-500" />
+                          : <Search className="w-4 h-4 text-emerald-600" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-headline font-bold text-on-surface text-sm truncate">{place.name}</p>
-                        <p className="text-[9px] font-label text-secondary truncate mt-0.5">{place.address}</p>
+                        <p className="text-[9px] font-label text-secondary truncate mt-0.5">{place.address || t(`planner.placeKind.${place.kind}`, { defaultValue: '' })}</p>
                       </div>
+                      {isCity && (
+                        <span className="text-[8px] font-label font-bold uppercase px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 shrink-0">
+                          {t(`planner.placeKind.${place.kind}`, { defaultValue: place.kind })}
+                        </span>
+                      )}
                     </button>
-                  ))}
+                  );})}
                 </>
               )}
             </div>
@@ -987,6 +1084,14 @@ export const Planner = () => {
             <h2 className="font-label font-bold text-[10px] uppercase tracking-widest text-secondary">
               {t('planner.routeFound', { count: itineraries.length })}
             </h2>
+            <button
+              type="button"
+              onClick={closeResults}
+              aria-label={t('planner.closeResults', { defaultValue: 'Close results' })}
+              className="ml-auto p-1.5 rounded-full hover:bg-white/5 text-secondary hover:text-on-surface transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
           {itineraries.map((it, i) => (
             <ItineraryCard

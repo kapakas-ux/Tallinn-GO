@@ -276,6 +276,24 @@
     "regionalBus": "Уездная линия",
     "regionalBusTag": "УЕЗД",
     "regionalBusHint": "Уездный субсидируемый рейс",
+    "closeResults": "Закрыть результаты",
+    "modeShort": {
+      "bus": "АВТ",
+      "tram": "ТРАМ",
+      "trolley": "ТРОЛ",
+      "train": "ПОЕЗД",
+      "ferry": "ПАРОМ",
+      "regional": "УЕЗД"
+    },
+    "placeKind": {
+      "city": "Город",
+      "town": "Город",
+      "village": "Деревня",
+      "suburb": "Район",
+      "street": "Улица",
+      "house": "Адрес",
+      "place": "Место"
+    },
     "origin": "Начало",
     "departure": "Отправление",
     "destination": "Направление",

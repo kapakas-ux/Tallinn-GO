@@ -272,6 +272,24 @@
     "regionalBus": "Regional bus",
     "regionalBusTag": "REG",
     "regionalBusHint": "County-subsidised regional service",
+    "closeResults": "Close results",
+    "modeShort": {
+      "bus": "BUS",
+      "tram": "TRAM",
+      "trolley": "TROL",
+      "train": "TRAIN",
+      "ferry": "FERRY",
+      "regional": "REG"
+    },
+    "placeKind": {
+      "city": "City",
+      "town": "Town",
+      "village": "Village",
+      "suburb": "District",
+      "street": "Street",
+      "house": "Address",
+      "place": "Place"
+    },
     "origin": "Origin",
     "departure": "Departure",
     "destination": "Destination",
