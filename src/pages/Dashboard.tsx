@@ -813,7 +813,6 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
             {closestStop && !isSimulated && (
               <button
                 onClick={() => {
-                  if (home && userLocation && getDistance(userLocation.lat, userLocation.lng, home.lat, home.lon) * 1000 < 200) return;
                   if (home) { navigate('/plan?to=home'); } else { setHomePickerOpen(true); }
                 }}
                 className={cn(
