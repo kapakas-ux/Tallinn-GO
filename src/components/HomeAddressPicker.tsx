@@ -35,8 +35,13 @@ async function geocodeAddress(query: string): Promise<GeocodedPlace[]> {
       })
       .map((f: any) => {
         const p = f.properties;
-        const name = p.name || p.street || query;
-        const parts = [p.housenumber, p.street, p.city || p.county].filter(Boolean);
+        // Prefer "Street Number" as the primary label so the house number
+        // is shown prominently (e.g. "Õismäe tee 74").
+        const street = p.street || p.name || '';
+        const name = (p.housenumber && street)
+          ? `${street} ${p.housenumber}`
+          : (p.name || street || query);
+        const parts = [p.city, p.district, p.county].filter(Boolean);
         return {
           name,
           address: parts.join(', ') || p.label || '',
