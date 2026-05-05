@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Arrival, Stop, Vehicle } from '../types';
 import { getRouteStopsForArrival, fetchTripStoptimes, TripStoptime, getVehicleForArrival } from '../services/transportService';
 import { cn, getVehicleColorClass } from '../lib/utils';
@@ -98,6 +98,19 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
   const [loading, setLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [liveMinutes, setLiveMinutes] = useState(() => getLiveMinutes(arrival));
+  const stopsListRef = useRef<HTMLDivElement>(null);
+
+  // Scroll the target stop into view whenever the stop list data loads
+  useEffect(() => {
+    if (!expanded || !stopsListRef.current) return;
+    const el = stopsListRef.current;
+    const target = el.querySelector('[data-target="true"]') as HTMLElement | null;
+    if (target) {
+      setTimeout(() => {
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, 50);
+    }
+  }, [expanded, tripStoptimes, routeStops]);
 
   // Tick every 15 seconds to keep the countdown accurate
   useEffect(() => {
@@ -293,20 +306,8 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
               </div>
               
               <div 
-                className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-2 relative bg-surface rounded-xl p-2" 
-                ref={(el) => {
-                  if (el) {
-                    setTimeout(() => {
-                      const target = el.querySelector('[data-target="true"]') as HTMLElement;
-                      if (target) {
-                        el.scrollTo({
-                          top: target.offsetTop - el.offsetTop - 40,
-                          behavior: 'smooth'
-                        });
-                      }
-                    }, 100);
-                  }
-                }}
+                className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-2 relative bg-surface rounded-xl p-2"
+                ref={stopsListRef}
               >
                 <div className="text-xs font-bold text-secondary uppercase tracking-wider mb-1 sticky top-0 bg-surface z-10 py-1">{t('arrivals.routeStops')}</div>
                 {tripStoptimes.length > 0 ? (
