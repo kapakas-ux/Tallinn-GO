@@ -5,6 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { SettingsModal } from './SettingsModal';
 import { GettingStartedModal } from './GettingStartedModal';
 import { getSettings, saveSettings, type AppLanguage } from '../services/settingsService';
+import { Capacitor } from '@capacitor/core';
+
+const isIos = Capacitor.getPlatform() === 'ios';
 
 export const TopBar = () => {
   const { t, i18n } = useTranslation();
@@ -189,7 +192,7 @@ export const TopBar = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setIsMenuOpen(false)}
-                  className="topbar-menu-item block w-full text-left px-4 py-3 text-sm hover:bg-surface-container-low transition-colors border-t border-outline-variant/10"
+                  className={`topbar-menu-item block w-full text-left px-4 py-3 text-sm hover:bg-surface-container-low transition-colors border-t border-outline-variant/10${isIos ? ' hidden' : ''}`}
                 >
                   <span className="font-headline font-bold text-amber-500">{t('topbar.coffee')}</span>
                   <p className="text-[10px] text-secondary font-normal mt-0.5">{t('topbar.coffeeDesc')}</p>

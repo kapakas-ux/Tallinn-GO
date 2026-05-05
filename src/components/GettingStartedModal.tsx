@@ -1,6 +1,9 @@
 import React from 'react';
 import { X, Star, Bell, MapPin, Navigation, Clock, Route, History, Smartphone, Home } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Capacitor } from '@capacitor/core';
+
+const isIos = Capacitor.getPlatform() === 'ios';
 
 interface GettingStartedModalProps {
   onClose: () => void;
@@ -127,6 +130,7 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
               </div>
             </div>
 
+            {!isIos && (
             <div className="flex gap-4 items-start">
               <div className="w-10 h-10 rounded-full bg-pink-500/10 flex items-center justify-center shrink-0 mt-1">
                 <Smartphone className="w-5 h-5 text-pink-500" />
@@ -138,6 +142,7 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
                 </p>
               </div>
             </div>
+            )}
           </div>
         </div>
         

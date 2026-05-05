@@ -1354,12 +1354,18 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                 </div>
               ) : (
                 serviceAlerts.map(alert => (
-                  <div key={alert.id} className={cn(
-                    "rounded-2xl p-3 border",
-                    alert.type === 'interruption'
-                      ? "bg-red-500/10 border-red-500/20"
-                      : "bg-amber-500/10 border-amber-500/20"
-                  )}>
+                  <a
+                    key={alert.id}
+                    href="https://transport.tallinn.ee/#notices"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      "block rounded-2xl p-3 border active:opacity-70 transition-opacity",
+                      alert.type === 'interruption'
+                        ? "bg-red-500/10 border-red-500/20"
+                        : "bg-amber-500/10 border-amber-500/20"
+                    )}
+                  >
                     <div className="flex flex-wrap items-center gap-2 mb-1.5">
                       {alert.routes.length > 0 && (
                         <div className="flex flex-wrap gap-1 min-w-0">
@@ -1385,7 +1391,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                     {alert.descriptionText && alert.descriptionText !== alert.headerText && (
                       <p className="font-body text-[11px] text-secondary leading-relaxed mt-1 line-clamp-2">{alert.descriptionText}</p>
                     )}
-                  </div>
+                  </a>
                 ))
               )}
             </div>
