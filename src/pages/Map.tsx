@@ -12,7 +12,7 @@ import { HomeAddressPicker } from '../components/HomeAddressPicker';
 import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
 import { Stop, Arrival, Vehicle, PlanItinerary, LegMode, ServiceAlert } from '../types';
-import { Bus, Loader2, Navigation, Footprints, Bell, X, Construction, TriangleAlert, Sun, Moon, Home } from 'lucide-react';
+import { Bus, Loader2, Navigation, Footprints, Bell, X, Construction, TriangleAlert, Sun, Moon, Home, ExternalLink } from 'lucide-react';
 import { getDistance } from '../lib/geo';
 import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
 import { fetchDarkMapStyle } from '../lib/mapStyles';
@@ -168,7 +168,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
   // Fly to user location when tab becomes active
   useEffect(() => {
     if (!active || !map.current || !userLocation || isSimulated) return;
-    map.current.flyTo({ center: userLocation, zoom: 15, essential: true });
+    map.current.flyTo({ center: userLocation, zoom: 15, essential: true, padding: { top: 80, bottom: 160, left: 40, right: 40 } });
   }, [active]);
 
   // Service alerts polling — only show when user is in Tallinn area
@@ -666,7 +666,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
             return `
               <div class="flex items-center justify-between py-2 border-b border-surface-container-high last:border-0 relative">
                 <div class="flex items-center gap-3">
-                  <div class="${getVehicleColorClass(d.type)} w-8 h-8 rounded-full flex items-center justify-center font-label font-bold text-xs">
+                  <div class="${getVehicleColorClass(d.type)} w-8 h-8 rounded-full flex items-center justify-center font-label font-bold ${d.line.length >= 4 ? 'text-[8px]' : 'text-xs'}">
                     ${d.line}
                   </div>
                   <div class="flex flex-col">
@@ -878,7 +878,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       const lng = parseFloat(lngParam);
       const zoom = zoomParam ? parseFloat(zoomParam) : 14;
       if (isValidLngLat(lng, lat)) {
-        map.current.flyTo({ center: [lng, lat], zoom, essential: true });
+        map.current.flyTo({ center: [lng, lat], zoom, essential: true, padding: { top: 80, bottom: 160, left: 40, right: 40 } });
       }
     }
   }, [location.search]);
@@ -1137,7 +1137,8 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       map.current.flyTo({
         center: userLocation,
         zoom: 15,
-        essential: true
+        essential: true,
+        padding: { top: 80, bottom: 160, left: 40, right: 40 }
       });
     } else if (locationError) {
       alert(i18next.t('map.locationError', { error: locationError }));
@@ -1391,6 +1392,13 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                     {alert.descriptionText && alert.descriptionText !== alert.headerText && (
                       <p className="font-body text-[11px] text-secondary leading-relaxed mt-1 line-clamp-2">{alert.descriptionText}</p>
                     )}
+                    <div className={cn(
+                      "flex items-center gap-1 mt-2 text-[10px] font-label font-bold uppercase tracking-wider",
+                      alert.type === 'interruption' ? "text-red-500" : "text-amber-600"
+                    )}>
+                      <ExternalLink className="w-3 h-3" />
+                      <span>{t('map.moreInfo', { defaultValue: 'More info' })}</span>
+                    </div>
                   </a>
                 ))
               )}

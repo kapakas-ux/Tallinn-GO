@@ -220,7 +220,8 @@
     "loading": "Laadimine...",
     "stopId": "ID: {{id}}",
     "serviceAlerts": "Teenindushäired",
-    "noServiceAlerts": "Aktiivseid teenindushäireid pole"
+    "noServiceAlerts": "Aktiivseid teenindushäireid pole",
+    "moreInfo": "Rohkem infot"
   },
   "planner": {
     "title": "Planeeri reis",

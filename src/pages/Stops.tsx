@@ -429,7 +429,7 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
                         <div key={i} className="flex-1 min-w-0">
                           <div className="flex items-center justify-between py-0.5 min-w-0">
                             <div className="flex items-center gap-1.5 min-w-0">
-                              <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
+                              <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold shrink-0", arr.line.length >= 4 ? 'text-[7px]' : 'text-[10px]', arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
                                 {arr.line}
                               </div>
                               <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>
@@ -541,7 +541,7 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
                               {col.map((arr, i) => (
                                 <div key={i} className="flex items-center justify-between py-0.5 min-w-0">
                                   <div className="flex items-center gap-1.5 min-w-0">
-                                    <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold text-[10px] shrink-0", arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
+                                    <div className={cn("h-6 w-6 rounded-full flex items-center justify-center font-label font-bold shrink-0", arr.line.length >= 4 ? 'text-[7px]' : 'text-[10px]', arr.status === 'departed' ? 'bg-surface-container-high text-secondary' : getVehicleColorClass(arr.type))}>
                                       {arr.line}
                                     </div>
                                     <span className={cn("font-headline font-bold text-[11px] text-primary truncate", arr.status === 'departed' && "line-through text-secondary/50")}>

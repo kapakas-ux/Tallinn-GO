@@ -220,7 +220,8 @@
     "loading": "Загрузка...",
     "stopId": "ID: {{id}}",
     "serviceAlerts": "Сервисные оповещения",
-    "noServiceAlerts": "Активных оповещений нет"
+    "noServiceAlerts": "Активных оповещений нет",
+    "moreInfo": "Подробнее"
   },
   "planner": {
     "title": "Планирование поездки",

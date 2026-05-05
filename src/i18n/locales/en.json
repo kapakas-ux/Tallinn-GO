@@ -220,7 +220,8 @@
     "loading": "Loading...",
     "stopId": "ID: {{id}}",
     "serviceAlerts": "Service Alerts",
-    "noServiceAlerts": "No active service alerts"
+    "noServiceAlerts": "No active service alerts",
+    "moreInfo": "More info"
   },
   "planner": {
     "title": "Plan a Journey",
