@@ -202,7 +202,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
           <div className={cn(
             "rounded-full flex items-center justify-center font-label font-bold shrink-0",
             isCompact ? "h-8 w-8" : "h-10 w-10",
-            arrival.line.length >= 4 ? "text-[9px]" : arrival.line.length === 3 ? (isCompact ? "text-[10px]" : "text-xs") : (isCompact ? "text-xs" : "text-base"),
+            arrival.line.length >= 4 ? (isCompact ? "text-[9px]" : "text-xs") : arrival.line.length === 3 ? (isCompact ? "text-[10px]" : "text-xs") : (isCompact ? "text-xs" : "text-base"),
             getVehicleColorClass(arrival.type)
           )}>
             {arrival.line}
