@@ -225,14 +225,14 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       ...s,
       distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng)
     })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
-    const nearest200 = withDist.slice(0, 200);
+    const nearest50 = withDist.slice(0, 50);
 
     // Fallback: clustering disabled → simple nearest-stop behaviour
     if (!clusterEnabled || !cachedClustersRef.current) {
       setHeroCluster(null);
       setClusterDepartures([]);
-      const nearest = nearest200[0];
-      const nearby = nearest200.slice(1, 4);
+      const nearest = nearest50[0];
+      const nearby = nearest50.slice(1, 4);
       if (!closestStop || nearest?.id !== closestStop.id) {
         setClosestStop(nearest || null);
         setNearbyStops(nearby);
@@ -264,7 +264,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
     // Collect single (non-clustered) stops
     const singles: Stop[] = [];
-    for (const s of nearest200) {
+    for (const s of nearest50) {
       if (!clusteredIds.has(s.id)) singles.push(s);
     }
 
