@@ -204,13 +204,18 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     );
   }, [allStops, clusterRadius]);
 
-  // Update closest stop / hero when location changes
-  // Only re-scores pre-computed clusters — O(n), not O(n²)
+  // Update closest stop / hero when user moves significantly (≥ 50 m).
+  // Avoids 3000× Haversine calls on every GPS tick.
+  const lastSignificantLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+
   useEffect(() => {
     if (!userLocation || allStops.length === 0) return;
+    const last = lastSignificantLocationRef.current;
+    if (last && getDistance(last.lat, last.lng, userLocation.lat, userLocation.lng) * 1000 < 50) return;
+    lastSignificantLocationRef.current = { lat: userLocation.lat, lng: userLocation.lng };
 
-    // Attach distances to all stops and sort
-    const sorted = [...allStops].map(s => ({
+    // Only compute distances for the top ~200 closest stops (sphere of interest)
+    const withDist = allStops.slice(0, 200).map(s => ({
       ...s,
       distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng)
     })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
@@ -218,8 +223,9 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     const clusters = (cachedClustersRef.current || []).map(c => ({
       ...c,
       stops: c.stops.map(s => {
-        const fresh = sorted.find(x => x.id === s.id);
-        return fresh ?? s;
+        // Use the distance from withDist if available, otherwise compute fresh
+        const match = withDist.find(x => x.id === s.id);
+        return match ?? { ...s, distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng) };
       }).sort((a, b) => (a.distance || 0) - (b.distance || 0)),
     }));
 
@@ -229,9 +235,9 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       for (const s of c.stops) clusteredIds.add(s.id);
     }
 
-    // Collect single (non-clustered) stops
+    // Collect single (non-clustered) stops (only top 200 have distances)
     const singles: Stop[] = [];
-    for (const s of sorted) {
+    for (const s of withDist) {
       if (!clusteredIds.has(s.id)) singles.push(s);
     }
 
