@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Play, Check, Home, ChevronRight } from 'lucide-react';
+import { X, Play, Check, Home, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ALARM_SOUNDS, getSettings, saveSettings, previewSound, stopPreview } from '../services/settingsService';
 import type { AppTheme } from '../services/settingsService';
@@ -96,37 +96,30 @@ export const SettingsModal = ({ onClose }: Props) => {
             <h3 className="font-headline font-bold text-sm text-secondary uppercase tracking-widest mb-3">
               {t('settings.alertSound')}
             </h3>
-            <p className="text-xs text-secondary font-label mb-4 leading-relaxed">
+            <p className="text-xs text-secondary font-label mb-3 leading-relaxed">
               {t('settings.alertSoundDesc')}
             </p>
-            <div className="space-y-2">
-              {ALARM_SOUNDS.map((sound) => (
-                <div
-                  key={sound.id}
-                  className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all cursor-pointer
-                    ${selectedSound === sound.id
-                      ? 'border-primary bg-primary/10'
-                      : 'border-black/8 bg-black/4 hover:bg-black/8'
-                    }`}
-                  onClick={() => handleSelect(sound.id)}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <select
+                  value={selectedSound}
+                  onChange={(e) => handleSelect(e.target.value)}
+                  className="w-full appearance-none px-4 py-3 rounded-xl border border-black/8 bg-black/4 font-headline font-bold text-sm text-primary cursor-pointer pr-10 focus:outline-none focus:border-primary transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
-                      ${selectedSound === sound.id ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
-                      {selectedSound === sound.id && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    <span className="font-headline font-bold text-sm text-primary">{sound.label}</span>
-                  </div>
-                  {sound.file && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); previewSound(sound.id); }}
-                      className="p-2 rounded-full bg-surface-container-high hover:bg-primary/10 text-secondary hover:text-primary transition-colors active:scale-90"
-                    >
-                      <Play className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              ))}
+                  {ALARM_SOUNDS.map(s => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary pointer-events-none" />
+              </div>
+              {ALARM_SOUNDS.find(s => s.id === selectedSound)?.file && (
+                <button
+                  onClick={() => previewSound(selectedSound)}
+                  className="p-3 rounded-xl border border-black/8 bg-black/4 hover:bg-black/8 text-secondary hover:text-primary transition-colors active:scale-90 shrink-0"
+                >
+                  <Play className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
 
