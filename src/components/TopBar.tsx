@@ -52,7 +52,6 @@ export const TopBar = () => {
   const LANGS: { code: AppLanguage; label: string }[] = [
     { code: 'en', label: 'EN' },
     { code: 'et', label: 'ET' },
-    { code: 'ru', label: 'RU' },
   ];
 
   const switchLang = (code: AppLanguage) => {

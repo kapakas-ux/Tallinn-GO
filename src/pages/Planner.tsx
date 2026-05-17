@@ -97,35 +97,16 @@ const COUNTY_ET_TO_EN: Record<string, string> = {
   'Hiiumaa': 'Hiiu County',
   'Võrumaa': 'Võru County',
 };
-const COUNTY_ET_TO_RU: Record<string, string> = {
-  'Harjumaa': 'Харьюмаа',
-  'Tartumaa': 'Тартумаа',
-  'Pärnumaa': 'Пярнумаа',
-  'Virumaa': 'Вирумаа',
-  'Ida-Virumaa': 'Ида-Вирумаа',
-  'Lääne-Virumaa': 'Ляэне-Вирумаа',
-  'Viljandimaa': 'Вильяндимаа',
-  'Raplamaa': 'Рапламаа',
-  'Saaremaa': 'Сааремаа',
-  'Jõgevamaa': 'Йыгевамаа',
-  'Järvamaa': 'Ярвамаа',
-  'Valgamaa': 'Валгамаа',
-  'Põlvamaa': 'Пылвамаа',
-  'Läänemaa': 'Ляэнемаа',
-  'Hiiumaa': 'Хийумаа',
-  'Võrumaa': 'Вырумаа',
-};
 
 function localiseStopDesc(desc: string | undefined, uiLang: string): string {
   if (!desc) return '';
   const l = uiLang.toLowerCase().split('-')[0];
   if (l === 'et') return desc;
-  const map = l === 'ru' ? COUNTY_ET_TO_RU : COUNTY_ET_TO_EN;
   return desc
     .split(',')
     .map(part => {
       const key = part.trim();
-      return map[key] ?? part;
+      return COUNTY_ET_TO_EN[key] ?? part;
     })
     .join(', ');
 }
@@ -155,20 +136,6 @@ function localiseAdmin(s: string | undefined, uiLang: string): string {
       .replace(/\bMunicipality\b/g, 'vald')
       .replace(/\bVillage\b/g, 'küla')
       .replace(/\bCity\b/g, 'linn');
-  } else if (l === 'ru') {
-    out = out
-      .replace(/\bCounty\b/g, 'уезд')
-      .replace(/\bParish\b/g, 'волость')
-      .replace(/\bRural Municipality\b/gi, 'волость')
-      .replace(/\bMunicipality\b/g, 'волость')
-      .replace(/\bVillage\b/g, 'деревня')
-      .replace(/\bCity\b/g, 'город')
-      // Also localise the existing Estonian suffixes that come back via lang=default
-      .replace(/\bmaakond\b/gi, 'уезд')
-      .replace(/\bvald\b/gi, 'волость')
-      .replace(/\bosavald\b/gi, 'район')
-      .replace(/\bküla\b/gi, 'деревня')
-      .replace(/\blinn\b/gi, 'город');
   } else {
     // English: turn Estonian suffixes that may arrive via lang=default into English
     out = out

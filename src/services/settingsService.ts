@@ -1,7 +1,7 @@
 const SETTINGS_KEY = 'tallinn_go_settings';
 
 export type AppTheme = 'daylight' | 'plum' | 'havgra' | 'latte';
-export type AppLanguage = 'en' | 'et' | 'ru';
+export type AppLanguage = 'en' | 'et';
 
 export interface AppSettings {
   alarmSound: string;
