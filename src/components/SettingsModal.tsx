@@ -103,7 +103,7 @@ export const SettingsModal = ({ onClose }: Props) => {
                   className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all cursor-pointer
                     ${selectedSound === sound.id
                       ? 'border-primary bg-primary/10'
-                      : 'border-outline-variant/30 bg-surface-container-low hover:bg-surface-container-high'
+                      : 'border-black/8 bg-black/4 hover:bg-black/8'
                     }`}
                   onClick={() => handleSelect(sound.id)}
                 >
@@ -128,7 +128,7 @@ export const SettingsModal = ({ onClose }: Props) => {
           </div>
 
           {/* Daily Fact toggle */}
-          <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-variant/30 bg-surface-container-low">
+          <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-black/8 bg-black/4">
             <div>
               <p className="font-headline font-bold text-sm text-primary">{t('settings.dailyFact')}</p>
               <p className="font-label text-[10px] text-secondary mt-0.5">{t('settings.dailyFactDesc')}</p>
@@ -146,7 +146,7 @@ export const SettingsModal = ({ onClose }: Props) => {
           </div>
 
           {/* Show Favorites First toggle */}
-          <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-outline-variant/30 bg-surface-container-low">
+          <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-black/8 bg-black/4">
             <div>
               <p className="font-headline font-bold text-sm text-primary">{t('settings.showFavoritesFirst')}</p>
               <p className="font-label text-[10px] text-secondary mt-0.5">{t('settings.showFavoritesFirstDesc')}</p>
@@ -166,7 +166,7 @@ export const SettingsModal = ({ onClose }: Props) => {
           {/* Home address */}
           <button
             onClick={() => setPickerOpen(true)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container-high transition-colors text-left"
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-black/8 bg-black/4 hover:bg-black/8 transition-colors text-left"
           >
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
@@ -184,7 +184,7 @@ export const SettingsModal = ({ onClose }: Props) => {
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-outline-variant/20 bg-surface-container-low">
+        <div className="p-6 border-t border-black/8 bg-black/4">
           <button onClick={handleClose} className="w-full py-3 bg-primary text-white rounded-xl font-bold font-headline hover:bg-primary/90 transition-colors">
             {t('common.done')}
           </button>
