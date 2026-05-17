@@ -180,7 +180,7 @@
   "stops": {
     "searchPlaceholder": "Otsi peatusi...",
     "searchResults": "Otsingutulemused",
-    "liveCoverage": "Väljumised",
+    "liveCoverage": "Reaalajas väljumised",
     "nearbyStops": "Lähedalolevad peatused",
     "locationRequired": "Asukoht vajalik",
     "locationRequiredDesc": "Palun lubage GPS, et leida peatusi teie praeguse asukoha lähedal.",
