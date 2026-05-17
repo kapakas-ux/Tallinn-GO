@@ -108,6 +108,18 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
     setNearbyStops(closest);
   }, [userLocation, allStops]);
 
+  // Fallback: when GPS is denied, show stops near Tallinn center
+  useEffect(() => {
+    if (!active || userLocation || allStops.length === 0) return;
+    const TALLINN_LAT = 59.437;
+    const TALLINN_LNG = 24.745;
+    const sorted = [...allStops].map(s => ({
+      ...s,
+      distance: getDistance(TALLINN_LAT, TALLINN_LNG, s.lat, s.lng)
+    })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    setNearbyStops(sorted.slice(0, 6));
+  }, [active, userLocation, allStops]);
+
   // Auto-fetch departures for all nearby stops
   useEffect(() => {
     if (nearbyStops.length === 0) return;
@@ -136,18 +148,36 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
       return;
     }
     const query = searchQuery.toLowerCase();
-    let results = allStops.filter(stop => 
-      stop.name.toLowerCase().includes(query) || stop.id.includes(query)
-    );
+    const results = allStops
+      .filter(stop => stop.name.toLowerCase().includes(query) || stop.id.includes(query))
+      .map(stop => {
+        // Text match scoring — exact prefix match > substring > ID match
+        const nameLower = stop.name.toLowerCase();
+        let textScore = 0;
+        if (nameLower === query) textScore = 10;
+        else if (nameLower.startsWith(query)) textScore = 8;
+        else if (nameLower.includes(query)) textScore = 5;
+        else if (stop.id.includes(query)) textScore = 2;
 
-    if (userLocation) {
-      results = results.map(s => ({
-        ...s,
-        distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng)
-      })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
-    }
+        // Weight by location if available
+        let distance: number | undefined;
+        if (userLocation) {
+          distance = getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng);
+        }
+        return { ...stop, distance, textScore };
+      });
 
-    setFilteredStops(results.slice(0, 20)); // limit to 20 results for performance
+    // Sort: text match first, then distance within same text-score tier
+    results.sort((a, b) => {
+      const ta = (a as any).textScore;
+      const tb = (b as any).textScore;
+      if (ta !== tb) return tb - ta;
+      // Same text match — closer is better
+      if (a.distance != null && b.distance != null) return a.distance - b.distance;
+      return 0;
+    });
+
+    setFilteredStops(results.slice(0, 20));
   }, [searchQuery, allStops, userLocation]);
 
   // Auto-fetch departures for search results
@@ -405,18 +435,16 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
                           </span>
                         )}
                       </div>
-                      {userLocation ? (
+                      {userLocation && stop.distance !== undefined ? (
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
-                            {(getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000).toFixed(0)}m
+                            {formatDistance(stop.distance * 1000)}
                           </span>
-                          <span className="text-secondary opacity-30">•</span>
-                          <div className="flex items-center gap-1">
-                            <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest">
-                              {Math.round((getDistance(userLocation.lat, userLocation.lng, stop.lat, stop.lng) * 1000) / 83.33)} min
-                            </span>
+                          <span className="text-secondary opacity-30">·</span>
+                          <span className="font-label text-[10px] text-secondary font-bold uppercase tracking-widest flex items-center gap-1">
+                            {formatWalkingTime(stop.distance * 1000)}
                             <Footprints className="w-3 h-3 text-secondary/60" />
-                          </div>
+                          </span>
                         </div>
                       ) : (
                         <p className="font-label text-xs text-secondary mt-0.5">{t('stops.stopId', { id: stop.id })}</p>
