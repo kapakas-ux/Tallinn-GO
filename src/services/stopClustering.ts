@@ -128,14 +128,10 @@ export function clusterStops(
   for (const [root, indices] of groups) {
     if (indices.length < 2) continue;
 
-    // Cap at 6 nearest members per cluster
-    const memberStops: Stop[] = indices
-      .map(i => ({
-        ...stops[i],
-        distance: getDistance(userLat, userLng, stops[i].lat, stops[i].lng),
-      }))
-      .sort((a, b) => (a.distance || 0) - (b.distance || 0))
-      .slice(0, 6);
+    const memberStops: Stop[] = indices.map(i => ({
+      ...stops[i],
+      distance: getDistance(userLat, userLng, stops[i].lat, stops[i].lng),
+    })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
     const nameFreq = rootNameCount.get(root)!;
     // Most frequent name, tie-broken by shortest name
@@ -172,10 +168,12 @@ export async function fetchClusterDepartures(
   cluster: StopCluster,
 ): Promise<{ departures: Arrival[]; departuresPerHour: number }> {
   // Fetch in batches of 3 to avoid overwhelming the API
+  // Only fetch the 6 nearest cluster members.
   const batchSize = 3;
+  const stops = cluster.stops.slice(0, 6);
   const results: Arrival[][] = [];
-  for (let i = 0; i < cluster.stops.length; i += batchSize) {
-    const batch = cluster.stops.slice(i, i + batchSize).map(stop =>
+  for (let i = 0; i < stops.length; i += batchSize) {
+    const batch = stops.slice(i, i + batchSize).map(stop =>
       fetchDepartures(stop.id, stop.siriId)
         .then(deps => deps.slice(0, 10))
         .catch(() => [] as Arrival[]),
