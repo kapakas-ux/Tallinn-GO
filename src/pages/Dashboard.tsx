@@ -1058,7 +1058,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
       {/* Cluster member stops — expandable list */}
       {heroCluster && (
-        <section className="mb-6">
+        <section className="mb-12">
           <details className="group">
             <summary className="cursor-pointer list-none flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-colors">
               <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1073,13 +1073,17 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
             </summary>
             <div className="mt-2 space-y-1 pl-3">
               {heroCluster.stops.map(s => (
-                <div key={s.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-container-low transition-colors">
+                <button
+                  key={s.id}
+                  onClick={() => navigate(`/map?lat=${s.lat}&lng=${s.lng}&zoom=20&stopId=${s.id}`)}
+                  className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-container-low transition-colors"
+                >
                   <span className="font-headline font-semibold text-sm text-primary">{s.name}</span>
                   <span className="font-label text-secondary text-[10px] flex items-center gap-1">
                     <Footprints className="w-2.5 h-2.5" />
                     {formatDistance((s.distance ?? 0) * 1000)} · {formatWalkingTime((s.distance ?? 0) * 1000)}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </details>

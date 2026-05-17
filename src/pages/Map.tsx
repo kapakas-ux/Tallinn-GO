@@ -169,7 +169,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
   useEffect(() => {
     if (!active || !map.current || !userLocation || isSimulated) return;
     map.current.flyTo({ center: userLocation, zoom: 15, essential: true, padding: { top: 80, bottom: 160, left: 40, right: 40 } });
-  }, [active]);
+  }, [active, userLocation]);
 
   // Service alerts polling — only show when user is in Tallinn area
   const isInTallinn = userLocation && userLocation[1] > 59.3 && userLocation[1] < 59.55 && userLocation[0] > 24.4 && userLocation[0] < 25.0;
