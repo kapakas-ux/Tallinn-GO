@@ -1058,7 +1058,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
       {/* Cluster member stops — expandable list */}
       {heroCluster && (
-        <section className="mb-12">
+        <section className="my-3">
           <details className="group">
             <summary className="cursor-pointer list-none flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-colors">
               <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
