@@ -217,7 +217,7 @@ export function ArrivalItem({ arrival, stop, variant = 'main', onAlertClick, isA
             </span>
             {!isCompact && (
               <span className="font-label text-[9px] text-secondary font-bold uppercase tracking-widest">
-                {(arrival.type === 'regional' ? 'Bus' : arrival.type.charAt(0).toUpperCase() + arrival.type.slice(1))} • {arrival.type === 'regional' ? t('arrivals.regional') : t('arrivals.local')}
+                {t(`arrivals.${arrival.type === 'regional' ? 'bus' : arrival.type}`)} • {arrival.type === 'regional' ? t('arrivals.regional') : t('arrivals.local')}
               </span>
             )}
             {(catchInfo || showLastChip || showDelayChip) && (

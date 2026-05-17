@@ -266,6 +266,7 @@
     "tram": "Tram",
     "train": "Train",
     "bus": "Bus",
+    "trolley": "Trolley",
     "ferry": "Ferry",
     "commercialBus": "Intercity bus",
     "commercialBusTag": "INTER",
