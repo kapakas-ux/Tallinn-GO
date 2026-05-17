@@ -209,9 +209,11 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     );
   }, [allStops, clusterRadius, clusterEnabled]);
 
-  // Update closest stop / hero when user moves significantly (≥ 50 m).
-  // Avoids 3000× Haversine calls on every GPS tick.
+  // Update closest stop / hero when user moves significantly (≥ 50 m)
+  // or when clustering settings change.
   const lastSignificantLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+  // Reset gate when settings change so effect re-evaluates immediately
+  useEffect(() => { lastSignificantLocationRef.current = null; }, [clusterEnabled, clusterRadius]);
 
   useEffect(() => {
     if (!userLocation || allStops.length === 0) return;
@@ -330,7 +332,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         setNearbyStops(nearby);
       }
     }
-  }, [userLocation, allStops.length > 0]);
+  }, [userLocation, allStops.length > 0, clusterEnabled, clusterRadius]);
 
   // Auto-fetch departures for all nearby stops
   useEffect(() => {
