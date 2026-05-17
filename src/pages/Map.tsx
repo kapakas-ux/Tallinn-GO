@@ -702,26 +702,25 @@ export const Map = ({ active = true }: { active?: boolean }) => {
         const isFav = isFavorite(id);
 
         let distanceHtml = '';
-        if (userLocation) {
-          const distanceKm = getDistance(userLocation[1], userLocation[0], coordinates[1], coordinates[0]);
-          const distanceM = distanceKm * 1000;
-          
-          distanceHtml = `
-            <div class="flex items-center gap-2 mt-1">
+        const distanceKm = getDistance(
+          userLocation?.[1] ?? 59.437, userLocation?.[0] ?? 24.745,
+          coordinates[1], coordinates[0]
+        );
+        const distanceM = distanceKm * 1000;
+
+        distanceHtml = `
+          <div class="flex items-center gap-2 mt-1">
+            <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
+              ${formatDistance(distanceM)}
+            </span>
+            <span class="text-secondary opacity-30">·</span>
+            <div class="flex items-center gap-1">
               <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-                ${formatDistance(distanceM)}
+                ${formatWalkingTime(distanceM)}
               </span>
-              <span class="text-secondary opacity-30">•</span>
-              <div class="flex items-center gap-1">
-                <span class="font-label text-[10px] text-secondary font-bold uppercase tracking-wider leading-tight">
-                  ${formatWalkingTime(distanceM)}
-                </span>
-              </div>
             </div>
-          `;
-        } else {
-          distanceHtml = `<p class="text-[10px] font-label uppercase tracking-wider text-secondary font-bold">${i18next.t('map.stopId', { id: siriId || id })}</p>`;
-        }
+          </div>
+        `;
 
         popupContent.innerHTML = `
           <div class="mb-3 pl-16 relative pr-8">
