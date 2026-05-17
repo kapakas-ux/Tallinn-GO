@@ -49,10 +49,26 @@
   }
 }
 
-/* Large Text accessibility mode — scales rem-based text by ~25% */
-[data-large-text="true"] {
-  font-size: 20px;
-}
+/* Large Text accessibility mode — scales text only, not layout/icons */
+[data-large-text="true"] .text-xs { font-size: 0.9375rem !important; }
+[data-large-text="true"] .text-sm { font-size: 1.09375rem !important; }
+[data-large-text="true"] .text-base { font-size: 1.25rem !important; }
+[data-large-text="true"] .text-lg { font-size: 1.40625rem !important; }
+[data-large-text="true"] .text-xl { font-size: 1.5625rem !important; }
+[data-large-text="true"] .text-2xl { font-size: 1.875rem !important; }
+[data-large-text="true"] .text-3xl { font-size: 2.34375rem !important; }
+[data-large-text="true"] .text-4xl { font-size: 2.8125rem !important; }
+[data-large-text="true"] .text-5xl { font-size: 3.75rem !important; }
+[data-large-text="true"] .text-6xl { font-size: 4.6875rem !important; }
+/* Arbitrary px-based text sizes (labels, badges, metadata) */
+[data-large-text="true"] .text-\[7px\] { font-size: 9px !important; }
+[data-large-text="true"] .text-\[8px\] { font-size: 10px !important; }
+[data-large-text="true"] .text-\[9px\] { font-size: 12px !important; }
+[data-large-text="true"] .text-\[10px\] { font-size: 13px !important; }
+[data-large-text="true"] .text-\[11px\] { font-size: 14px !important; }
+/* MapLibre popup text rendered inside map canvas */
+[data-large-text="true"] .maplibregl-popup-content { font-size: 14px; }
+[data-large-text="true"] { --map-text-scale: 1.25; }
 
 /* Fade-in for reflected content (pull-to-refresh, tab switches) */
 .content-fade {

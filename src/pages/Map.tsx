@@ -1007,10 +1007,10 @@ export const Map = ({ active = true }: { active?: boolean }) => {
             const walkEl = document.createElement('div');
             walkEl.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
             walkEl.innerHTML = `
-              <div style="background: white; border: 2px solid #9ca3af; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 14px;">
+              <div style="background: white; border: 2px solid #9ca3af; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: calc(14px * var(--map-text-scale, 1));">
                 🚶
               </div>
-              <div style="background: white; color: #374151; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); white-space: nowrap; text-align: center;">
+              <div style="background: white; color: #374151; font-size: calc(9px * var(--map-text-scale, 1)); font-weight: 700; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); white-space: nowrap; text-align: center;">
                 ${walkMins} ${i18next.t('arrivals.min')} · ${walkDist}
               </div>
             `;
@@ -1025,11 +1025,11 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           const el = document.createElement('div');
           el.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
           el.innerHTML = `
-            <div style="background: ${color}; color: white; border-radius: 12px; padding: 3px 8px; font-size: 11px; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 3px; white-space: nowrap;">
-              <span style="font-size: 12px;">${modeEmoji(leg.mode)}</span>
+            <div style="background: ${color}; color: white; border-radius: 12px; padding: 3px 8px; font-size: calc(11px * var(--map-text-scale, 1)); font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 3px; white-space: nowrap;">
+              <span style="font-size: calc(12px * var(--map-text-scale, 1));">${modeEmoji(leg.mode)}</span>
               ${routeLabel}
             </div>
-            <div style="background: white; color: #374151; font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); white-space: nowrap; text-align: center; max-width: 130px; overflow: hidden; text-overflow: ellipsis;">
+            <div style="background: white; color: #374151; font-size: calc(9px * var(--map-text-scale, 1)); font-weight: 600; padding: 1px 5px; border-radius: 6px; margin-top: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); white-space: nowrap; text-align: center; max-width: 130px; overflow: hidden; text-overflow: ellipsis;">
               ${leg.from.name || i18next.t('map.board')} · ${fmtTime(leg.startTime)}
             </div>
           `;
@@ -1046,7 +1046,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
               <div style="background: white; border: 2px solid ${color}; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1);">
                 <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color};"></div>
               </div>
-              <div style="background: white; color: #6b7280; font-size: 8px; font-weight: 600; padding: 1px 4px; border-radius: 4px; margin-top: 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap; max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
+              <div style="background: white; color: #6b7280; font-size: calc(8px * var(--map-text-scale, 1)); font-weight: 600; padding: 1px 4px; border-radius: 4px; margin-top: 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap; max-width: 100px; overflow: hidden; text-overflow: ellipsis;">
                 ${leg.to.name || i18next.t('map.alight')} · ${fmtTime(leg.endTime)}
               </div>
             `;
@@ -1065,10 +1065,10 @@ export const Map = ({ active = true }: { active?: boolean }) => {
         const startEl = document.createElement('div');
         startEl.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
         startEl.innerHTML = `
-          <div style="background: #003571; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,53,113,0.4); font-size: 18px; border: 3px solid white;">
+          <div style="background: #003571; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,53,113,0.4); font-size: calc(18px * var(--map-text-scale, 1)); border: 3px solid white;">
             📍
           </div>
-          <div style="background: #003571; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-top: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">
+          <div style="background: #003571; color: white; font-size: calc(10px * var(--map-text-scale, 1)); font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-top: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">
             ${i18next.t('map.start')} · ${fmtTime(itinerary.startTime)}
           </div>
         `;
@@ -1084,10 +1084,10 @@ export const Map = ({ active = true }: { active?: boolean }) => {
         const endEl = document.createElement('div');
         endEl.style.cssText = 'pointer-events: none; display: flex; flex-direction: column; align-items: center;';
         endEl.innerHTML = `
-          <div style="background: #DC143C; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(220,20,60,0.4); font-size: 18px; border: 3px solid white;">
+          <div style="background: #DC143C; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(220,20,60,0.4); font-size: calc(18px * var(--map-text-scale, 1)); border: 3px solid white;">
             🏁
           </div>
-          <div style="background: #DC143C; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-top: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">
+          <div style="background: #DC143C; color: white; font-size: calc(10px * var(--map-text-scale, 1)); font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-top: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">
             ${last.to.name || i18next.t('map.arrive')} · ${fmtTime(itinerary.endTime)}
           </div>
         `;
