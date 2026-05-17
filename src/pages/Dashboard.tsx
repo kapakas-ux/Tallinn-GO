@@ -235,16 +235,14 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       setClusterDepartures([]);
       const nearest = nearest50[0];
       const nearby = nearest50.slice(1, 4);
-      if (!closestStop || nearest?.id !== closestStop.id) {
-        setClosestStop(nearest || null);
+      if (nearest) {
+        setClosestStop(nearest);
         setNearbyStops(nearby);
-        if (nearest) {
-          setLoading(true);
-          fetchDepartures(nearest.id, nearest.siriId).then(deps => {
-            setDepartures(deps.slice(0, 6));
-            setLoading(false);
-          }).catch(() => setLoading(false));
-        }
+        setLoading(true);
+        fetchDepartures(nearest.id, nearest.siriId).then(deps => {
+          setDepartures(deps.slice(0, 6));
+          setLoading(false);
+        }).catch(() => setLoading(false));
       }
       return;
     }
