@@ -981,11 +981,6 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                 </>
               ) : t('dashboard.locating')}
             </h2>
-            {heroCluster && (
-              <p className="font-label text-[10px] text-primary/60 font-bold uppercase tracking-wider mt-0.5">
-                {t('dashboard.stopsInCluster', { count: heroCluster.stops.length })}
-              </p>
-            )}
           </div>
           <div className="flex gap-2">
             {closestStop && !isSimulated && (
@@ -1065,14 +1060,21 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       {heroCluster && (
         <section className="mb-6">
           <details className="group">
-            <summary className="cursor-pointer list-none flex items-center gap-2 text-[10px] font-label font-bold uppercase tracking-widest text-secondary/70 hover:text-primary transition-colors">
-              <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />
-              {t('dashboard.stopsInCluster', { count: heroCluster.stops.length })}
+            <summary className="cursor-pointer list-none flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high transition-colors">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <MapPin className="w-3.5 h-3.5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="font-headline font-bold text-sm text-primary">
+                  {heroCluster.stops.length} {t('dashboard.clusteredStops', { defaultValue: 'clustered stops' })}
+                </span>
+              </div>
+              <ChevronDown className="w-4 h-4 text-secondary group-open:rotate-180 transition-transform" />
             </summary>
-            <div className="mt-2 space-y-1 pl-5">
+            <div className="mt-2 space-y-1 pl-3">
               {heroCluster.stops.map(s => (
-                <div key={s.id} className="flex items-center justify-between text-[11px]">
-                  <span className="font-headline font-semibold text-primary">{s.name}</span>
+                <div key={s.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-container-low transition-colors">
+                  <span className="font-headline font-semibold text-sm text-primary">{s.name}</span>
                   <span className="font-label text-secondary text-[10px] flex items-center gap-1">
                     <Footprints className="w-2.5 h-2.5" />
                     {formatDistance((s.distance ?? 0) * 1000)} · {formatWalkingTime((s.distance ?? 0) * 1000)}

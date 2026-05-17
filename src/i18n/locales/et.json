@@ -171,7 +171,8 @@
     "emojiBus": "Buss",
     "emojiHeart": "Süda",
     "routeChanges": "marsruudimuudatust",
-    "stopsInCluster": "❯ {{count}} peatust"
+    "stopsInCluster": "❯ {{count}} peatust",
+    "clusteredStops": "rühmitatud peatust"
   },
   "stops": {
     "searchPlaceholder": "Otsi peatusi...",

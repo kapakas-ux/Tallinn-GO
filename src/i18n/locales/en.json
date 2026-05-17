@@ -171,7 +171,8 @@
     "emojiBus": "Bus",
     "emojiHeart": "Heart",
     "routeChanges": "route changes active",
-    "stopsInCluster": "❯ {{count}} stops"
+    "stopsInCluster": "❯ {{count}} stops",
+    "clusteredStops": "clustered stops"
   },
   "stops": {
     "searchPlaceholder": "Search stops...",
