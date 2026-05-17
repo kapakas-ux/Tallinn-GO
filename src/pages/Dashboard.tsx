@@ -247,17 +247,17 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       return;
     }
 
+    // Build a fast id→distance map from the full sorted list
+    const distMap = new Map<string, Stop>();
+    for (const s of withDist) distMap.set(s.id, s);
+
     // Only consider clusters whose members appear in the nearest 50.
-    // This discards far-away clusters (e.g., Tartu when user is in Tallinn).
     const nearbyIds = new Set(nearest50.map(s => s.id));
     const localClusters = (cachedClustersRef.current || []).map(c => ({
       ...c,
       stops: c.stops
         .filter(s => nearbyIds.has(s.id))
-        .map(s => {
-          const match = withDist.find(x => x.id === s.id);
-          return match ?? { ...s, distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng) };
-        })
+        .map(s => distMap.get(s.id) ?? { ...s, distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng) })
         .sort((a, b) => (a.distance || 0) - (b.distance || 0)),
     })).filter(c => c.stops.length >= 2);
 
@@ -330,7 +330,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         setNearbyStops(nearby);
       }
     }
-  }, [userLocation, allStops]);
+  }, [userLocation, allStops.length > 0]);
 
   // Auto-fetch departures for all nearby stops
   useEffect(() => {
