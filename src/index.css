@@ -49,6 +49,11 @@
   }
 }
 
+/* Large Text accessibility mode — scales rem-based text by ~25% */
+[data-large-text="true"] {
+  font-size: 20px;
+}
+
 /* Fade-in for reflected content (pull-to-refresh, tab switches) */
 .content-fade {
   opacity: 0;

@@ -114,6 +114,8 @@
     "dailyFactDesc": "Näita lõbusat fakti avalehel iga päev",
     "showFavoritesFirst": "Näita lemmikuid esimesena",
     "showFavoritesFirstDesc": "Kuva lemmikud lähedalasuvate peatuste kohal",
+    "largeText": "Suurem tekst",
+    "largeTextDesc": "Suurenda teksti suurust kogu rakenduses",
     "homeAddress": "Koduaadress",
     "homeAddressUnset": "Vajuta määramiseks"
   },

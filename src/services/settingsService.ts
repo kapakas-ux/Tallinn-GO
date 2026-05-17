@@ -7,6 +7,7 @@ export interface AppSettings {
   alarmSound: string;
   showDailyFact: boolean;
   showFavoritesFirst: boolean;
+  largeText: boolean;
   theme: AppTheme;
   language: AppLanguage;
 }
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   alarmSound: 'default',
   showDailyFact: true,
   showFavoritesFirst: false,
+  largeText: false,
   theme: 'daylight',
   language: 'en',
 };

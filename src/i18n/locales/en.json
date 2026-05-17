@@ -114,6 +114,8 @@
     "dailyFactDesc": "Show a fun fact on the dashboard each day",
     "showFavoritesFirst": "Show Favorites First",
     "showFavoritesFirstDesc": "Display favorites above nearby stops",
+    "largeText": "Larger Text",
+    "largeTextDesc": "Increase text size throughout the app",
     "homeAddress": "Home address",
     "homeAddressUnset": "Tap to set"
   },

@@ -97,7 +97,12 @@ function AppContent() {
   };
 
   useEffect(() => {
-    const onSettings = () => setTheme(getSettings().theme);
+    const onSettings = () => {
+      const s = getSettings();
+      setTheme(s.theme);
+      document.documentElement.setAttribute('data-large-text', s.largeText ? 'true' : 'false');
+    };
+    onSettings(); // initial
     window.addEventListener('settings_changed', onSettings);
     return () => window.removeEventListener('settings_changed', onSettings);
   }, []);
