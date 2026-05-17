@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Play, Check, Home, ChevronRight } from 'lucide-react';
+import { X, Play, Check, Home, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ALARM_SOUNDS, getSettings, saveSettings, previewSound, stopPreview } from '../services/settingsService';
 import type { AppTheme } from '../services/settingsService';
@@ -93,41 +93,44 @@ export const SettingsModal = ({ onClose }: Props) => {
           </div>
 
           <div>
-            <h3 className="font-headline font-bold text-sm text-secondary uppercase tracking-widest mb-3">
-              {t('settings.alertSound')}
-            </h3>
-            <p className="text-xs text-secondary font-label mb-4 leading-relaxed">
-              {t('settings.alertSoundDesc')}
-            </p>
-            <div className="space-y-2">
-              {ALARM_SOUNDS.map((sound) => (
-                <div
-                  key={sound.id}
-                  className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all cursor-pointer
-                    ${selectedSound === sound.id
-                      ? 'border-primary bg-primary/10'
-                      : 'border-black/8 bg-black/4 hover:bg-black/8'
-                    }`}
-                  onClick={() => handleSelect(sound.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
-                      ${selectedSound === sound.id ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
-                      {selectedSound === sound.id && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    <span className="font-headline font-bold text-sm text-primary">{sound.label}</span>
-                  </div>
-                  {sound.file && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); previewSound(sound.id); }}
-                      className="p-2 rounded-full bg-surface-container-high hover:bg-primary/10 text-secondary hover:text-primary transition-colors active:scale-90"
-                    >
-                      <Play className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+            <details className="group">
+              <summary className="cursor-pointer list-none flex items-center justify-between px-4 py-3 rounded-xl border border-black/8 bg-black/4 hover:bg-black/8 transition-colors">
+                <div className="min-w-0 mr-3">
+                  <p className="font-headline font-bold text-sm text-primary">{t('settings.alertSound')}: <span className="text-secondary font-normal">{ALARM_SOUNDS.find(s => s.id === selectedSound)?.label}</span></p>
+                  <p className="font-label text-[10px] text-secondary mt-0.5 pr-4">{t('settings.alertSoundDesc')}</p>
                 </div>
-              ))}
-            </div>
+                <ChevronDown className="w-5 h-5 text-secondary group-open:rotate-180 transition-transform shrink-0" />
+              </summary>
+              <div className="space-y-2 mt-2 pl-2">
+                {ALARM_SOUNDS.map((sound) => (
+                  <div
+                    key={sound.id}
+                    className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all cursor-pointer
+                      ${selectedSound === sound.id
+                        ? 'border-primary bg-primary/10'
+                        : 'border-black/8 bg-black/4 hover:bg-black/8'
+                      }`}
+                    onClick={() => handleSelect(sound.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
+                        ${selectedSound === sound.id ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
+                        {selectedSound === sound.id && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                      <span className="font-headline font-bold text-sm text-primary">{sound.label}</span>
+                    </div>
+                    {sound.file && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); previewSound(sound.id); }}
+                        className="p-2 rounded-full bg-surface-container-high hover:bg-primary/10 text-secondary hover:text-primary transition-colors active:scale-90"
+                      >
+                        <Play className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </details>
           </div>
 
           {/* Daily Fact toggle */}
