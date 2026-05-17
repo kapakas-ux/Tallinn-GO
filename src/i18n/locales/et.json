@@ -95,6 +95,8 @@
     "recent": "Teie viimased 6 reisiotsingut salvestatakse planeerija lehel, et saaksite kiirelt korduvat marsruuti ühe puudutusega uuesti planeerida.",
     "widgetTitle": "Avakuva vidin",
     "widget": "Lisage avakuvale vidin, et näha lemmikpeatuste reaalajas väljumisi ühe pilguga — rakendust pole vaja avada!",
+    "clusteringTitle": "Peatuste rühmitamine",
+    "clustering": "Luba seadetes peatuste rühmitamine, et liita suurtes sõlmpunktides (nagu Balti jaam) lähedased peatused ühtseks väljumiste tabeliks. Rühmitamise raadiust saad vastavalt vajadusele reguleerida.",
     "gotIt": "Selge!"
   },
   "settings": {
