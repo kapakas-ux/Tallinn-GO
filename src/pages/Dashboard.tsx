@@ -62,7 +62,11 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   });
 
   useEffect(() => {
-    const handleSettingsChange = () => setSettings(getSettings());
+    const handleSettingsChange = () => {
+      const s = getSettings();
+      setSettings(s);
+      setClusterRadius(s.clusterRadius);
+    };
     window.addEventListener('settings_changed', handleSettingsChange);
     return () => window.removeEventListener('settings_changed', handleSettingsChange);
   }, []);
@@ -186,21 +190,38 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     };
   }, []); // Run once on mount
 
-  // Update closest stop and nearby when location changes
+  const [clusterRadius, setClusterRadius] = useState(getSettings().clusterRadius);
+  // Cache clusters — only recompute when allStops or radius changes
+  const cachedClustersRef = useRef<StopCluster[] | null>(null);
+
+  // Pre-compute clusters once when allStops or radius changes
+  // (clustering uses stop-to-stop distance, independent of user location)
+  useEffect(() => {
+    if (allStops.length === 0) return;
+    cachedClustersRef.current = clusterStops(
+      allStops, 59.437, 24.745, // dummy coords — clusterStops only uses them for .distance, ignored here
+      { radiusM: clusterRadius, topN: 20 },
+    );
+  }, [allStops, clusterRadius]);
+
+  // Update closest stop / hero when location changes
+  // Only re-scores pre-computed clusters — O(n), not O(n²)
   useEffect(() => {
     if (!userLocation || allStops.length === 0) return;
 
-    const { clusterRadius } = settings;
+    // Attach distances to all stops and sort
     const sorted = [...allStops].map(s => ({
       ...s,
       distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng)
     })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
-    // Run geographic clustering
-    const clusters = clusterStops(sorted, userLocation.lat, userLocation.lng, {
-      radiusM: clusterRadius,
-      topN: 5,
-    });
+    const clusters = (cachedClustersRef.current || []).map(c => ({
+      ...c,
+      stops: c.stops.map(s => {
+        const fresh = sorted.find(x => x.id === s.id);
+        return fresh ?? s;
+      }).sort((a, b) => (a.distance || 0) - (b.distance || 0)),
+    }));
 
     // Build a set of stop ids that belong to clusters
     const clusteredIds = new Set<string>();
@@ -217,57 +238,42 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     // Merge clusters + singles into a ranked list
     const items: (StopCluster | Stop)[] = [];
 
-    // First, add all clusters with their initial score (0 departures — will be
-    // re-scored once departures arrive)
     for (const c of clusters) {
       items.push({ ...c, score: 1 / Math.max(1, (c.stops[0]?.distance ?? 0.1) * 1000) });
     }
 
-    // Then single stops — sorted by distance
     for (const s of singles.slice(0, 10)) items.push(s);
 
     // Pick the hero item
     const hero = items[0];
     if (hero && 'hubName' in hero) {
-      // Top item is a cluster
       const cluster = hero as StopCluster;
       const prevId = heroCluster?.id;
       setHeroCluster(cluster);
-      setClosestStop(cluster.stops[0]); // for backward compat in map link etc
+      setClosestStop(cluster.stops[0]);
 
-      // Fetch merged cluster departures
       if (cluster.id !== prevId) {
         setLoading(true);
         fetchClusterDepartures(cluster).then(({ departures, departuresPerHour }) => {
           setClusterDepartures(departures.slice(0, 12));
-          setDepartures(departures.slice(0, 12)); // for ArrivalItem rendering
-          // Re-score with real dph
+          setDepartures(departures.slice(0, 12));
           setHeroCluster(prev => prev ? { ...prev, score: scoreCluster(prev, departuresPerHour), departuresPerHour } : null);
           setLoading(false);
         }).catch(() => setLoading(false));
       }
 
-      // Nearby: next best items
       const nearby: Stop[] = [];
       for (let i = 1; i < items.length && nearby.length < 3; i++) {
         const item = items[i];
-        if ('hubName' in item) {
-          // Nearby cluster — show its best stop for now
-          nearby.push((item as StopCluster).stops[0]);
-        } else {
-          nearby.push(item as Stop);
-        }
+        nearby.push('hubName' in item ? (item as StopCluster).stops[0] : item as Stop);
       }
       setNearbyStops(nearby);
     } else if (hero) {
-      // Top item is a single stop — fall through to existing behaviour
       setHeroCluster(null);
       setClusterDepartures([]);
       const nearest = hero as Stop;
-
       const nearby = items.slice(1, 4).map(i => ('hubName' in i ? (i as StopCluster).stops[0] : i as Stop));
 
-      // Only update departures if the closest stop actually changed
       if (!closestStop || nearest.id !== closestStop.id) {
         setClosestStop(nearest);
         setNearbyStops(nearby);
@@ -281,7 +287,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         setNearbyStops(nearby);
       }
     }
-  }, [userLocation, allStops, settings.clusterRadius]);
+  }, [userLocation, allStops]);
 
   // Auto-fetch departures for all nearby stops
   useEffect(() => {
