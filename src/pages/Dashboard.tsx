@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
@@ -37,6 +37,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const [home, setHome] = useState<HomeLocation | null>(getHome());
   const [homePickerOpen, setHomePickerOpen] = useState(false);
   const [contentReady, setContentReady] = useState(false);
+  const refreshFnRef = useRef<(() => void) | null>(null);
   
   const [expandedNearby, setExpandedNearby] = useState(null as string | null);
   const [nearbyDepartures, setNearbyDepartures] = useState({} as { [key: string]: Arrival[] });
@@ -296,40 +297,60 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         requestAnimationFrame(() => requestAnimationFrame(fn));
       };
 
+      let pending = 0;
+      const markDone = () => {
+        pending--;
+        if (pending <= 0) {
+          // All fetches scheduled — signal App.tsx to hide the spinner
+          window.dispatchEvent(new CustomEvent('pull-refresh-done'));
+        }
+      };
+
       // Refresh closest stop
       if (closestStop) {
+        pending++;
         fetchDepartures(closestStop.id, closestStop.siriId).then(deps => {
           scheduleUpdate(() => setDepartures(deps.slice(0, 6)));
-        }).catch(err => console.error("Failed to refresh closest stop departures", err));
+        }).catch(err => console.error("Failed to refresh closest stop departures", err))
+        .finally(markDone);
       }
 
       // Refresh nearby stops
       nearbyStops.forEach(stop => {
+        pending++;
         fetchDepartures(stop.id, stop.siriId).then(deps => {
           scheduleUpdate(() => setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) })));
-        }).catch(err => console.error("Failed to refresh nearby departures", err));
+        }).catch(err => console.error("Failed to refresh nearby departures", err))
+        .finally(markDone);
       });
 
       // Refresh favorites (which have their own rows in the dashboard)
       favorites.forEach(fav => {
-        // Skip if this favorite is already covered as the closest or a nearby stop
         if (closestStop?.id === fav.id) return;
         if (nearbyStops.some(s => s.id === fav.id)) return;
+        pending++;
         fetchDepartures(fav.id, fav.siriId).then(deps => {
           scheduleUpdate(() => setNearbyDepartures(prev => ({ ...prev, [fav.id]: deps.slice(0, 6) })));
-        }).catch(err => console.error("Failed to refresh favorite departures", err));
+        }).catch(err => console.error("Failed to refresh favorite departures", err))
+        .finally(markDone);
       });
 
       // Refresh expanded favorite (3 rows when expanded)
       if (expandedNearby && !nearbyStops.some(s => s.id === expandedNearby)) {
         const stop = favorites.find(f => f.id === expandedNearby);
         if (stop) {
+          pending++;
           fetchDepartures(stop.id, stop.siriId).then(deps => {
             scheduleUpdate(() => setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 3) })));
-          }).catch(err => console.error("Failed to refresh favorite departures", err));
+          }).catch(err => console.error("Failed to refresh favorite departures", err))
+          .finally(markDone);
         }
       }
+
+      if (pending === 0) markDone();
     };
+
+    refreshFnRef.current = refreshAll;
 
     const interval = setInterval(refreshAll, 10000);
 
@@ -342,9 +363,14 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     };
     document.addEventListener('visibilitychange', onVisible);
 
+    // Listen for pull-to-refresh gesture from App.tsx
+    const onPullRefresh = () => refreshFnRef.current?.();
+    window.addEventListener('pull-to-refresh', onPullRefresh);
+
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pull-to-refresh', onPullRefresh);
     };
   }, [active, closestStop, expandedNearby, allStops, favorites, nearbyStops]);
 

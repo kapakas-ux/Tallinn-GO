@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, Star, Navigation as NearMe, ChevronRight, Loader2, X, Trash2, Map as MapIcon, MapPin, ChevronDown, ChevronUp, Footprints, Edit, X as CloseIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -67,6 +67,7 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
   const [nearbyStops, setNearbyStops] = useState([] as Stop[]);
   const [expandedNearby, setExpandedNearby] = useState(null as string | null);
   const [nearbyDepartures, setNearbyDepartures] = useState({} as { [key: string]: Arrival[] });
+  const refreshFnRef = useRef<(() => void) | null>(null);
   const [nearbyLoading, setNearbyLoading] = useState({} as { [key: string]: boolean });
   const [isSimulated, setIsSimulated] = useState(false);
   const [searchDepartures, setSearchDepartures] = useState({} as { [key: string]: Arrival[] });
@@ -261,6 +262,8 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
       }
     };
 
+    refreshFnRef.current = refreshAll;
+
     const interval = setInterval(refreshAll, 10000);
 
     // Immediate refresh on app resume / tab visibility so cached
@@ -270,9 +273,14 @@ export const Stops = ({ active = true }: { active?: boolean }) => {
     };
     document.addEventListener('visibilitychange', onVisible);
 
+    // Listen for pull-to-refresh gesture from App.tsx
+    const onPullRefresh = () => refreshFnRef.current?.();
+    window.addEventListener('pull-to-refresh', onPullRefresh);
+
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pull-to-refresh', onPullRefresh);
     };
   }, [active, favorites, expandedNearby, selectedStop, allStops]);
 

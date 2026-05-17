@@ -91,9 +91,9 @@ function AppContent() {
     if (!shouldRefresh) return;
 
     setIsRefreshing(true);
-    window.setTimeout(() => {
-      window.location.reload();
-    }, 120);
+    // Dispatch a custom event so only the active page refreshes its data —
+    // no full page reload, TopBar and BottomNav stay untouched.
+    window.dispatchEvent(new CustomEvent('pull-to-refresh'));
   };
 
   useEffect(() => {
@@ -111,6 +111,16 @@ function AppContent() {
     resetPull();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+
+  // Hide pull-to-refresh spinner once page reports data has loaded
+  useEffect(() => {
+    const onDone = () => {
+      // Small delay so rAF-batched DOM updates finish painting
+      setTimeout(() => setIsRefreshing(false), 180);
+    };
+    window.addEventListener('pull-refresh-done', onDone);
+    return () => window.removeEventListener('pull-refresh-done', onDone);
+  }, []);
 
   useEffect(() => {
     startRidangoWS();
