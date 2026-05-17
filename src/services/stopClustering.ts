@@ -66,12 +66,38 @@ export function clusterStops(
     else { parent[rb] = ra; rank[ra]++; }
   };
 
-  // Union stops within radiusM (comparing every pair — O(n²) but n is small,
-  // typically < 4000, and this runs once on the full stop list)
+  // Spatial grid to avoid O(n²) comparisons.
+  // Cell size in degrees (1° lat ≈ 111 km).  Use radiusM * 1.5 for safety.
+  const cellDeg = (radiusM * 1.5) / 111_000;
+  const grid = new Map<string, number[]>();
   for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const d = getDistance(stops[i].lat, stops[i].lng, stops[j].lat, stops[j].lng) * 1000;
-      if (d <= radiusM) union(i, j);
+    const key = `${Math.floor(stops[i].lat / cellDeg)}|${Math.floor(stops[i].lng / cellDeg)}`;
+    const arr = grid.get(key) || [];
+    arr.push(i);
+    grid.set(key, arr);
+  }
+
+  // Only compare stops within the same cell or 8 adjacent cells
+  for (const [key, indices] of grid) {
+    const [cy, cx] = key.split('|').map(Number);
+    // Collect all indices from this cell and its 8 neighbors
+    const pool: number[] = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const neighborKey = `${cy + dy}|${cx + dx}`;
+        const neighbor = grid.get(neighborKey);
+        if (neighbor) pool.push(...neighbor);
+      }
+    }
+    // Compare each stop in the center cell with all stops in the pool
+    for (let a = 0; a < indices.length; a++) {
+      const i = indices[a];
+      for (let b = 0; b < pool.length; b++) {
+        const j = pool[b];
+        if (j <= i) continue; // avoid duplicate comparisons
+        const d = getDistance(stops[i].lat, stops[i].lng, stops[j].lat, stops[j].lng) * 1000;
+        if (d <= radiusM) union(i, j);
+      }
     }
   }
 
