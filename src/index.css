@@ -39,8 +39,9 @@
     margin: 0;
     padding: 0;
     overscroll-behavior: none;
-    /* Prevent white flash during WebView overscroll */
-    background-color: #fcf9f5 !important;
+    /* Follow theme surface color — prevents white flash during WebView overscroll
+       while respecting dark themes (plum, havgra) */
+    background-color: var(--color-surface, #fcf9f5);
   }
   
   body {
