@@ -8,6 +8,7 @@ import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportS
 import { getFavorites, isFavorite, subscribeFavorites, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
+import { clusterStops, fetchClusterDepartures, scoreCluster, type StopCluster } from '../services/stopClustering';
 import { ArrivalItem, getLiveMinutes, CompactTime } from '../components/ArrivalItem';
 import { Stop, Arrival } from '../types';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
@@ -42,6 +43,9 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const [expandedNearby, setExpandedNearby] = useState(null as string | null);
   const [nearbyDepartures, setNearbyDepartures] = useState({} as { [key: string]: Arrival[] });
   const [nearbyLoading, setNearbyLoading] = useState({} as { [key: string]: boolean });
+  // Stop clustering — when enabled, clusters replace the individual next-stop cards
+  const [heroCluster, setHeroCluster] = useState<StopCluster | null>(null);
+  const [clusterDepartures, setClusterDepartures] = useState<Arrival[]>([]);
   const [favorites, setFavorites] = useState([] as Stop[]);
   const [allStops, setAllStops] = useState([] as Stop[]);
   const [isEditingFavs, setIsEditingFavs] = useState(false);
@@ -186,32 +190,98 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   useEffect(() => {
     if (!userLocation || allStops.length === 0) return;
 
+    const { clusterRadius } = settings;
     const sorted = [...allStops].map(s => ({
       ...s,
       distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng)
     })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
-    const nearest = sorted[0];
-    const nearby = sorted.slice(1, 4);
-    
-    // Only update departures if the closest stop actually changed
-    if (!closestStop || nearest.id !== closestStop.id) {
-      setClosestStop(nearest);
-      setNearbyStops(nearby);
-      setLoading(true);
-      
-      fetchDepartures(nearest.id, nearest.siriId).then(deps => {
-        setDepartures(deps.slice(0, 6));
-        setLoading(false);
-      }).catch(() => {
-        setLoading(false);
-      });
-    } else {
-      // Just update distance
-      setClosestStop(nearest);
-      setNearbyStops(nearby);
+    // Run geographic clustering
+    const clusters = clusterStops(sorted, userLocation.lat, userLocation.lng, {
+      radiusM: clusterRadius,
+      topN: 5,
+    });
+
+    // Build a set of stop ids that belong to clusters
+    const clusteredIds = new Set<string>();
+    for (const c of clusters) {
+      for (const s of c.stops) clusteredIds.add(s.id);
     }
-  }, [userLocation, allStops]);
+
+    // Collect single (non-clustered) stops
+    const singles: Stop[] = [];
+    for (const s of sorted) {
+      if (!clusteredIds.has(s.id)) singles.push(s);
+    }
+
+    // Merge clusters + singles into a ranked list
+    const items: (StopCluster | Stop)[] = [];
+
+    // First, add all clusters with their initial score (0 departures — will be
+    // re-scored once departures arrive)
+    for (const c of clusters) {
+      items.push({ ...c, score: 1 / Math.max(1, (c.stops[0]?.distance ?? 0.1) * 1000) });
+    }
+
+    // Then single stops — sorted by distance
+    for (const s of singles.slice(0, 10)) items.push(s);
+
+    // Pick the hero item
+    const hero = items[0];
+    if (hero && 'hubName' in hero) {
+      // Top item is a cluster
+      const cluster = hero as StopCluster;
+      const prevId = heroCluster?.id;
+      setHeroCluster(cluster);
+      setClosestStop(cluster.stops[0]); // for backward compat in map link etc
+
+      // Fetch merged cluster departures
+      if (cluster.id !== prevId) {
+        setLoading(true);
+        fetchClusterDepartures(cluster).then(({ departures, departuresPerHour }) => {
+          setClusterDepartures(departures.slice(0, 12));
+          setDepartures(departures.slice(0, 12)); // for ArrivalItem rendering
+          // Re-score with real dph
+          setHeroCluster(prev => prev ? { ...prev, score: scoreCluster(prev, departuresPerHour), departuresPerHour } : null);
+          setLoading(false);
+        }).catch(() => setLoading(false));
+      }
+
+      // Nearby: next best items
+      const nearby: Stop[] = [];
+      for (let i = 1; i < items.length && nearby.length < 3; i++) {
+        const item = items[i];
+        if ('hubName' in item) {
+          // Nearby cluster — show its best stop for now
+          nearby.push((item as StopCluster).stops[0]);
+        } else {
+          nearby.push(item as Stop);
+        }
+      }
+      setNearbyStops(nearby);
+    } else if (hero) {
+      // Top item is a single stop — fall through to existing behaviour
+      setHeroCluster(null);
+      setClusterDepartures([]);
+      const nearest = hero as Stop;
+
+      const nearby = items.slice(1, 4).map(i => ('hubName' in i ? (i as StopCluster).stops[0] : i as Stop));
+
+      // Only update departures if the closest stop actually changed
+      if (!closestStop || nearest.id !== closestStop.id) {
+        setClosestStop(nearest);
+        setNearbyStops(nearby);
+        setLoading(true);
+        fetchDepartures(nearest.id, nearest.siriId).then(deps => {
+          setDepartures(deps.slice(0, 6));
+          setLoading(false);
+        }).catch(() => setLoading(false));
+      } else {
+        setClosestStop(nearest);
+        setNearbyStops(nearby);
+      }
+    }
+  }, [userLocation, allStops, settings.clusterRadius]);
 
   // Auto-fetch departures for all nearby stops
   useEffect(() => {
@@ -306,8 +376,17 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         }
       };
 
-      // Refresh closest stop
-      if (closestStop) {
+      // Refresh closest stop (or hero cluster if active)
+      if (heroCluster) {
+        pending++;
+        fetchClusterDepartures(heroCluster).then(({ departures }) => {
+          scheduleUpdate(() => {
+            setClusterDepartures(departures.slice(0, 12));
+            setDepartures(departures.slice(0, 12));
+          });
+        }).catch(err => console.error("Failed to refresh cluster departures", err))
+        .finally(markDone);
+      } else if (closestStop) {
         pending++;
         fetchDepartures(closestStop.id, closestStop.siriId).then(deps => {
           scheduleUpdate(() => setDepartures(deps.slice(0, 6)));
@@ -846,10 +925,18 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                   {favorites.find(f => f.id === closestStop.id)?.emoji && (
                     <span className="text-4xl md:text-5xl">{favorites.find(f => f.id === closestStop.id)?.emoji}</span>
                   )}
-                  {favorites.find(f => f.id === closestStop.id)?.customName || closestStop.name}
+                  {heroCluster 
+                    ? heroCluster.hubName
+                    : (favorites.find(f => f.id === closestStop.id)?.customName || closestStop.name)
+                  }
                 </>
               ) : t('dashboard.locating')}
             </h2>
+            {heroCluster && (
+              <p className="font-label text-[10px] text-primary/60 font-bold uppercase tracking-wider mt-0.5">
+                {t('dashboard.stopsInCluster', { count: heroCluster.stops.length })}
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             {closestStop && !isSimulated && (
@@ -924,6 +1011,29 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
           </div>
         )}
       </section>
+
+      {/* Cluster member stops — expandable list */}
+      {heroCluster && (
+        <section className="mb-6">
+          <details className="group">
+            <summary className="cursor-pointer list-none flex items-center gap-2 text-[10px] font-label font-bold uppercase tracking-widest text-secondary/70 hover:text-primary transition-colors">
+              <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />
+              {t('dashboard.stopsInCluster', { count: heroCluster.stops.length })}
+            </summary>
+            <div className="mt-2 space-y-1 pl-5">
+              {heroCluster.stops.map(s => (
+                <div key={s.id} className="flex items-center justify-between text-[11px]">
+                  <span className="font-headline font-semibold text-primary">{s.name}</span>
+                  <span className="font-label text-secondary text-[10px] flex items-center gap-1">
+                    <Footprints className="w-2.5 h-2.5" />
+                    {formatDistance((s.distance ?? 0) * 1000)} · {formatWalkingTime((s.distance ?? 0) * 1000)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </details>
+        </section>
+      )}
 
       {/* Real-Time Arrivals Section */}
       <section className="mb-12 space-y-6">

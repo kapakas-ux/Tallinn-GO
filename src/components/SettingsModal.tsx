@@ -22,6 +22,7 @@ export const SettingsModal = ({ onClose }: Props) => {
   const [showFact, setShowFact] = useState(getSettings().showDailyFact);
   const [showFavoritesFirst, setShowFavoritesFirst] = useState(getSettings().showFavoritesFirst);
   const [largeText, setLargeText] = useState(getSettings().largeText);
+  const [clusterRadius, setClusterRadius] = useState(getSettings().clusterRadius);
   const [activeTheme, setActiveTheme] = useState<AppTheme>(getSettings().theme);
   const [home, setHome] = useState<HomeLocation | null>(getHome());
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -180,6 +181,30 @@ export const SettingsModal = ({ onClose }: Props) => {
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${largeText ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
+          </div>
+
+          {/* Cluster Radius slider */}
+          <div className="px-4 py-3 rounded-xl border border-black/8 bg-black/4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="font-headline font-bold text-sm text-primary">{t('settings.clusterRadius')}</p>
+                <p className="font-label text-[10px] text-secondary mt-0.5">{t('settings.clusterRadiusDesc')}</p>
+              </div>
+              <span className="font-headline font-bold text-sm text-primary tabular-nums">{clusterRadius} m</span>
+            </div>
+            <input
+              type="range"
+              min="30"
+              max="300"
+              step="10"
+              value={clusterRadius}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setClusterRadius(v);
+                saveSettings({ clusterRadius: v });
+              }}
+              className="w-full h-2 bg-outline-variant/30 rounded-full appearance-none cursor-pointer accent-primary"
+            />
           </div>
 
           {/* Home address */}

@@ -114,6 +114,8 @@
     "dailyFactDesc": "Show a fun fact on the dashboard each day",
     "showFavoritesFirst": "Show Favorites First",
     "showFavoritesFirstDesc": "Display favorites above nearby stops",
+    "clusterRadius": "Stop Clustering Radius",
+    "clusterRadiusDesc": "Group nearby stops together (default 80 m)",
     "largeText": "Larger Text",
     "largeTextDesc": "Increase text size throughout the app",
     "homeAddress": "Home address",
@@ -166,7 +168,8 @@
     "emojiAirport": "Airport",
     "emojiBus": "Bus",
     "emojiHeart": "Heart",
-    "routeChanges": "route changes active"
+    "routeChanges": "route changes active",
+    "stopsInCluster": "❯ {{count}} stops"
   },
   "stops": {
     "searchPlaceholder": "Search stops...",

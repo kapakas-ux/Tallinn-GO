@@ -116,6 +116,8 @@
     "showFavoritesFirstDesc": "Kuva lemmikud lähedalasuvate peatuste kohal",
     "largeText": "Suurem tekst",
     "largeTextDesc": "Suurenda teksti suurust kogu rakenduses",
+    "clusterRadius": "Peatuste rühmitamise raadius",
+    "clusterRadiusDesc": "Rühmita läheduses olevad peatused (vaikimisi 80 m)",
     "homeAddress": "Koduaadress",
     "homeAddressUnset": "Vajuta määramiseks"
   },
@@ -166,7 +168,8 @@
     "emojiAirport": "Lennujaam",
     "emojiBus": "Buss",
     "emojiHeart": "Süda",
-    "routeChanges": "marsruudimuudatust"
+    "routeChanges": "marsruudimuudatust",
+    "stopsInCluster": "❯ {{count}} peatust"
   },
   "stops": {
     "searchPlaceholder": "Otsi peatusi...",
