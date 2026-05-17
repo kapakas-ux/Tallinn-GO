@@ -120,6 +120,7 @@
     "clusterRadiusDesc": "Rühmita läheduses olevad peatused (vaikimisi 80 m)",
     "clusterEnabled": "Peatuste rühmitamine",
     "clusterEnabledDesc": "Liida lähedased peatused ühtse väljumistega sõlmpunktiks",
+    "clusterBeta": "⚠ Beeta — võib rakendust aeglustada",
     "homeAddress": "Koduaadress",
     "homeAddressUnset": "Vajuta määramiseks"
   },

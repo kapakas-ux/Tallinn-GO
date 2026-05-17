@@ -118,6 +118,7 @@
     "clusterRadiusDesc": "Group nearby stops together (default 80 m)",
     "clusterEnabled": "Stop Clustering",
     "clusterEnabledDesc": "Merge nearby stops into hubs with unified departure boards",
+    "clusterBeta": "⚠ Beta — may slow down the app",
     "largeText": "Larger Text",
     "largeTextDesc": "Increase text size throughout the app",
     "homeAddress": "Home address",

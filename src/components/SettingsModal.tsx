@@ -189,6 +189,7 @@ export const SettingsModal = ({ onClose }: Props) => {
             <div>
               <p className="font-headline font-bold text-sm text-primary">{t('settings.clusterEnabled')}</p>
               <p className="font-label text-[10px] text-secondary mt-0.5">{t('settings.clusterEnabledDesc')}</p>
+              <p className="font-label text-[9px] text-amber-600 mt-0.5">{t('settings.clusterBeta')}</p>
             </div>
             <button
               onClick={() => {
