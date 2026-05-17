@@ -5,8 +5,10 @@ const config: CapacitorConfig = {
   appName: 'GO NOW',
   webDir: 'dist',
   android: {
+    backgroundColor: "#fcf9f5",
   },
   ios: {
+    backgroundColor: "#fcf9f5",
   },
   server: {
     cleartext: true,

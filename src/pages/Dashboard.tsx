@@ -36,6 +36,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [home, setHome] = useState<HomeLocation | null>(getHome());
   const [homePickerOpen, setHomePickerOpen] = useState(false);
+  const [contentReady, setContentReady] = useState(false);
   
   const [expandedNearby, setExpandedNearby] = useState(null as string | null);
   const [nearbyDepartures, setNearbyDepartures] = useState({} as { [key: string]: Arrival[] });
@@ -133,6 +134,12 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
     return cleanup;
   }, [active]);
+
+  // Mark content as visible after first paint to enable fade-in transition
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setContentReady(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // Fetch weather data when location is available
   useEffect(() => {
@@ -283,17 +290,23 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     if (!active) return;
 
     const refreshAll = () => {
+      // Use rAF to batch DOM updates — prevents white flash from
+      // intermediate empty states during rapid re-renders.
+      const scheduleUpdate = (fn: () => void) => {
+        requestAnimationFrame(() => requestAnimationFrame(fn));
+      };
+
       // Refresh closest stop
       if (closestStop) {
         fetchDepartures(closestStop.id, closestStop.siriId).then(deps => {
-          setDepartures(deps.slice(0, 6));
+          scheduleUpdate(() => setDepartures(deps.slice(0, 6)));
         }).catch(err => console.error("Failed to refresh closest stop departures", err));
       }
 
       // Refresh nearby stops
       nearbyStops.forEach(stop => {
         fetchDepartures(stop.id, stop.siriId).then(deps => {
-          setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) }));
+          scheduleUpdate(() => setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 6) })));
         }).catch(err => console.error("Failed to refresh nearby departures", err));
       });
 
@@ -303,7 +316,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         if (closestStop?.id === fav.id) return;
         if (nearbyStops.some(s => s.id === fav.id)) return;
         fetchDepartures(fav.id, fav.siriId).then(deps => {
-          setNearbyDepartures(prev => ({ ...prev, [fav.id]: deps.slice(0, 6) }));
+          scheduleUpdate(() => setNearbyDepartures(prev => ({ ...prev, [fav.id]: deps.slice(0, 6) })));
         }).catch(err => console.error("Failed to refresh favorite departures", err));
       });
 
@@ -312,7 +325,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         const stop = favorites.find(f => f.id === expandedNearby);
         if (stop) {
           fetchDepartures(stop.id, stop.siriId).then(deps => {
-            setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 3) }));
+            scheduleUpdate(() => setNearbyDepartures(prev => ({ ...prev, [stop.id]: deps.slice(0, 3) })));
           }).catch(err => console.error("Failed to refresh favorite departures", err));
         }
       }
@@ -692,7 +705,10 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   );
 
   return (
-    <div className="max-w-screen-md mx-auto px-6 mt-4 pb-10">
+    <div className={cn(
+      "max-w-screen-md mx-auto px-6 mt-4 pb-10 content-fade",
+      contentReady && "content-visible"
+    )}>
      {/* Edit Favorite Modal */}
       {editingFav && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">

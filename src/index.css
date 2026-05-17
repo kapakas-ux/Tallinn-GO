@@ -39,11 +39,28 @@
     margin: 0;
     padding: 0;
     overscroll-behavior: none;
+    /* Prevent white flash during WebView overscroll */
+    background-color: #fcf9f5 !important;
   }
   
   body {
     @apply bg-surface text-on-surface font-body;
   }
+}
+
+/* Fade-in for reflected content (pull-to-refresh, tab switches) */
+.content-fade {
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+.content-fade.content-visible {
+  opacity: 1;
+}
+
+/* Prevent WebView overscroll glow/refresh on Android */
+html {
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .editorial-shadow {
