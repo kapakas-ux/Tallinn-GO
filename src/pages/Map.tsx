@@ -163,11 +163,15 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     return cleanup;
   }, [active]);
 
+  const hasFlownRef = useRef(false);
+
   useEffect(() => subscribeHome(setHome), []);
 
-  // Fly to user location when tab becomes active
+  // Fly to user location once when tab activates or location first arrives
   useEffect(() => {
-    if (!active || !map.current || !userLocation || isSimulated) return;
+    if (!active) { hasFlownRef.current = false; return; }
+    if (!map.current || !userLocation || isSimulated || hasFlownRef.current) return;
+    hasFlownRef.current = true;
     map.current.flyTo({ center: userLocation, zoom: 15, essential: true, padding: { top: 80, bottom: 160, left: 40, right: 40 } });
   }, [active, userLocation]);
 
