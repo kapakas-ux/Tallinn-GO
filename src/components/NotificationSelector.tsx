@@ -50,12 +50,12 @@ export const NotificationSelector = ({ stop, arrival, onClose, onScheduled }: No
     <>
       {/* Invisible overlay to catch outside clicks */}
       <div 
-        className="fixed inset-0 z-[99] bg-black/40"
+        className="absolute inset-0 z-[99] bg-black/40"
         onClick={(e) => { e.stopPropagation(); onClose(); }}
       />
       <div
         ref={popupRef}
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] rounded-2xl p-5 w-56 border border-outline-variant/20 shadow-2xl notification-selector-popup"
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] rounded-2xl p-5 w-56 border border-outline-variant/20 shadow-2xl notification-selector-popup"
         onClick={(e) => e.stopPropagation()}
       >
       <div className="flex items-center justify-between mb-3">
