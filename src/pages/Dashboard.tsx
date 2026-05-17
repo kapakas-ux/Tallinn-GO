@@ -247,18 +247,23 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       return;
     }
 
-    const clusters = (cachedClustersRef.current || []).map(c => ({
+    // Only consider clusters whose members appear in the nearest 50.
+    // This discards far-away clusters (e.g., Tartu when user is in Tallinn).
+    const nearbyIds = new Set(nearest50.map(s => s.id));
+    const localClusters = (cachedClustersRef.current || []).map(c => ({
       ...c,
-      stops: c.stops.map(s => {
-        // Pick distance from the full sorted list
-        const match = withDist.find(x => x.id === s.id);
-        return match ?? { ...s, distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng) };
-      }).sort((a, b) => (a.distance || 0) - (b.distance || 0)),
-    }));
+      stops: c.stops
+        .filter(s => nearbyIds.has(s.id))
+        .map(s => {
+          const match = withDist.find(x => x.id === s.id);
+          return match ?? { ...s, distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng) };
+        })
+        .sort((a, b) => (a.distance || 0) - (b.distance || 0)),
+    })).filter(c => c.stops.length >= 2);
 
-    // Build a set of stop ids that belong to clusters
+    // Build a set of stop ids already in local clusters (to exclude from singles)
     const clusteredIds = new Set<string>();
-    for (const c of clusters) {
+    for (const c of localClusters) {
       for (const s of c.stops) clusteredIds.add(s.id);
     }
 
@@ -268,14 +273,19 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       if (!clusteredIds.has(s.id)) singles.push(s);
     }
 
-    // Merge clusters + singles into a ranked list
+    // Merge localClusters + singles into a ranked list
     const items: (StopCluster | Stop)[] = [];
 
-    for (const c of clusters) {
+    for (const c of localClusters) {
       items.push({ ...c, score: 1 / Math.max(1, (c.stops[0]?.distance ?? 0.1) * 1000) });
     }
 
     for (const s of singles.slice(0, 10)) items.push(s);
+    items.sort((a, b) => {
+      const sa = 'hubName' in a ? a.score : (1 / Math.max(1, (a.distance ?? 0.1) * 1000));
+      const sb = 'hubName' in b ? b.score : (1 / Math.max(1, (b.distance ?? 0.1) * 1000));
+      return sb - sa;
+    });
 
     // Pick the hero item
     const hero = items[0];
