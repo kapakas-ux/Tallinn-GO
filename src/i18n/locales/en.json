@@ -116,6 +116,8 @@
     "showFavoritesFirstDesc": "Display favorites above nearby stops",
     "clusterRadius": "Stop Clustering Radius",
     "clusterRadiusDesc": "Group nearby stops together (default 80 m)",
+    "clusterEnabled": "Stop Clustering",
+    "clusterEnabledDesc": "Merge nearby stops into hubs with unified departure boards",
     "largeText": "Larger Text",
     "largeTextDesc": "Increase text size throughout the app",
     "homeAddress": "Home address",

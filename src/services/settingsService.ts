@@ -8,6 +8,7 @@ export interface AppSettings {
   showDailyFact: boolean;
   showFavoritesFirst: boolean;
   largeText: boolean;
+  clusterEnabled: boolean;
   clusterRadius: number;
   theme: AppTheme;
   language: AppLanguage;
@@ -18,6 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   showDailyFact: true,
   showFavoritesFirst: false,
   largeText: false,
+  clusterEnabled: true,
   clusterRadius: 80,
   theme: 'daylight',
   language: 'en',

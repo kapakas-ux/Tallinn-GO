@@ -66,6 +66,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       const s = getSettings();
       setSettings(s);
       setClusterRadius(s.clusterRadius);
+      setClusterEnabled(s.clusterEnabled);
     };
     window.addEventListener('settings_changed', handleSettingsChange);
     return () => window.removeEventListener('settings_changed', handleSettingsChange);
@@ -191,18 +192,22 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   }, []); // Run once on mount
 
   const [clusterRadius, setClusterRadius] = useState(getSettings().clusterRadius);
+  const [clusterEnabled, setClusterEnabled] = useState(getSettings().clusterEnabled);
   // Cache clusters — only recompute when allStops or radius changes
   const cachedClustersRef = useRef<StopCluster[] | null>(null);
 
   // Pre-compute clusters once when allStops or radius changes
   // (clustering uses stop-to-stop distance, independent of user location)
   useEffect(() => {
-    if (allStops.length === 0) return;
+    if (allStops.length === 0 || !clusterEnabled) {
+      if (!clusterEnabled) cachedClustersRef.current = null;
+      return;
+    }
     cachedClustersRef.current = clusterStops(
       allStops, 59.437, 24.745, // dummy coords — clusterStops only uses them for .distance, ignored here
       { radiusM: clusterRadius, topN: 20 },
     );
-  }, [allStops, clusterRadius]);
+  }, [allStops, clusterRadius, clusterEnabled]);
 
   // Update closest stop / hero when user moves significantly (≥ 50 m).
   // Avoids 3000× Haversine calls on every GPS tick.
@@ -219,6 +224,26 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       ...s,
       distance: getDistance(userLocation.lat, userLocation.lng, s.lat, s.lng)
     })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+    // Fallback: clustering disabled → simple nearest-stop behaviour
+    if (!clusterEnabled || !cachedClustersRef.current) {
+      setHeroCluster(null);
+      setClusterDepartures([]);
+      const nearest = withDist[0];
+      const nearby = withDist.slice(1, 4);
+      if (!closestStop || nearest?.id !== closestStop.id) {
+        setClosestStop(nearest || null);
+        setNearbyStops(nearby);
+        if (nearest) {
+          setLoading(true);
+          fetchDepartures(nearest.id, nearest.siriId).then(deps => {
+            setDepartures(deps.slice(0, 6));
+            setLoading(false);
+          }).catch(() => setLoading(false));
+        }
+      }
+      return;
+    }
 
     const clusters = (cachedClustersRef.current || []).map(c => ({
       ...c,

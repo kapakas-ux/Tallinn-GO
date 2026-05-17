@@ -23,6 +23,7 @@ export const SettingsModal = ({ onClose }: Props) => {
   const [showFavoritesFirst, setShowFavoritesFirst] = useState(getSettings().showFavoritesFirst);
   const [largeText, setLargeText] = useState(getSettings().largeText);
   const [clusterRadius, setClusterRadius] = useState(getSettings().clusterRadius);
+  const [clusterEnabled, setClusterEnabled] = useState(getSettings().clusterEnabled);
   const [activeTheme, setActiveTheme] = useState<AppTheme>(getSettings().theme);
   const [home, setHome] = useState<HomeLocation | null>(getHome());
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -183,6 +184,24 @@ export const SettingsModal = ({ onClose }: Props) => {
             </button>
           </div>
 
+          {/* Stop Clustering toggle */}
+          <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-black/8 bg-black/4">
+            <div>
+              <p className="font-headline font-bold text-sm text-primary">{t('settings.clusterEnabled')}</p>
+              <p className="font-label text-[10px] text-secondary mt-0.5">{t('settings.clusterEnabledDesc')}</p>
+            </div>
+            <button
+              onClick={() => {
+                const next = !clusterEnabled;
+                setClusterEnabled(next);
+                saveSettings({ clusterEnabled: next });
+              }}
+              className={`relative w-11 h-6 rounded-full transition-colors ${clusterEnabled ? 'bg-primary' : 'bg-outline-variant/40'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${clusterEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
           {/* Cluster Radius slider */}
           <div className="px-4 py-3 rounded-xl border border-black/8 bg-black/4">
             <div className="flex items-center justify-between mb-2">
@@ -198,11 +217,9 @@ export const SettingsModal = ({ onClose }: Props) => {
               max="300"
               step="10"
               value={clusterRadius}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                setClusterRadius(v);
-                saveSettings({ clusterRadius: v });
-              }}
+              onChange={(e) => setClusterRadius(Number(e.target.value))}
+              onMouseUp={() => saveSettings({ clusterRadius })}
+              onTouchEnd={() => saveSettings({ clusterRadius })}
               className="w-full h-2 bg-outline-variant/30 rounded-full appearance-none cursor-pointer accent-primary"
             />
           </div>
