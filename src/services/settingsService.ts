@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   showDailyFact: true,
   showFavoritesFirst: false,
   largeText: false,
-  clusterEnabled: true,
+  clusterEnabled: false,
   clusterRadius: 80,
   theme: 'daylight',
   language: 'en',
