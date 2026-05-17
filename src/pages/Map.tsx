@@ -882,7 +882,10 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       const lng = parseFloat(lngParam);
       const zoom = zoomParam ? parseFloat(zoomParam) : 14;
       if (isValidLngLat(lng, lat)) {
-        map.current.flyTo({ center: [lng, lat], zoom, essential: true, padding: { top: 80, bottom: 160, left: 40, right: 40 } });
+        // Small delay so this wins over the initial location flyTo
+        setTimeout(() => {
+          map.current?.flyTo({ center: [lng, lat], zoom, essential: true, padding: { top: 80, bottom: 160, left: 40, right: 40 } });
+        }, 200);
       }
     }
   }, [location.search]);
