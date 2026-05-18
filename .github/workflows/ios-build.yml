@@ -169,11 +169,14 @@ jobs:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
         run: |
           IPA_PATH=$(find $RUNNER_TEMP/export -name "*.ipa" | head -1)
-          xcrun altool --upload-app \
+          echo "Uploading $IPA_PATH…"
+          OUTPUT=$(xcrun altool --upload-app \
             --file "$IPA_PATH" \
             --type ios \
             --apiKey "$APPSTORE_KEY_ID" \
-            --apiIssuer "$APPSTORE_ISSUER_ID"
+            --apiIssuer "$APPSTORE_ISSUER_ID" 2>&1) || true
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi 'error\|failed' && exit 1 || echo "Upload OK"
 
       - name: Clean up keychain
         if: always()
