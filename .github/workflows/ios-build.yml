@@ -178,7 +178,7 @@ jobs:
             --apiKey "$APPSTORE_KEY_ID" \
             --apiIssuer "$APPSTORE_ISSUER_ID" 2>&1) || true
           echo "$OUTPUT"
-          echo "$OUTPUT" | grep -qi 'error\|failed' && exit 1 || echo "Upload OK"
+          echo "$OUTPUT" | grep -qi 'UPLOAD SUCCEEDED' && echo "✅ Upload OK" || (echo "❌ Upload failed" && exit 1)
 
       - name: Clean up keychain
         if: always()
