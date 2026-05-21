@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home } from 'lucide-react';
+import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home, Route as RouteIcon } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleColorClass } from '../lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
-import { fetchStops, fetchDepartures, fetchRoutes } from '../services/transportService';
+import { fetchStops, fetchDepartures, fetchRoutes, planJourney } from '../services/transportService';
 import { getFavorites, isFavorite, subscribeFavorites, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
+import { getFavouriteJourneys, subscribeJourneys, removeFavouriteJourney, type FavouriteJourney } from '../services/favouriteJourneysService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { clusterStops, fetchClusterDepartures, scoreCluster, type StopCluster } from '../services/stopClustering';
 import { ArrivalItem, getLiveMinutes, CompactTime } from '../components/ArrivalItem';
-import { Stop, Arrival } from '../types';
+import { Stop, Arrival, PlanItinerary } from '../types';
 import { getActiveAlerts, isAlertActive } from '../services/alertService';
 import { NotificationSelector } from '../components/NotificationSelector';
 import { ActiveAlerts } from '../components/ActiveAlerts';
@@ -46,6 +47,10 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   // Stop clustering — when enabled, clusters replace the individual next-stop cards
   const [heroCluster, setHeroCluster] = useState<StopCluster | null>(null);
   const [clusterDepartures, setClusterDepartures] = useState<Arrival[]>([]);
+  const [favJourneys, setFavJourneys] = useState<FavouriteJourney[]>(getFavouriteJourneys());
+  const [journeyResults, setJourneyResults] = useState<Record<string, PlanItinerary | null>>({});
+  const [journeyLoading, setJourneyLoading] = useState<Record<string, boolean>>({});
+  const [expandedJourney, setExpandedJourney] = useState<string | null>(null);
   const [favorites, setFavorites] = useState([] as Stop[]);
   const [allStops, setAllStops] = useState([] as Stop[]);
   const [isEditingFavs, setIsEditingFavs] = useState(false);
@@ -111,6 +116,11 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       setFavorites(nextFavorites);
     });
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeJourneys(setFavJourneys);
+    return unsub;
   }, []);
 
   useEffect(() => subscribeHome(setHome), []);
@@ -858,6 +868,97 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     </section>
   );
 
+  const handleJourneyClick = async (j: FavouriteJourney) => {
+    if (expandedJourney === j.id) { setExpandedJourney(null); return; }
+    setExpandedJourney(j.id);
+    if (journeyResults[j.id]) return;
+    setJourneyLoading(prev => ({ ...prev, [j.id]: true }));
+    try {
+      const fromLat = j.fromLat ?? 59.437;
+      const fromLon = j.fromLon ?? 24.745;
+      const toLat = j.toLat ?? 59.437;
+      const toLon = j.toLon ?? 24.745;
+      const results = await planJourney(fromLat, fromLon, toLat, toLon, 1);
+      setJourneyResults(prev => ({ ...prev, [j.id]: results[0] ?? null }));
+    } catch { setJourneyResults(prev => ({ ...prev, [j.id]: null })); }
+    finally { setJourneyLoading(prev => ({ ...prev, [j.id]: false })); }
+  };
+
+  const renderFavouriteJourneys = () => (
+    <section className="space-y-4 mb-12">
+      <div className="flex items-baseline justify-between">
+        <h3 className="font-headline font-bold text-2xl gradient-text">{t('dashboard.favouriteJourneys')}</h3>
+      </div>
+      {favJourneys.length === 0 ? (
+        <div className="p-10 bg-surface-container-lowest editorial-shadow rounded-[20px] text-center border-2 border-dashed border-outline-variant/20">
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <RouteIcon className="w-8 h-8 text-primary/40" />
+          </div>
+          <h4 className="font-headline font-bold text-primary mb-2 text-lg">{t('dashboard.favouriteJourneys')}</h4>
+          <p className="text-secondary text-sm max-w-[240px] mx-auto">{t('dashboard.noFavouriteJourneys')}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3">
+          {favJourneys.map(j => (
+            <div key={j.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all">
+              <button
+                onClick={() => handleJourneyClick(j)}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-container-low transition-colors rounded-[20px]"
+              >
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <RouteIcon className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-headline font-bold text-sm text-primary truncate">{j.fromName} → {j.toName}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeFavouriteJourney(j.id); }}
+                    className="p-1.5 rounded-full hover:bg-red-100 text-secondary hover:text-red-500 transition-colors"
+                  ><CloseIcon className="w-3.5 h-3.5" /></button>
+                  <ChevronDown className={cn("w-5 h-5 text-secondary transition-transform", expandedJourney === j.id && "rotate-180")} />
+                </div>
+              </button>
+              {expandedJourney === j.id && (
+                <div className="px-4 pb-4 border-t border-outline-variant/10 pt-3 bg-surface-container-lowest/50 rounded-b-[20px]">
+                  {journeyLoading[j.id] ? (
+                    <div className="flex justify-center py-6"><Loader2 className="w-6 h-6 animate-spin text-secondary" /></div>
+                  ) : journeyResults[j.id] === null ? (
+                    <p className="text-sm text-secondary text-center py-4">{t('map.noRoutes')}</p>
+                  ) : journeyResults[j.id] ? (
+                    <div className="space-y-2">
+                      {journeyResults[j.id]!.legs.map((leg, li) => (
+                        <div key={li} className="flex items-center gap-3 text-sm">
+                          <div className={cn(
+                            "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs shrink-0",
+                            leg.mode === 'WALK' ? 'bg-surface-container-high text-secondary' : 'bg-primary text-white'
+                          )}>
+                            {leg.mode === 'WALK' ? <Footprints className="w-4 h-4" /> : (leg.routeShortName || leg.mode.slice(0, 3))}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-headline font-bold text-xs text-primary truncate">
+                              {leg.mode === 'WALK' ? `${Math.round(leg.distance)} m walk` : (leg.headsign || leg.to.name)}
+                            </p>
+                            <p className="text-[9px] text-secondary font-label">
+                              {new Date(leg.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(leg.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {' · '}{Math.round(leg.duration / 60)} min
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+
   return (
     <div className={cn(
       "max-w-screen-md mx-auto px-6 mt-4 pb-10 content-fade",
@@ -1164,6 +1265,8 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
           {renderFavorites()}
         </>
       )}
+
+      {renderFavouriteJourneys()}
 
       {homePickerOpen && (
         <HomeAddressPicker

@@ -5,7 +5,7 @@ import maplibregl from 'maplibre-gl';
 import {
   MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram, TrainFront, Ship,
   Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon, Route as RouteIcon,
-  CalendarDays, Building2, Home as HomeIcon
+  CalendarDays, Building2, Home as HomeIcon, Star
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { fetchStops, planJourney } from '../services/transportService';
@@ -13,6 +13,7 @@ import { watchLocation } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
 import { darknessOverlapMs } from '../services/sunTimesService';
 import { getHome } from '../services/homeService';
+import { toggleFavouriteJourney, isJourneyFavourited } from '../services/favouriteJourneysService';
 import type { Stop, PlanItinerary, LegMode } from '../types';
 
 // ─── geocoding ──────────────────────────────────────────────────
@@ -1291,6 +1292,31 @@ export const Planner = () => {
               className="ml-auto p-1.5 rounded-full hover:bg-white/5 text-secondary hover:text-on-surface transition-colors"
             >
               <X className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const fromPlace = selectedFromPlace.current;
+                const toPlace = selectedToPlace.current;
+                const fromStop = selectedFromStop.current;
+                const toStop = selectedToStop.current;
+                toggleFavouriteJourney(
+                  from, to,
+                  fromPlace?.lat ?? fromStop?.lat,
+                  fromPlace?.lon ?? fromStop?.lng,
+                  toPlace?.lat ?? toStop?.lat,
+                  toPlace?.lon ?? toStop?.lng,
+                );
+              }}
+              aria-label={t('dashboard.saveJourney')}
+              className={cn(
+                "p-1.5 rounded-full transition-colors",
+                isJourneyFavourited(from, to)
+                  ? "text-amber-400 hover:text-amber-500"
+                  : "text-secondary hover:text-amber-400"
+              )}
+            >
+              <Star className={cn("w-4 h-4", isJourneyFavourited(from, to) && "fill-current")} />
             </button>
           </div>
           {itineraries.map((it, i) => (

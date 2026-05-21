@@ -175,7 +175,11 @@
     "emojiHeart": "Heart",
     "routeChanges": "Route changes active",
     "stopsInCluster": "❯ {{count}} stops",
-    "clusteredStops": "Clustered stops"
+    "clusteredStops": "Clustered stops",
+    "favouriteJourneys": "Favourite journeys",
+    "noFavouriteJourneys": "Save a journey from the Planner to see it here",
+    "saveJourney": "Save journey",
+    "removeJourney": "Remove journey"
   },
   "stops": {
     "searchPlaceholder": "Search stops...",

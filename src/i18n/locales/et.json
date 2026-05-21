@@ -175,7 +175,11 @@
     "emojiHeart": "Süda",
     "routeChanges": "marsruudimuudatust",
     "stopsInCluster": "❯ {{count}} peatust",
-    "clusteredStops": "rühmitatud peatust"
+    "clusteredStops": "rühmitatud peatust",
+    "favouriteJourneys": "Lemmikmarsruudid",
+    "noFavouriteJourneys": "Salvesta marsruut planeerijast, et seda siin näha",
+    "saveJourney": "Salvesta marsruut",
+    "removeJourney": "Eemalda marsruut"
   },
   "stops": {
     "searchPlaceholder": "Otsi peatusi...",
