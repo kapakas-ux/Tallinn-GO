@@ -1,6 +1,6 @@
 const SETTINGS_KEY = 'tallinn_go_settings';
 
-export type AppTheme = 'daylight' | 'plum' | 'havgra' | 'latte';
+export type AppTheme = 'daylight' | 'plum' | 'havgra' | 'latte' | 'minimal';
 export type AppLanguage = 'en' | 'et';
 
 /** Detect the initial theme on first launch based on device dark mode preference.

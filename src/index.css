@@ -325,6 +325,34 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   --color-on-primary-fixed-variant: #92400e;
 }
 
+/* Minimal (pure monochrome) */
+[data-theme="minimal"] {
+  --theme-bg: #000000;
+  --theme-orb1: #1a1a1a;
+  --theme-orb2: #222222;
+  --theme-orb3: #111111;
+  --nav-orb1: #444444;
+  --nav-orb2: #333333;
+  --nav-orb3: #555555;
+  --theme-gradient: linear-gradient(135deg, #ffffff 0%, #aaaaaa 50%, #cccccc 100%);
+
+  --color-surface: #0a0a0a;
+  --color-on-surface: #ffffff;
+  --color-primary: #ffffff;
+  --color-primary-container: #1a1a1a;
+  --color-on-primary-container: #ffffff;
+  --color-secondary: #888888;
+  --color-surface-container-low: rgba(255, 255, 255, 0.04);
+  --color-surface-container-lowest: rgba(255, 255, 255, 0.06);
+  --color-surface-container-high: rgba(255, 255, 255, 0.08);
+  --color-surface-container-highest: rgba(255, 255, 255, 0.10);
+  --color-outline-variant: rgba(255, 255, 255, 0.12);
+  --color-tertiary: #cccccc;
+  --color-on-tertiary: #000000;
+  --color-primary-fixed: rgba(255, 255, 255, 0.08);
+  --color-on-primary-fixed-variant: #ffffff;
+}
+
 /* ─── GLOBAL DARK BACKGROUND (themed) ───────────────────────── */
 [data-theme] {
   background-color: var(--theme-bg);
@@ -344,7 +372,11 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="havgra"] .bg-surface-container-lowest,
 [data-theme="havgra"] .bg-surface-container-low,
 [data-theme="havgra"] .bg-surface-container-high,
-[data-theme="havgra"] .bg-surface-container-highest {
+[data-theme="havgra"] .bg-surface-container-highest,
+[data-theme="minimal"] .bg-surface-container-lowest,
+[data-theme="minimal"] .bg-surface-container-low,
+[data-theme="minimal"] .bg-surface-container-high,
+[data-theme="minimal"] .bg-surface-container-highest {
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   transform: translate3d(0, 0, 0);
@@ -472,6 +504,14 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   color: #3d2b14;
+}
+[data-theme="minimal"] .settings-panel {
+  background: rgba(10, 10, 10, 0.92) !important;
+  backdrop-filter: blur(28px) saturate(100%);
+  -webkit-backdrop-filter: blur(28px) saturate(100%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  color: #ffffff;
 }
 
 /* ─── APP ROOT STACKING ──────────────────────────────────────── */

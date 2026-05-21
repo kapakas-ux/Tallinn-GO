@@ -149,6 +149,7 @@ function AppContent() {
           latte: '#faf6ef',
           plum: '#0c0718',
           havgra: '#060e18',
+          minimal: '#000000',
         };
         StatusBar.setBackgroundColor({ color: bgColors[currentTheme] || '#020617' });
       };

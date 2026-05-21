@@ -112,6 +112,8 @@
     "havgraDesc": "Norwegian sea gray",
     "latte": "Latte",
     "latteDesc": "Sand & caramel",
+    "minimal": "Minimal",
+    "minimalDesc": "Pure black and white",
     "alertSound": "Alert sound",
     "alertSoundDesc": "Choose the sound played when a departure alert fires. Press ▶ to preview.",
     "dailyFact": "Daily transit fact",

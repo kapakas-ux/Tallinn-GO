@@ -13,6 +13,7 @@ const THEMES: { id: AppTheme; labelKey: string; descKey: string; orb1: string; o
   { id: 'plum',     labelKey: 'settings.plum',    descKey: 'settings.plumDesc',       orb1: '#7c3aed', orb2: '#a21caf', orb3: '#4338ca' },
   { id: 'havgra',   labelKey: 'settings.havgra',  descKey: 'settings.havgraDesc',          orb1: '#1a3f6b', orb2: '#0d4f4f', orb3: '#1e3550' },
   { id: 'latte',    labelKey: 'settings.latte',   descKey: 'settings.latteDesc',              orb1: '#92400e', orb2: '#7c2d12', orb3: '#854d0e' },
+  { id: 'minimal',  labelKey: 'settings.minimal', descKey: 'settings.minimalDesc',            orb1: '#1a1a1a', orb2: '#333333', orb3: '#111111' },
 ];
 
 export const SettingsModal = ({ onClose }: Props) => {
