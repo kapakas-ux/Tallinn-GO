@@ -916,30 +916,8 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
           {favJourneys.map(j => (
             <div key={j.id} className={cn(
               "bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all",
-              isEditingJourneys && editingJourneyId === j.id && "ring-2 ring-primary/20"
+              isEditingJourneys && "ring-2 ring-primary/20"
             )}>
-              {isEditingJourneys && editingJourneyId === j.id ? (
-                <div className="p-4 flex items-center gap-3">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={editJourneyName}
-                    onChange={e => setEditJourneyName(e.target.value)}
-                    className="flex-1 h-10 px-3 bg-surface-container-low rounded-xl border border-outline-variant/20 font-headline font-bold text-sm text-primary focus:outline-none focus:border-primary"
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        renameJourney(j.id, editJourneyName || j.fromName + ' → ' + j.toName);
-                        setEditingJourneyId(null);
-                      }
-                    }}
-                  />
-                  <button onClick={() => { renameJourney(j.id, editJourneyName || j.fromName + ' → ' + j.toName); setEditingJourneyId(null); }}
-                    className="px-3 py-2 bg-primary text-white rounded-xl font-headline font-bold text-xs">OK</button>
-                  <button onClick={() => setEditingJourneyId(null)}
-                    className="p-2 rounded-full text-secondary hover:text-primary"><CloseIcon className="w-4 h-4" /></button>
-                </div>
-              ) : (
-              <>
               <button
                 onClick={() => {
                   if (isEditingJourneys) {
@@ -957,9 +935,9 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                 <div className="flex items-center gap-4 min-w-0">
                   <div className={cn(
                     "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
-                    isEditingJourneys ? "bg-red-100 text-red-500" : "bg-amber-100 text-amber-600"
+                    isEditingJourneys ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-600"
                   )}>
-                    {isEditingJourneys ? <CloseIcon className="w-5 h-5" /> : <RouteIcon className="w-5 h-5" />}
+                    {isEditingJourneys ? <Edit className="w-5 h-5" /> : <RouteIcon className="w-5 h-5" />}
                   </div>
                   <div className="min-w-0">
                     <p className="font-headline font-bold text-sm text-primary truncate">{j.customName || `${j.fromName} → ${j.toName}`}</p>
@@ -1000,8 +978,6 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                     </div>
                   ) : null}
                 </div>
-              )}
-              </>
               )}
             </div>
           ))}
@@ -1070,6 +1046,44 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
               <button 
                 onClick={handleSaveEdit}
+                className="w-full h-14 bg-primary text-white font-headline font-black text-lg rounded-2xl hover:bg-primary/90 active:scale-95 transition-all"
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Journey Modal */}
+      {editingJourneyId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+          <div className="bg-surface-container-lowest editorial-shadow w-full max-w-sm rounded-[32px] overflow-hidden">
+            <div className="p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="font-headline font-bold text-2xl text-primary">{t('dashboard.editJourneys')}</h3>
+                <button onClick={() => setEditingJourneyId(null)} className="text-secondary hover:text-primary transition-colors">
+                  <CloseIcon className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                <label className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary">{t('dashboard.customName')}</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={editJourneyName}
+                  onChange={e => setEditJourneyName(e.target.value)}
+                  className="w-full h-12 px-4 bg-surface-container-low rounded-2xl border border-outline-variant/20 font-headline font-bold text-primary focus:outline-none focus:border-primary transition-colors"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      renameJourney(editingJourneyId, editJourneyName || '');
+                      setEditingJourneyId(null);
+                    }
+                  }}
+                />
+              </div>
+              <button
+                onClick={() => { renameJourney(editingJourneyId, editJourneyName || ''); setEditingJourneyId(null); }}
                 className="w-full h-14 bg-primary text-white font-headline font-black text-lg rounded-2xl hover:bg-primary/90 active:scale-95 transition-all"
               >
                 {t('common.save')}
