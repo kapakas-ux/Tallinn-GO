@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home, Route as RouteIcon, Trash2 } from 'lucide-react';
+import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home, Route as RouteIcon, Trash2, GripVertical } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleColorClass } from '../lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
@@ -68,6 +68,91 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     status: 'Checking...',
     lastError: null
   });
+
+  // ─── Section drag-to-reorder ──────────────────────────────────
+  type SectionId = 'nearby' | 'favorites' | 'journeys';
+  const DEFAULT_SECTION_ORDER: SectionId[] = ['nearby', 'favorites', 'journeys'];
+  const [sectionOrder, setSectionOrder] = useState<SectionId[]>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard_section_order');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === 3 && parsed.every((v: any) => DEFAULT_SECTION_ORDER.includes(v))) {
+          return parsed as SectionId[];
+        }
+      }
+    } catch {}
+    return DEFAULT_SECTION_ORDER;
+  });
+  const saveSectionOrder = (order: SectionId[]) => {
+    setSectionOrder(order);
+    try { localStorage.setItem('dashboard_section_order', JSON.stringify(order)); } catch {}
+  };
+  const [dragSection, setDragSection] = useState<{ id: SectionId; startY: number; currentY: number } | null>(null);
+  const sectionElRefs = useRef<Record<SectionId, HTMLDivElement | null>>({} as any);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
+  const hasMovedDuringPress = useRef(false);
+
+  const onSectionHeaderDown = useCallback((sectionId: SectionId, e: React.PointerEvent) => {
+    // Only enable on section titles, not edit buttons etc.
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+    pointerDownPos.current = { x: e.clientX, y: e.clientY };
+    hasMovedDuringPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      if (!hasMovedDuringPress.current) {
+        setDragSection({ id: sectionId, startY: e.clientY, currentY: e.clientY });
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      }
+      longPressTimer.current = null;
+    }, 500);
+  }, []);
+
+  const onSectionHeaderMove = useCallback((e: React.PointerEvent) => {
+    if (pointerDownPos.current) {
+      const dx = Math.abs(e.clientX - pointerDownPos.current.x);
+      const dy = Math.abs(e.clientY - pointerDownPos.current.y);
+      if (dx > 5 || dy > 5) hasMovedDuringPress.current = true;
+    }
+    if (!dragSection) return;
+    setDragSection(prev => prev ? { ...prev, currentY: e.clientY } : null);
+    // Determine swap target by comparing pointer Y with section midpoints
+    const order = [...sectionOrder];
+    const dragIdx = order.indexOf(dragSection.id);
+    for (let i = 0; i < order.length; i++) {
+      if (i === dragIdx) continue;
+      const el = sectionElRefs.current[order[i]];
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if ((dragIdx < i && e.clientY > midY) || (dragIdx > i && e.clientY < midY)) {
+        // Swap
+        const newOrder = [...order];
+        [newOrder[dragIdx], newOrder[i]] = [newOrder[i], newOrder[dragIdx]];
+        setSectionOrder(newOrder);
+        // Reset startY so translateY doesn't accumulate across swaps
+        setDragSection(prev => prev ? { ...prev, startY: e.clientY } : null);
+        break;
+      }
+    }
+  }, [dragSection, sectionOrder]);
+
+  const onSectionHeaderUp = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    pointerDownPos.current = null;
+    if (dragSection) {
+      // Persist final order
+      try { localStorage.setItem('dashboard_section_order', JSON.stringify(sectionOrder)); } catch {}
+      setDragSection(null);
+    }
+  }, [dragSection, sectionOrder]);
+
+  // Drag offset for translateY visual feedback
+  const dragOffset = dragSection ? dragSection.currentY - dragSection.startY : 0;
 
   useEffect(() => {
     const handleSettingsChange = () => {
@@ -525,11 +610,21 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
   const visibleFavs = showAllFavs ? favorites : favorites.slice(0, 3);
 
+  // ─── Section drag helpers ────────────────────────────────────
+  const sectionHeaderProps = (id: SectionId) => ({
+    className: cn(
+      "font-headline font-bold text-2xl gradient-text select-none cursor-grab active:cursor-grabbing transition-transform",
+      dragSection?.id === id && "scale-105 opacity-80"
+    ),
+    onPointerDown: (e: React.PointerEvent) => onSectionHeaderDown(id, e),
+  } as const);
+
   const renderNearbyStops = () => (
     nearbyStops.length > 0 && (
-      <section className="mb-12 space-y-4">
+      <section className="mb-12 space-y-4" ref={(el) => { sectionElRefs.current['nearby'] = el as any; }} data-section-id="nearby">
         <div className="flex items-baseline justify-between">
-          <h3 className="font-headline font-bold text-2xl gradient-text">{t('dashboard.nearbyStops')}</h3>
+          <h3 {...sectionHeaderProps('nearby')}>{t('dashboard.nearbyStops')}</h3>
+          {dragSection?.id === 'nearby' && <GripVertical className="w-5 h-5 text-primary animate-pulse" />}
         </div>
         <div className="grid grid-cols-1 gap-3">
           {nearbyStops.map((stop) => (
@@ -673,10 +768,12 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   );
 
   const renderFavorites = () => (
-    <section className="space-y-4 mb-12">
+    <section className="space-y-4 mb-12" ref={(el) => { sectionElRefs.current['favorites'] = el as any; }} data-section-id="favorites">
       <div className="flex items-baseline justify-between">
-        <h3 className="font-headline font-bold text-2xl gradient-text">{t('dashboard.favorites')}</h3>
-        {favorites.length > 0 && (
+        <h3 {...sectionHeaderProps('favorites')}>{t('dashboard.favorites')}</h3>
+        <div className="flex items-center gap-2">
+          {dragSection?.id === 'favorites' && <GripVertical className="w-5 h-5 text-primary animate-pulse" />}
+          {favorites.length > 0 && (
           <button 
             onClick={() => setIsEditingFavs(!isEditingFavs)}
             className={cn(
@@ -687,6 +784,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
             {isEditingFavs ? t('common.done') : t('common.edit')}
           </button>
         )}
+        </div>
       </div>
       
       <div className="grid grid-cols-1 gap-3">
@@ -888,10 +986,12 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   };
 
   const renderFavouriteJourneys = () => (
-    <section className="space-y-4 mb-12">
+    <section className="space-y-4 mb-12" ref={(el) => { sectionElRefs.current['journeys'] = el as any; }} data-section-id="journeys">
       <div className="flex items-baseline justify-between">
-        <h3 className="font-headline font-bold text-2xl gradient-text">{t('dashboard.favouriteJourneys')}</h3>
-        {favJourneys.length > 0 && (
+        <h3 {...sectionHeaderProps('journeys')}>{t('dashboard.favouriteJourneys')}</h3>
+        <div className="flex items-center gap-2">
+          {dragSection?.id === 'journeys' && <GripVertical className="w-5 h-5 text-primary animate-pulse" />}
+          {favJourneys.length > 0 && (
           <button 
             onClick={() => setIsEditingJourneys(!isEditingJourneys)}
             className={cn(
@@ -902,6 +1002,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
             {isEditingJourneys ? t('common.done') : t('common.edit')}
           </button>
         )}
+        </div>
       </div>
       {favJourneys.length === 0 ? (
         <div className="p-10 bg-surface-container-lowest editorial-shadow rounded-[20px] text-center border-2 border-dashed border-outline-variant/20">
@@ -991,10 +1092,16 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   );
 
   return (
-    <div className={cn(
-      "max-w-screen-md mx-auto px-6 mt-4 pb-10 content-fade",
-      contentReady && "content-visible"
-    )}>
+    <div
+      className={cn(
+        "max-w-screen-md mx-auto px-6 mt-4 pb-10 content-fade",
+        contentReady && "content-visible",
+        dragSection && "select-none"
+      )}
+      onPointerMove={onSectionHeaderMove}
+      onPointerUp={onSectionHeaderUp}
+      onPointerLeave={onSectionHeaderUp}
+    >
      {/* Edit Favorite Modal */}
       {editingFav && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
@@ -1333,20 +1440,30 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
         )}
       </section>
 
-      {/* Nearby Stations and Favorites Section */}
-      {settings.showFavoritesFirst ? (
-        <>
-          {renderFavorites()}
-          {renderNearbyStops()}
-        </>
-      ) : (
-        <>
-          {renderNearbyStops()}
-          {renderFavorites()}
-        </>
-      )}
-
-      {renderFavouriteJourneys()}
+      {/* Nearby Stations, Favorites & Journeys — drag-reorderable */}
+      {sectionOrder.map(id => {
+        const isDragging = dragSection?.id === id;
+        const content = (() => {
+          switch (id) {
+            case 'nearby': return renderNearbyStops();
+            case 'favorites': return renderFavorites();
+            case 'journeys': return renderFavouriteJourneys();
+            default: return null;
+          }
+        })();
+        return (
+          <div
+            key={id}
+            className={cn(
+              "transition-transform duration-150",
+              isDragging && "relative z-20 scale-[1.02]"
+            )}
+            style={isDragging ? { transform: `translateY(${dragOffset}px)`, filter: 'brightness(1.05)' } : undefined}
+          >
+            {content}
+          </div>
+        );
+      })}
 
       {homePickerOpen && (
         <HomeAddressPicker

@@ -411,12 +411,36 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="minimal"] .text-blue-500\/70 {
   color: #888888 !important;
 }
+/* Minimal: hero section live-location badge (bg-blue-50 etc) */
+[data-theme="minimal"] .bg-blue-50 {
+  background-color: rgba(255,255,255,0.06) !important;
+}
+[data-theme="minimal"] .border-blue-100 {
+  border-color: rgba(255,255,255,0.10) !important;
+}
 [data-theme="minimal"] .text-emerald-500,
 [data-theme="minimal"] .text-emerald-600 {
   color: #cccccc !important;
 }
 [data-theme="minimal"] .bg-emerald-500\/10 {
   background-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="minimal"] .ring-emerald-500\/20 {
+  --tw-ring-color: rgba(255,255,255,0.10) !important;
+}
+[data-theme="minimal"] .text-emerald-700 {
+  color: #cccccc !important;
+}
+/* Minimal: walk-in-darkness indigo badge */
+[data-theme="minimal"] .bg-indigo-500\/10 {
+  background-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="minimal"] .text-indigo-600,
+[data-theme="minimal"] .text-indigo-500 {
+  color: #cccccc !important;
+}
+[data-theme="minimal"] .ring-indigo-500\/20 {
+  --tw-ring-color: rgba(255,255,255,0.10) !important;
 }
 [data-theme="minimal"] .bg-sky-500\/10 {
   background-color: rgba(255,255,255,0.08) !important;
@@ -427,6 +451,23 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="minimal"] .bg-amber-500\/10,
 [data-theme="minimal"] .bg-amber-500\/15 {
   background-color: rgba(255,255,255,0.06) !important;
+}
+/* Minimal: SPRINT catch-tier — red → grey */
+[data-theme="minimal"] .bg-red-500\/10 {
+  background-color: rgba(255,255,255,0.06) !important;
+}
+[data-theme="minimal"] .text-red-600,
+[data-theme="minimal"] .text-red-500,
+[data-theme="minimal"] .text-red-400,
+[data-theme="minimal"] .dark\:text-red-400 {
+  color: #cccccc !important;
+}
+[data-theme="minimal"] .ring-red-500\/30 {
+  --tw-ring-color: rgba(255,255,255,0.12) !important;
+}
+/* Minimal: live-update pulsing dot → grey instead of red */
+[data-theme="minimal"] .bg-error {
+  background-color: #666666 !important;
 }
 /* Minimal: planner mode pill active state */
 [data-theme="minimal"] .bg-primary-fixed {
