@@ -403,9 +403,11 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 [data-theme="minimal"] .text-blue-500,
 [data-theme="minimal"] .text-blue-600,
-[data-theme="minimal"] .text-blue-400,
-[data-theme="minimal"] .fill-blue-500 {
+[data-theme="minimal"] .text-blue-400 {
   color: #cccccc !important;
+}
+[data-theme="minimal"] .fill-blue-500 {
+  fill: #cccccc !important;
 }
 [data-theme="minimal"] .text-blue-500\/60,
 [data-theme="minimal"] .text-blue-500\/70 {
@@ -464,6 +466,10 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 [data-theme="minimal"] .ring-red-500\/30 {
   --tw-ring-color: rgba(255,255,255,0.12) !important;
+}
+/* Minimal: error/red text icons (e.g. Planner TO pin) → grey */
+[data-theme="minimal"] .text-error {
+  color: #cccccc !important;
 }
 /* Minimal: live-update pulsing dot → grey instead of red */
 [data-theme="minimal"] .bg-error {

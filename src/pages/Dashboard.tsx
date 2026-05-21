@@ -116,6 +116,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       if (dx > 5 || dy > 5) hasMovedDuringPress.current = true;
     }
     if (!dragSection) return;
+    e.preventDefault(); // block scrolling while dragging
     setDragSection(prev => prev ? { ...prev, currentY: e.clientY } : null);
     // Determine swap target by comparing pointer Y with section midpoints
     const order = [...sectionOrder];
@@ -616,6 +617,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       "font-headline font-bold text-2xl gradient-text select-none cursor-grab active:cursor-grabbing transition-transform",
       dragSection?.id === id && "scale-105 opacity-80"
     ),
+    style: { touchAction: 'none' } as React.CSSProperties,
     onPointerDown: (e: React.PointerEvent) => onSectionHeaderDown(id, e),
   } as const);
 
@@ -1096,11 +1098,12 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       className={cn(
         "max-w-screen-md mx-auto px-6 mt-4 pb-10 content-fade",
         contentReady && "content-visible",
-        dragSection && "select-none"
+        dragSection && "select-none touch-none"
       )}
       onPointerMove={onSectionHeaderMove}
       onPointerUp={onSectionHeaderUp}
       onPointerLeave={onSectionHeaderUp}
+      onPointerCancel={onSectionHeaderUp}
     >
      {/* Edit Favorite Modal */}
       {editingFav && (
