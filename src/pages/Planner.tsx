@@ -1287,14 +1287,6 @@ export const Planner = () => {
             </h2>
             <button
               type="button"
-              onClick={closeResults}
-              aria-label={t('planner.closeResults', { defaultValue: 'Close results' })}
-              className="ml-auto p-1.5 rounded-full hover:bg-white/5 text-secondary hover:text-on-surface transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
               onClick={() => {
                 const fromPlace = selectedFromPlace.current;
                 const toPlace = selectedToPlace.current;
@@ -1310,13 +1302,21 @@ export const Planner = () => {
               }}
               aria-label={t('dashboard.saveJourney')}
               className={cn(
-                "p-1.5 rounded-full transition-colors",
+                "ml-auto p-1.5 rounded-full transition-colors",
                 isJourneyFavourited(from, to)
                   ? "text-amber-400 hover:text-amber-500"
                   : "text-secondary hover:text-amber-400"
               )}
             >
               <Star className={cn("w-4 h-4", isJourneyFavourited(from, to) && "fill-current")} />
+            </button>
+            <button
+              type="button"
+              onClick={closeResults}
+              aria-label={t('planner.closeResults', { defaultValue: 'Close results' })}
+              className="p-1.5 rounded-full hover:bg-white/5 text-secondary hover:text-on-surface transition-colors"
+            >
+              <X className="w-4 h-4" />
             </button>
           </div>
           {itineraries.map((it, i) => (

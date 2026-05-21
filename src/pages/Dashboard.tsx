@@ -51,6 +51,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const [journeyResults, setJourneyResults] = useState<Record<string, PlanItinerary | null>>({});
   const [journeyLoading, setJourneyLoading] = useState<Record<string, boolean>>({});
   const [expandedJourney, setExpandedJourney] = useState<string | null>(null);
+  const [isEditingJourneys, setIsEditingJourneys] = useState(false);
   const [favorites, setFavorites] = useState([] as Stop[]);
   const [allStops, setAllStops] = useState([] as Stop[]);
   const [isEditingFavs, setIsEditingFavs] = useState(false);
@@ -888,11 +889,22 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     <section className="space-y-4 mb-12">
       <div className="flex items-baseline justify-between">
         <h3 className="font-headline font-bold text-2xl gradient-text">{t('dashboard.favouriteJourneys')}</h3>
+        {favJourneys.length > 0 && (
+          <button 
+            onClick={() => setIsEditingJourneys(!isEditingJourneys)}
+            className={cn(
+              "font-label text-xs font-bold uppercase tracking-widest transition-all px-3 py-1 rounded-full",
+              isEditingJourneys ? "bg-primary text-white" : "text-primary hover:bg-primary/5"
+            )}
+          >
+            {isEditingJourneys ? t('common.done') : t('common.edit')}
+          </button>
+        )}
       </div>
       {favJourneys.length === 0 ? (
         <div className="p-10 bg-surface-container-lowest editorial-shadow rounded-[20px] text-center border-2 border-dashed border-outline-variant/20">
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <RouteIcon className="w-8 h-8 text-primary/40" />
+          <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <RouteIcon className="w-8 h-8 text-amber-400/40" />
           </div>
           <h4 className="font-headline font-bold text-primary mb-2 text-lg">{t('dashboard.favouriteJourneys')}</h4>
           <p className="text-secondary text-sm max-w-[240px] mx-auto">{t('dashboard.noFavouriteJourneys')}</p>
@@ -900,26 +912,31 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       ) : (
         <div className="grid grid-cols-1 gap-3">
           {favJourneys.map(j => (
-            <div key={j.id} className="bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all">
+            <div key={j.id} className={cn(
+              "bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all",
+              isEditingJourneys && "ring-2 ring-primary/20"
+            )}>
               <button
-                onClick={() => handleJourneyClick(j)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-container-low transition-colors rounded-[20px]"
+                onClick={() => isEditingJourneys ? removeFavouriteJourney(j.id) : handleJourneyClick(j)}
+                className={cn(
+                  "w-full p-4 flex items-center justify-between text-left hover:bg-surface-container-low transition-colors",
+                  expandedJourney === j.id ? "rounded-t-[20px]" : "rounded-[20px]"
+                )}
               >
                 <div className="flex items-center gap-4 min-w-0">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <RouteIcon className="w-5 h-5 text-primary" />
+                  <div className={cn(
+                    "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
+                    isEditingJourneys ? "bg-red-100 text-red-500" : "bg-amber-100 text-amber-600"
+                  )}>
+                    {isEditingJourneys ? <CloseIcon className="w-5 h-5" /> : <RouteIcon className="w-5 h-5" />}
                   </div>
                   <div className="min-w-0">
                     <p className="font-headline font-bold text-sm text-primary truncate">{j.fromName} → {j.toName}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); removeFavouriteJourney(j.id); }}
-                    className="p-1.5 rounded-full hover:bg-red-100 text-secondary hover:text-red-500 transition-colors"
-                  ><CloseIcon className="w-3.5 h-3.5" /></button>
-                  <ChevronDown className={cn("w-5 h-5 text-secondary transition-transform", expandedJourney === j.id && "rotate-180")} />
-                </div>
+                {!isEditingJourneys && (
+                  <ChevronDown className={cn("w-5 h-5 text-secondary transition-transform shrink-0", expandedJourney === j.id && "rotate-180")} />
+                )}
               </button>
               {expandedJourney === j.id && (
                 <div className="px-4 pb-4 border-t border-outline-variant/10 pt-3 bg-surface-container-lowest/50 rounded-b-[20px]">
