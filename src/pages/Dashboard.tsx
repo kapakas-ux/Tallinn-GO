@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home, Route as RouteIcon } from 'lucide-react';
+import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home, Route as RouteIcon, Trash2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleColorClass } from '../lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
@@ -933,11 +933,15 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                 )}
               >
                 <div className="flex items-center gap-4 min-w-0">
-                  <div className={cn(
-                    "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
-                    isEditingJourneys ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-600"
-                  )}>
-                    {isEditingJourneys ? <Edit className="w-5 h-5" /> : <RouteIcon className="w-5 h-5" />}
+                  <div className="relative">
+                    <div className="h-10 w-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                      <RouteIcon className="w-5 h-5" />
+                    </div>
+                    {isEditingJourneys && (
+                      <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-1 shadow-sm">
+                        <Edit className="w-2.5 h-2.5" />
+                      </div>
+                    )}
                   </div>
                   <div className="min-w-0">
                     <p className="font-headline font-bold text-sm text-primary truncate">{j.customName || `${j.fromName} → ${j.toName}`}</p>
@@ -1057,8 +1061,12 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
       {/* Edit Journey Modal */}
       {editingJourneyId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
-          <div className="bg-surface-container-lowest editorial-shadow w-full max-w-sm rounded-[32px] overflow-hidden">
+        <div
+          className="fixed inset-x-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          style={{ top: typeof window !== 'undefined' ? (window.visualViewport?.offsetTop ?? 0) : 0, height: typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : '100%' }}
+          onClick={() => setEditingJourneyId(null)}
+        >
+          <div className="bg-surface-container-lowest editorial-shadow w-full max-w-sm rounded-[32px] overflow-hidden mb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)]" onClick={e => e.stopPropagation()}>
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="font-headline font-bold text-2xl text-primary">{t('dashboard.editJourneys')}</h3>
@@ -1087,6 +1095,13 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                 className="w-full h-14 bg-primary text-white font-headline font-black text-lg rounded-2xl hover:bg-primary/90 active:scale-95 transition-all"
               >
                 {t('common.save')}
+              </button>
+              <button
+                onClick={() => { removeFavouriteJourney(editingJourneyId); setEditingJourneyId(null); }}
+                className="w-full h-12 flex items-center justify-center gap-2 text-error font-headline font-bold text-sm rounded-xl hover:bg-error/5 active:scale-95 transition-all border border-error/20"
+              >
+                <Trash2 className="w-4 h-4" />
+                {t('dashboard.removeJourney')}
               </button>
             </div>
           </div>
