@@ -337,20 +337,20 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   --theme-gradient: linear-gradient(135deg, #ffffff 0%, #999999 50%, #cccccc 100%);
 
   --color-surface: #000000;
-  --color-on-surface: #ffffff;
-  --color-primary: #333333;
-  --color-primary-container: #1a1a1a;
+  --color-on-surface: #e0e0e0;
+  --color-primary: #e0e0e0;
+  --color-primary-container: #222222;
   --color-on-primary-container: #ffffff;
   --color-secondary: #999999;
-  --color-surface-container-low: rgba(255, 255, 255, 0.03);
-  --color-surface-container-lowest: rgba(255, 255, 255, 0.05);
-  --color-surface-container-high: rgba(255, 255, 255, 0.07);
-  --color-surface-container-highest: rgba(255, 255, 255, 0.09);
-  --color-outline-variant: rgba(255, 255, 255, 0.12);
+  --color-surface-container-low: rgba(255, 255, 255, 0.05);
+  --color-surface-container-lowest: rgba(255, 255, 255, 0.08);
+  --color-surface-container-high: rgba(255, 255, 255, 0.12);
+  --color-surface-container-highest: rgba(255, 255, 255, 0.15);
+  --color-outline-variant: rgba(255, 255, 255, 0.14);
   --color-tertiary: #555555;
   --color-on-tertiary: #ffffff;
-  --color-error: #ffffff;
-  --color-primary-fixed: rgba(255, 255, 255, 0.08);
+  --color-error: #ff4444;
+  --color-primary-fixed: rgba(255, 255, 255, 0.10);
   --color-on-primary-fixed-variant: #ffffff;
 
   /* Override vehicle/transport colors to monochrome */
@@ -360,6 +360,41 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   --color-bus-light: #666666;
   --color-train: #555555;
   --color-regional: #444444;
+}
+
+/* Minimal: buttons need white-on-dark */
+[data-theme="minimal"] .bg-primary {
+  background-color: #444444 !important;
+}
+[data-theme="minimal"] .bg-primary\/10 {
+  background-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="minimal"] .text-primary {
+  color: #e0e0e0 !important;
+}
+/* Minimal: amber/gold/colored accents → gray */
+[data-theme="minimal"] .bg-amber-100,
+[data-theme="minimal"] .bg-amber-50,
+[data-theme="minimal"] .bg-amber-400\/10,
+[data-theme="minimal"] .bg-yellow-50 {
+  background-color: rgba(255,255,255,0.06) !important;
+}
+[data-theme="minimal"] .text-amber-600,
+[data-theme="minimal"] .text-amber-500,
+[data-theme="minimal"] .text-amber-400 {
+  color: #cccccc !important;
+}
+[data-theme="minimal"] .fill-current.text-amber-400 {
+  color: #888888 !important;
+}
+/* Minimal: map dark mode */
+[data-theme="minimal"] .maplibregl-popup-content {
+  background: #1a1a1a !important;
+  color: #e0e0e0 !important;
+}
+[data-theme="minimal"] .maplibregl-popup-tip {
+  border-top-color: #1a1a1a !important;
+  border-bottom-color: #1a1a1a !important;
 }
 
 /* ─── GLOBAL DARK BACKGROUND (themed) ───────────────────────── */
