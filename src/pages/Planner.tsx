@@ -13,7 +13,7 @@ import { watchLocation } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
 import { darknessOverlapMs } from '../services/sunTimesService';
 import { getHome } from '../services/homeService';
-import { toggleFavouriteJourney, isJourneyFavourited } from '../services/favouriteJourneysService';
+import { toggleFavouriteJourney, isJourneyFavourited, renameJourney, getFavouriteJourneys } from '../services/favouriteJourneysService';
 import type { Stop, PlanItinerary, LegMode } from '../types';
 
 // ─── geocoding ──────────────────────────────────────────────────
@@ -671,6 +671,7 @@ export const Planner = () => {
   const [itineraries, setItineraries] = useState<PlanItinerary[]>(persisted.current?.itineraries ?? []);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(persisted.current?.expandedIndex ?? null);
   const [searchHistory, setSearchHistory] = useState<SearchEntry[]>(() => getSearchHistory());
+  const [namingJourney, setNamingJourney] = useState<{ from: string; to: string; fromLat?: number; fromLon?: number; toLat?: number; toLon?: number } | null>(null);
 
   // Time chooser state
   type TimeMode = 'now' | 'leave-at' | 'arrive-at';
@@ -1288,17 +1289,21 @@ export const Planner = () => {
             <button
               type="button"
               onClick={() => {
+                if (isJourneyFavourited(from, to)) {
+                  toggleFavouriteJourney(from, to);
+                  return;
+                }
                 const fromPlace = selectedFromPlace.current;
                 const toPlace = selectedToPlace.current;
                 const fromStop = selectedFromStop.current;
                 const toStop = selectedToStop.current;
-                toggleFavouriteJourney(
+                setNamingJourney({
                   from, to,
-                  fromPlace?.lat ?? fromStop?.lat,
-                  fromPlace?.lon ?? fromStop?.lng,
-                  toPlace?.lat ?? toStop?.lat,
-                  toPlace?.lon ?? toStop?.lng,
-                );
+                  fromLat: fromPlace?.lat ?? fromStop?.lat,
+                  fromLon: fromPlace?.lon ?? fromStop?.lng,
+                  toLat: toPlace?.lat ?? toStop?.lat,
+                  toLon: toPlace?.lon ?? toStop?.lng,
+                });
               }}
               aria-label={t('dashboard.saveJourney')}
               className={cn(
@@ -1341,6 +1346,48 @@ export const Planner = () => {
           <p className="font-label font-bold text-[10px] uppercase tracking-widest opacity-60">
             {t('planner.enterOriginDest')}
           </p>
+        </div>
+      )}
+
+      {/* Name-your-journey popup */}
+      {namingJourney && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm" onClick={() => setNamingJourney(null)}>
+          <div className="bg-surface rounded-[24px] p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-headline font-bold text-lg text-primary mb-1">{t('dashboard.saveJourney')}</h3>
+            <p className="text-sm text-secondary mb-4">{namingJourney.from} → {namingJourney.to}</p>
+            <input
+              autoFocus
+              type="text"
+              defaultValue={`${namingJourney.from} → ${namingJourney.to}`}
+              className="w-full h-12 px-4 bg-surface-container-low rounded-2xl border border-outline-variant/20 font-headline font-bold text-primary focus:outline-none focus:border-primary transition-colors mb-4"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  const name = (e.target as HTMLInputElement).value.trim() || `${namingJourney.from} → ${namingJourney.to}`;
+                  const { from, to, fromLat, fromLon, toLat, toLon } = namingJourney;
+                  toggleFavouriteJourney(from, to, fromLat, fromLon, toLat, toLon);
+                  const saved = getFavouriteJourneys().find(j => j.fromName === from && j.toName === to);
+                  if (saved) renameJourney(saved.id, name);
+                  setNamingJourney(null);
+                }
+              }}
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setNamingJourney(null)} className="flex-1 py-3 rounded-xl border border-outline-variant font-headline font-bold text-sm text-secondary">
+                {t('common.cancel')}
+              </button>
+              <button onClick={() => {
+                const input = document.querySelector('#journey-name-input') as HTMLInputElement;
+                const name = input?.value.trim() || `${namingJourney.from} → ${namingJourney.to}`;
+                const { from, to, fromLat, fromLon, toLat, toLon } = namingJourney;
+                toggleFavouriteJourney(from, to, fromLat, fromLon, toLat, toLon);
+                const saved = getFavouriteJourneys().find(j => j.fromName === from && j.toName === to);
+                if (saved) renameJourney(saved.id, name);
+                setNamingJourney(null);
+              }} className="flex-1 py-3 rounded-xl bg-primary text-white font-headline font-bold text-sm">
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

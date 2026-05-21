@@ -6,7 +6,7 @@ import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleCol
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchStops, fetchDepartures, fetchRoutes, planJourney } from '../services/transportService';
 import { getFavorites, isFavorite, subscribeFavorites, toggleFavorite as toggleFavService, updateFavorite } from '../services/favoritesService';
-import { getFavouriteJourneys, subscribeJourneys, removeFavouriteJourney, type FavouriteJourney } from '../services/favouriteJourneysService';
+import { getFavouriteJourneys, subscribeJourneys, removeFavouriteJourney, renameJourney, type FavouriteJourney } from '../services/favouriteJourneysService';
 import { watchLocation } from '../services/locationService';
 import { getDistance } from '../lib/geo';
 import { clusterStops, fetchClusterDepartures, scoreCluster, type StopCluster } from '../services/stopClustering';
@@ -52,6 +52,8 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const [journeyLoading, setJourneyLoading] = useState<Record<string, boolean>>({});
   const [expandedJourney, setExpandedJourney] = useState<string | null>(null);
   const [isEditingJourneys, setIsEditingJourneys] = useState(false);
+  const [editingJourneyId, setEditingJourneyId] = useState<string | null>(null);
+  const [editJourneyName, setEditJourneyName] = useState('');
   const [favorites, setFavorites] = useState([] as Stop[]);
   const [allStops, setAllStops] = useState([] as Stop[]);
   const [isEditingFavs, setIsEditingFavs] = useState(false);
@@ -914,10 +916,39 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
           {favJourneys.map(j => (
             <div key={j.id} className={cn(
               "bg-surface-container-lowest editorial-shadow rounded-[20px] transition-all",
-              isEditingJourneys && "ring-2 ring-primary/20"
+              isEditingJourneys && editingJourneyId === j.id && "ring-2 ring-primary/20"
             )}>
+              {isEditingJourneys && editingJourneyId === j.id ? (
+                <div className="p-4 flex items-center gap-3">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editJourneyName}
+                    onChange={e => setEditJourneyName(e.target.value)}
+                    className="flex-1 h-10 px-3 bg-surface-container-low rounded-xl border border-outline-variant/20 font-headline font-bold text-sm text-primary focus:outline-none focus:border-primary"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        renameJourney(j.id, editJourneyName || j.fromName + ' → ' + j.toName);
+                        setEditingJourneyId(null);
+                      }
+                    }}
+                  />
+                  <button onClick={() => { renameJourney(j.id, editJourneyName || j.fromName + ' → ' + j.toName); setEditingJourneyId(null); }}
+                    className="px-3 py-2 bg-primary text-white rounded-xl font-headline font-bold text-xs">OK</button>
+                  <button onClick={() => setEditingJourneyId(null)}
+                    className="p-2 rounded-full text-secondary hover:text-primary"><CloseIcon className="w-4 h-4" /></button>
+                </div>
+              ) : (
+              <>
               <button
-                onClick={() => isEditingJourneys ? removeFavouriteJourney(j.id) : handleJourneyClick(j)}
+                onClick={() => {
+                  if (isEditingJourneys) {
+                    setEditingJourneyId(j.id);
+                    setEditJourneyName(j.customName || j.fromName + ' → ' + j.toName);
+                  } else {
+                    handleJourneyClick(j);
+                  }
+                }}
                 className={cn(
                   "w-full p-4 flex items-center justify-between text-left hover:bg-surface-container-low transition-colors",
                   expandedJourney === j.id ? "rounded-t-[20px]" : "rounded-[20px]"
@@ -931,7 +962,8 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                     {isEditingJourneys ? <CloseIcon className="w-5 h-5" /> : <RouteIcon className="w-5 h-5" />}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-headline font-bold text-sm text-primary truncate">{j.fromName} → {j.toName}</p>
+                    <p className="font-headline font-bold text-sm text-primary truncate">{j.customName || `${j.fromName} → ${j.toName}`}</p>
+                    {j.customName && <p className="text-[9px] text-secondary font-label truncate">{j.fromName} → {j.toName}</p>}
                   </div>
                 </div>
                 {!isEditingJourneys && (
@@ -968,6 +1000,8 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                     </div>
                   ) : null}
                 </div>
+              )}
+              </>
               )}
             </div>
           ))}

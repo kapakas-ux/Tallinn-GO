@@ -8,8 +8,7 @@ export interface FavouriteJourney {
   fromLat?: number;
   fromLon?: number;
   toLat?: number;
-  toLon?: number;
-  createdAt: number; // ms epoch
+  toLon?: number;  customName?: string;  createdAt: number; // ms epoch
 }
 
 // ─── Storage ──────────────────────────────────────────────────────
@@ -44,11 +43,18 @@ export const addFavouriteJourney = (from: string, to: string, fromLat?: number, 
     toName: to,
     fromLat, fromLon,
     toLat, toLon,
+    customName: `${from} → ${to}`,
     createdAt: Date.now(),
   };
-  const next = [item, ...list].slice(0, 10); // max 10
+  const next = [item, ...list].slice(0, 10);
   save(next);
   return next;
+};
+
+export const renameJourney = (id: string, customName: string) => {
+  const list = getFavouriteJourneys().map(j => j.id === id ? { ...j, customName } : j);
+  save(list);
+  return list;
 };
 
 export const removeFavouriteJourney = (id: string) => {

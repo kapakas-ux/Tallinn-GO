@@ -97,6 +97,8 @@
     "widget": "Lisage avakuvale vidin, et näha lemmikpeatuste reaalajas väljumisi ühe pilguga — rakendust pole vaja avada!",
     "clusteringTitle": "Peatuste rühmitamine",
     "clustering": "Luba seadetes peatuste rühmitamine, et liita suurtes sõlmpunktides (nagu Balti jaam) lähedased peatused ühtseks väljumiste tabeliks. Rühmitamise raadiust saad vastavalt vajadusele reguleerida.",
+    "journeysTitle": "Lemmikmarsruudid",
+    "journeys": "Leidsid marsruudi, mida sageli kasutad? Vajuta planeerijas tärni, et see salvestada. Salvestatud marsruudid kuvatakse avalehel, et saaksid ühe puudutusega järgmist väljumist kontrollida.",
     "gotIt": "Selge!"
   },
   "settings": {
@@ -121,7 +123,7 @@
     "clusterRadius": "Peatuste rühmitamise raadius",
     "clusterRadiusDesc": "Rühmita läheduses olevad peatused (vaikimisi 80 m)",
     "clusterEnabled": "Peatuste rühmitamine",
-    "clusterEnabledDesc": "Liida lähedased peatused ühtse väljumistega sõlmpunktiks",
+    "clusterEnabledDesc": "Liida lähedased peatused ühtseks sõlmpunktiks",
     "clusterBeta": "⚠ Beeta — võib rakendust aeglustada",
     "homeAddress": "Koduaadress",
     "homeAddressUnset": "Vajuta määramiseks"

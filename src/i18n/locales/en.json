@@ -97,6 +97,8 @@
     "widget": "Add a widget to your home screen to see live departures from your favorite stops at a glance — no need to open the app!",
     "clusteringTitle": "Stop Clustering",
     "clustering": "Enable stop clustering in Settings to merge nearby stops at major hubs (like Balti jaam) into a single unified departure board. You can adjust the grouping radius to suit your needs.",
+    "journeysTitle": "Favourite Journeys",
+    "journeys": "Found a route you take often? Tap the star in the Journey Planner to save it. Your saved routes appear on the dashboard so you can check the next departure with one tap.",
     "gotIt": "Got it!"
   },
   "settings": {

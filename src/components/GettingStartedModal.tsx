@@ -155,6 +155,18 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
               </div>
             </div>
             )}
+
+            <div className="flex gap-4 items-start">
+              <div className="w-10 h-10 rounded-full bg-amber-400/10 flex items-center justify-center shrink-0 mt-1">
+                <Route className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-primary text-base mb-1">{t('gettingStarted.journeysTitle')}</h3>
+                <p>
+                  {t('gettingStarted.journeys')}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
         
