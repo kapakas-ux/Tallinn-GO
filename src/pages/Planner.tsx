@@ -287,6 +287,16 @@ const fmtFare = (cents: number, currency: string) => {
 };
 
 function modeColor(mode: LegMode): string {
+  const isMinimal = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'minimal';
+  if (isMinimal) {
+    switch (mode) {
+      case 'TRAM':  return '#666666';
+      case 'RAIL':  return '#555555';
+      case 'BUS':   return '#444444';
+      case 'FERRY': return '#666666';
+      default:      return '#555555';
+    }
+  }
   switch (mode) {
     case 'TRAM':  return '#DC143C';
     case 'RAIL':  return '#f37021';
@@ -299,6 +309,12 @@ function modeColor(mode: LegMode): string {
 // Color override by service tier so commercial intercity and county regional
 // buses stand out from the default city-bus navy.
 function legColor(leg: { mode: LegMode; tier?: 'city' | 'regional' | 'commercial' }): string {
+  const isMinimal = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'minimal';
+  if (isMinimal) {
+    if (leg.mode === 'BUS' && leg.tier === 'commercial') return '#777777';
+    if (leg.mode === 'BUS' && leg.tier === 'regional')   return '#666666';
+    return modeColor(leg.mode);
+  }
   if (leg.mode === 'BUS' && leg.tier === 'commercial') return '#7c3aed'; // violet-600
   if (leg.mode === 'BUS' && leg.tier === 'regional')   return '#0d9488'; // teal-600
   return modeColor(leg.mode);
@@ -849,7 +865,7 @@ export const Planner = () => {
     if (!userCoords || stops.length === 0) return; // wait for prerequisites
     homeAutoPlanned.current = true;
     setTo(home.label);
-    selectedToPlace.current = { name: home.label, address: home.label, lat: home.lat, lon: home.lon };
+    selectedToPlace.current = { name: home.label, address: home.label, lat: home.lat, lon: home.lon, kind: 'house' };
     selectedToStop.current = null;
     setSearchParams({}, { replace: true });
     findRoutes(t('planner.currentLocation'), home.label);

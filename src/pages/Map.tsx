@@ -27,7 +27,7 @@ import { AnimatePresence, motion } from 'motion/react';
 const TALLINN_CENTER: [number, number] = [TALLINN_CENTER_COORD.lng, TALLINN_CENTER_COORD.lat]; // [lng, lat]
 const VEHICLE_VISIBILITY_MIN_ZOOM = 13;
 
-const isDarkTheme = (theme: AppTheme) => theme === 'plum' || theme === 'havgra';
+const isDarkTheme = (theme: AppTheme) => theme === 'plum' || theme === 'havgra' || theme === 'minimal';
 
 const isValidLngLat = (lng: number, lat: number) => {
   return !isNaN(lng) && !isNaN(lat) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
