@@ -3,6 +3,22 @@ const SETTINGS_KEY = 'tallinn_go_settings';
 export type AppTheme = 'daylight' | 'plum' | 'havgra' | 'latte';
 export type AppLanguage = 'en' | 'et';
 
+/** Detect the initial theme on first launch based on device dark mode preference.
+ *  Once the user picks a theme manually it is persisted and this is ignored. */
+export function getInitialTheme(): AppTheme {
+  try {
+    const stored = localStorage.getItem(SETTINGS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed.theme) return parsed.theme as AppTheme;
+    }
+  } catch { /* ignore */ }
+  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+    return 'plum';
+  }
+  return 'daylight';
+}
+
 export interface AppSettings {
   alarmSound: string;
   showDailyFact: boolean;
@@ -37,7 +53,13 @@ export const ALARM_SOUNDS = [
 export function getSettings(): AppSettings {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY);
-    return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
+    if (stored) return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+    // First launch: detect system dark mode preference
+    const initialTheme = getInitialTheme();
+    const defaults = { ...DEFAULT_SETTINGS, theme: initialTheme };
+    // Persist the detected theme so it doesn't flip on next load
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ theme: initialTheme }));
+    return defaults;
   } catch {
     return DEFAULT_SETTINGS;
   }
