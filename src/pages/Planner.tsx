@@ -1351,12 +1351,17 @@ export const Planner = () => {
 
       {/* Name-your-journey popup */}
       {namingJourney && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm" onClick={() => setNamingJourney(null)}>
-          <div className="bg-surface rounded-[24px] p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-x-0 z-[110] flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          style={{ top: typeof window !== 'undefined' ? (window.visualViewport?.offsetTop ?? 0) : 0, height: typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : '100%' }}
+          onClick={() => setNamingJourney(null)}
+        >
+          <div className="bg-surface rounded-[24px] p-6 w-full max-w-sm shadow-2xl mb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)]" onClick={e => e.stopPropagation()}>
             <h3 className="font-headline font-bold text-lg text-primary mb-1">{t('dashboard.saveJourney')}</h3>
             <p className="text-sm text-secondary mb-4">{namingJourney.from} → {namingJourney.to}</p>
             <input
               autoFocus
+              id="journey-name-input"
               type="text"
               defaultValue={`${namingJourney.from} → ${namingJourney.to}`}
               className="w-full h-12 px-4 bg-surface-container-low rounded-2xl border border-outline-variant/20 font-headline font-bold text-primary focus:outline-none focus:border-primary transition-colors mb-4"
