@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home, Route as RouteIcon, Trash2, GripVertical } from 'lucide-react';
+import { Star, Loader2, ChevronDown, ChevronUp, MapPin, Navigation, Map as MapIcon, Footprints, Edit, X as CloseIcon, Home, Route as RouteIcon, GripVertical } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { cn, formatDistance, formatWalkingTime, getStopColorClass, getVehicleColorClass } from '../lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
@@ -1062,7 +1062,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                       className="h-10 w-10 rounded-full flex items-center justify-center text-amber-400 active:scale-90 transition-all"
                       title={t('dashboard.removeJourney')}
                     >
-                      <Trash2 className="w-5 h-5" />
+                      <Star className="w-5 h-5 fill-current" />
                     </button>
                   ) : (
                     <ChevronDown className={cn("w-5 h-5 text-secondary transition-transform", expandedJourney === j.id && "rotate-180")} />
