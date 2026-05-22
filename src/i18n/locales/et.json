@@ -219,7 +219,7 @@
     "connectionError": "Marsruutide toomine ebaõnnestus. Kontrollige ühendust.",
     "noDepartures": "Väljumisi pole planeeritud",
     "updated": "Uuendatud {{time}}",
-    "fetchingDepartures": "Väljumiste toomine...",
+    "fetchingDepartures": "Väljumiste laadimine...",
     "setAlert": "Sea teavitus",
     "notifyBefore": "Teavita mind enne kui {{line}} suunas {{dest}} väljub.",
     "fiveMin": "5 minutit enne",
