@@ -487,6 +487,17 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="minimal"] .bg-amber-500\/15 {
   background-color: rgba(255,255,255,0.06) !important;
 }
+/* Minimal: map FAB buttons — dark bg so icons are visible */
+[data-theme="minimal"] .map-fab {
+  background: #2a2a2a !important;
+}
+[data-theme="minimal"] .map-fab:hover {
+  background: #3a3a3a !important;
+}
+[data-theme="minimal"] .map-fab .text-primary,
+[data-theme="minimal"] .map-fab .text-secondary {
+  color: #cccccc !important;
+}
 /* Minimal: SPRINT catch-tier — red → grey */
 [data-theme="minimal"] .bg-red-500\/10 {
   background-color: rgba(255,255,255,0.06) !important;

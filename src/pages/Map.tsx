@@ -1203,7 +1203,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       {/* Service Alerts Button */}
       <button
         onClick={() => setShowAlertsPanel(true)}
-        className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-4 z-10 bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors group"
+        className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-4 z-10 map-fab bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors group"
         title={t('map.serviceAlerts')}
       >
         <Construction className="w-5 h-5 text-red-500" />
@@ -1216,7 +1216,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
 
       <button 
         onClick={handleLocateMe}
-        className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-10 bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors group"
+        className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-10 map-fab bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors group"
         title={t('map.locateMe')}
       >
         <Navigation className={`w-5 h-5 ${userLocation ? 'text-blue-600 fill-blue-600' : 'text-primary'}`} />
@@ -1227,7 +1227,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           if (getHome()) navigate('/plan?to=home');
           else setHomePickerOpen(true);
         }}
-        className="absolute bottom-[calc(9.5rem+env(safe-area-inset-bottom))] right-4 z-10 bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors"
+        className="absolute bottom-[calc(9.5rem+env(safe-area-inset-bottom))] right-4 z-10 map-fab bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors"
         title={t('home.takeMeHome')}
       >
         <Home className={`w-5 h-5 ${home ? 'text-primary' : 'text-secondary'}`} />
