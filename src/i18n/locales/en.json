@@ -111,6 +111,8 @@
     "clustering": "Enable stop clustering in Settings to merge nearby stops at major hubs (like Balti jaam) into a single unified departure board. You can adjust the grouping radius to suit your needs.",
     "journeysTitle": "Favourite Journeys",
     "journeys": "Found a route you take often? Tap the star in the Journey Planner to save it. Your saved routes appear on the dashboard so you can check the next departure with one tap.",
+    "reorderTitle": "Reorder sections",
+    "reorder": "Long-press any section title on the dashboard (e.g. \"Favourite stops\") to drag and rearrange the order. Your layout is saved and stays the way you like it.",
     "gotIt": "Got it!"
   },
   "settings": {

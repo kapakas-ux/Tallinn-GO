@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Star, Bell, MapPin, Navigation, Clock, Route, History, Smartphone, Home, Layers } from 'lucide-react';
+import { X, Star, Bell, MapPin, Navigation, Clock, Route, History, Smartphone, Home, Layers, GripVertical } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
 
@@ -164,6 +164,18 @@ export const GettingStartedModal = ({ onClose }: GettingStartedModalProps) => {
                 <h3 className="font-bold text-primary text-base mb-1">{t('gettingStarted.journeysTitle')}</h3>
                 <p>
                   {t('gettingStarted.journeys')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="w-10 h-10 rounded-full bg-gray-500/10 flex items-center justify-center shrink-0 mt-1">
+                <GripVertical className="w-5 h-5 text-gray-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-primary text-base mb-1">{t('gettingStarted.reorderTitle')}</h3>
+                <p>
+                  {t('gettingStarted.reorder')}
                 </p>
               </div>
             </div>

@@ -477,6 +477,13 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="minimal"] .text-pink-500 {
   color: #cccccc !important;
 }
+/* Minimal: gray-500 for Getting Started drag icon */
+[data-theme="minimal"] .bg-gray-500\/10 {
+  background-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="minimal"] .text-gray-500 {
+  color: #cccccc !important;
+}
 [data-theme="minimal"] .bg-sky-500\/10 {
   background-color: rgba(255,255,255,0.08) !important;
 }

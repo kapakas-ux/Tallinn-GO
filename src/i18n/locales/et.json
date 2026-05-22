@@ -111,6 +111,8 @@
     "clustering": "Luba seadetes peatuste rühmitamine, et liita suurtes sõlmpunktides (nagu Balti jaam) lähedased peatused ühtseks väljumiste tabeliks. Rühmitamise raadiust saad vastavalt vajadusele reguleerida.",
     "journeysTitle": "Lemmikmarsruudid",
     "journeys": "Leidsid marsruudi, mida sageli kasutad? Vajuta planeerijas tärni, et see salvestada. Salvestatud marsruudid kuvatakse avalehel, et saaksid ühe puudutusega järgmist väljumist kontrollida.",
+    "reorderTitle": "Järjekorra muutmine",
+    "reorder": "Hoia pikalt avalehe jaotise pealkirja (nt \"Lemmikpeatused\"), et seda lohistada ja järjekorda muuta. Sinu paigutus salvestatakse ja jääb selliseks nagu sulle meeldib.",
     "gotIt": "Selge!"
   },
   "settings": {
