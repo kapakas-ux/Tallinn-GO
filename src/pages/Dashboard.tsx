@@ -186,10 +186,6 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       }
     }
   }, [dragSection, sectionOrder, autoScroll]);
-        break;
-      }
-    }
-  }, [dragSection, sectionOrder, autoScroll]);
 
   const onSectionHeaderUp = useCallback(() => {
     if (longPressTimer.current) {
