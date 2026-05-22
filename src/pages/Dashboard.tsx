@@ -1065,8 +1065,11 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                       <Star className="w-5 h-5 fill-current" />
                     </button>
                   ) : (
-                    <ChevronDown className={cn("w-5 h-5 text-secondary transition-transform", expandedJourney === j.id && "rotate-180")} />
+                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-amber-400">
+                      <Star className="w-5 h-5 fill-current" />
+                    </div>
                   )}
+                  <ChevronDown className={cn("w-5 h-5 text-secondary transition-transform", expandedJourney === j.id && "rotate-180")} />
                 </div>
               </button>
               {expandedJourney === j.id && (
