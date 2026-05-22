@@ -1105,9 +1105,8 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                         onClick={(e) => {
                           e.stopPropagation();
                           const it = journeyResults[j.id]!;
-                          const fromLeg = it.legs[0];
-                          const toLeg = it.legs[it.legs.length - 1];
-                          navigate(`/map?fromLat=${fromLeg.from.lat}&fromLng=${fromLeg.from.lon}&toLat=${toLeg.to.lat}&toLng=${toLeg.to.lon}&plan=1`);
+                          sessionStorage.setItem('planner_journey', JSON.stringify(it));
+                          navigate('/map?journey=1');
                         }}
                         className="w-full py-2.5 flex items-center justify-center gap-2 rounded-xl bg-surface-container-high text-primary font-headline font-bold text-xs uppercase tracking-wider hover:bg-surface-container-highest active:scale-95 transition-all"
                       >
