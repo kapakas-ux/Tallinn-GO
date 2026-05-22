@@ -381,7 +381,8 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 [data-theme="minimal"] .text-amber-600,
 [data-theme="minimal"] .text-amber-500,
-[data-theme="minimal"] .text-amber-400 {
+[data-theme="minimal"] .text-amber-400,
+[data-theme="minimal"] .text-amber-400\/40 {
   color: #cccccc !important;
 }
 [data-theme="minimal"] .fill-current.text-amber-400 {

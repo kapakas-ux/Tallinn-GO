@@ -1024,6 +1024,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
               <button
                 onClick={() => {
                   if (isEditingJourneys) {
+                    // In edit mode, tapping card opens rename modal
                     setEditingJourneyId(j.id);
                     setEditJourneyName(j.customName || j.fromName + ' → ' + j.toName);
                   } else {
@@ -1051,9 +1052,22 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                     {j.customName && <p className="text-[9px] text-secondary font-label truncate">{j.fromName} → {j.toName}</p>}
                   </div>
                 </div>
-                {!isEditingJourneys && (
-                  <ChevronDown className={cn("w-5 h-5 text-secondary transition-transform shrink-0", expandedJourney === j.id && "rotate-180")} />
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {isEditingJourneys ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFavouriteJourney(j.id);
+                      }}
+                      className="h-10 w-10 rounded-full flex items-center justify-center text-amber-400 active:scale-90 transition-all"
+                      title={t('dashboard.removeJourney')}
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  ) : (
+                    <ChevronDown className={cn("w-5 h-5 text-secondary transition-transform", expandedJourney === j.id && "rotate-180")} />
+                  )}
+                </div>
               </button>
               {expandedJourney === j.id && (
                 <div className="px-4 pb-4 border-t border-outline-variant/10 pt-3 bg-surface-container-lowest/50 rounded-b-[20px]">
@@ -1205,13 +1219,6 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                 className="w-full h-14 bg-primary text-white font-headline font-black text-lg rounded-2xl hover:bg-primary/90 active:scale-95 transition-all"
               >
                 {t('common.save')}
-              </button>
-              <button
-                onClick={() => { removeFavouriteJourney(editingJourneyId); setEditingJourneyId(null); }}
-                className="w-full h-12 flex items-center justify-center gap-2 text-error font-headline font-bold text-sm rounded-xl hover:bg-error/5 active:scale-95 transition-all border border-error/20"
-              >
-                <Trash2 className="w-4 h-4" />
-                {t('dashboard.removeJourney')}
               </button>
             </div>
           </div>
