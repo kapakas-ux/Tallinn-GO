@@ -407,7 +407,8 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="minimal"] .text-blue-400 {
   color: #cccccc !important;
 }
-[data-theme="minimal"] .fill-blue-500 {
+[data-theme="minimal"] .fill-blue-500,
+[data-theme="minimal"] .fill-blue-600 {
   fill: #cccccc !important;
 }
 [data-theme="minimal"] .text-blue-500\/60,
