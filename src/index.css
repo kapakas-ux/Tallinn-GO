@@ -475,6 +475,13 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="minimal"] .bg-error {
   background-color: #666666 !important;
 }
+/* Minimal: weather pill — ensure cloud emoji is visible on black bg */
+[data-theme="minimal"] .bg-secondary\/5 {
+  background-color: rgba(255,255,255,0.10) !important;
+}
+[data-theme="minimal"] .border-secondary\/10 {
+  border-color: rgba(255,255,255,0.15) !important;
+}
 /* Minimal: planner mode pill active state */
 [data-theme="minimal"] .bg-primary-fixed {
   background-color: rgba(255,255,255,0.12) !important;
