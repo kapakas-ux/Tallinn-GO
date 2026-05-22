@@ -1354,11 +1354,9 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                 {formatWalkingTime(closestStop.distance * 1000)}
               </span>
             </div>
-            {weather && (() => {
-              const Icon = weatherIcon(weather.phenomenon);
-              return (
+            {weather && (
               <div className="flex items-center gap-1 px-2 py-0.5 bg-secondary/5 rounded-full border border-secondary/10 whitespace-nowrap shrink-0">
-                <Icon className="w-4 h-4 text-secondary" />
+                {React.createElement(weatherIcon(weather.phenomenon), { className: "w-4 h-4 text-secondary" })}
                 <span className="font-label text-secondary text-[10px] uppercase tracking-wider font-bold">
                   {Math.round(weather.temperature)}°C
                 </span>
@@ -1368,8 +1366,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                   </span>
                 )}
               </div>
-              );
-            })()}
+            )}
           </div>
         )}
       </section>

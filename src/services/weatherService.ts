@@ -104,7 +104,7 @@ export async function getWeatherForLocation(lat: number, lon: number): Promise<W
   }
 }
 
-import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Sun, Haze } from 'lucide-react';
+import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Sun } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** Return a lucide weather icon component for the given phenomenon text */
