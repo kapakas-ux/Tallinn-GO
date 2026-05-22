@@ -934,6 +934,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     let drawn = false;
 
     const drawJourney = () => {
+      try {
       if (drawn) return;
       if (!m.isStyleLoaded()) { console.warn('journey: style not loaded yet, skipping draw'); return; }
       drawn = true;
@@ -1108,13 +1109,19 @@ export const Map = ({ active = true }: { active?: boolean }) => {
 
       // Fit bounds
       if (allCoords.length) {
-        const lngs = allCoords.map(c => c[0]);
-        const lats = allCoords.map(c => c[1]);
-        console.log('journey: fitting bounds, total coords:', allCoords.length);
-        m.fitBounds(
-          [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-          { padding: 80, duration: 800 }
-        );
+        try {
+          const lngs = allCoords.map(c => c[0]);
+          const lats = allCoords.map(c => c[1]);
+          m.fitBounds(
+            [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+            { padding: 80, duration: 800 }
+          );
+        } catch (err) {
+          console.error('journey: fitBounds failed:', err);
+        }
+      }
+      } catch (err) {
+        console.error('journey: drawJourney failed:', err);
       }
     };
 
