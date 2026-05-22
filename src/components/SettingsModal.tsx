@@ -66,25 +66,24 @@ export const SettingsModal = ({ onClose }: Props) => {
             <h3 className="font-headline font-bold text-sm text-secondary uppercase tracking-widest mb-3">
               {t('settings.theme')}
             </h3>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
               {THEMES.map((th) => (
                 <button
                   key={th.id}
                   onClick={() => handleTheme(th.id)}
-                  className={`relative flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all
+                  className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border-2 transition-all shrink-0 w-[80px] snap-start
                     ${activeTheme === th.id
                       ? 'border-primary scale-[1.03] shadow-lg'
                       : 'border-outline-variant/30 hover:border-outline-variant/60'
                     }`}
                 >
                   {/* Mini orb preview */}
-                  <div className="relative w-12 h-12 rounded-full overflow-hidden">
+                  <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0">
                     <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 30% 35%, ${th.orb1}, ${th.orb2} 55%, ${th.orb3})` }} />
                   </div>
-                  <span className="font-headline font-bold text-xs text-on-surface leading-tight text-center">{t(th.labelKey)}</span>
-                  <span className="font-label text-[9px] text-secondary leading-tight text-center">{t(th.descKey)}</span>
+                  <span className="font-headline font-bold text-[11px] text-on-surface leading-tight text-center">{t(th.labelKey)}</span>
                   {activeTheme === th.id && (
-                    <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
                       <Check className="w-2.5 h-2.5 text-white" />
                     </div>
                   )}
