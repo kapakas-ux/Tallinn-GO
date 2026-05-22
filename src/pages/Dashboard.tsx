@@ -1079,26 +1079,41 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                   ) : journeyResults[j.id] === null ? (
                     <p className="text-sm text-secondary text-center py-4">{t('map.noRoutes')}</p>
                   ) : journeyResults[j.id] ? (
-                    <div className="space-y-2">
-                      {journeyResults[j.id]!.legs.map((leg, li) => (
-                        <div key={li} className="flex items-center gap-3 text-sm">
-                          <div className={cn(
-                            "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs shrink-0",
-                            leg.mode === 'WALK' ? 'bg-surface-container-high text-secondary' : 'bg-primary text-white'
-                          )}>
-                            {leg.mode === 'WALK' ? <Footprints className="w-4 h-4" /> : (leg.routeShortName || leg.mode.slice(0, 3))}
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        {journeyResults[j.id]!.legs.map((leg, li) => (
+                          <div key={li} className="flex items-center gap-3 text-sm">
+                            <div className={cn(
+                              "h-8 w-8 rounded-full flex items-center justify-center font-label font-bold text-xs shrink-0",
+                              leg.mode === 'WALK' ? 'bg-surface-container-high text-secondary' : 'bg-primary text-white'
+                            )}>
+                              {leg.mode === 'WALK' ? <Footprints className="w-4 h-4" /> : (leg.routeShortName || leg.mode.slice(0, 3))}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-headline font-bold text-xs text-primary truncate">
+                                {leg.mode === 'WALK' ? `${Math.round(leg.distance)} m walk` : (leg.headsign || leg.to.name)}
+                              </p>
+                              <p className="text-[9px] text-secondary font-label">
+                                {new Date(leg.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(leg.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {' · '}{Math.round(leg.duration / 60)} min
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-headline font-bold text-xs text-primary truncate">
-                              {leg.mode === 'WALK' ? `${Math.round(leg.distance)} m walk` : (leg.headsign || leg.to.name)}
-                            </p>
-                            <p className="text-[9px] text-secondary font-label">
-                              {new Date(leg.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(leg.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              {' · '}{Math.round(leg.duration / 60)} min
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const it = journeyResults[j.id]!;
+                          const fromLeg = it.legs[0];
+                          const toLeg = it.legs[it.legs.length - 1];
+                          navigate(`/map?fromLat=${fromLeg.from.lat}&fromLng=${fromLeg.from.lon}&toLat=${toLeg.to.lat}&toLng=${toLeg.to.lon}&plan=1`);
+                        }}
+                        className="w-full py-2.5 flex items-center justify-center gap-2 rounded-xl bg-surface-container-high text-primary font-headline font-bold text-xs uppercase tracking-wider hover:bg-surface-container-highest active:scale-95 transition-all"
+                      >
+                        <MapIcon className="w-4 h-4" />
+                        {t('dashboard.viewOnMap')}
+                      </button>
                     </div>
                   ) : null}
                 </div>
