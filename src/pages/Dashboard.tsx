@@ -97,6 +97,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
   const hasMovedDuringPress = useRef(false);
   const lastSwapTime = useRef(0);
+  const skipFrames = useRef(0); // skip N frames after a swap to let layout settle
   const scrollRaf = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dragVisualY, setDragVisualY] = useState(0);
@@ -158,9 +159,12 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     setDragVisualY(dragOffset.current);
     autoScroll(e.clientY);
 
-    // Only swap if >150ms since last swap (debounce to prevent jitter)
+    // Skip frames after a swap so the layout settles before checking again
+    if (skipFrames.current > 0) { skipFrames.current--; return; }
+
+    // 250ms debounce between swaps
     const now = Date.now();
-    if (now - lastSwapTime.current < 150) return;
+    if (now - lastSwapTime.current < 250) return;
 
     const order = sectionOrder;
     const dragIdx = order.indexOf(dragSection);
@@ -170,14 +174,18 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       if (!el) continue;
       const rect = el.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
-      // Hysteresis: need 12px past midpoint to trigger swap
-      if ((dragIdx < i && e.clientY > midY + 12) || (dragIdx > i && e.clientY < midY - 12)) {
+      // Larger hysteresis: 25px past midpoint
+      if ((dragIdx < i && e.clientY > midY + 25) || (dragIdx > i && e.clientY < midY - 25)) {
         const newOrder = [...order];
         [newOrder[dragIdx], newOrder[i]] = [newOrder[i], newOrder[dragIdx]];
         setSectionOrder(newOrder);
         lastSwapTime.current = now;
-        // Adjust startY so the visual offset stays relative to the new position
+        skipFrames.current = 5; // skip next 5 frames
         dragStartY.current = e.clientY - dragOffset.current;
+        break;
+      }
+    }
+  }, [dragSection, sectionOrder, autoScroll]);
         break;
       }
     }
