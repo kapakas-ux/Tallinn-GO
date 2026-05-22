@@ -104,20 +104,22 @@ export async function getWeatherForLocation(lat: number, lon: number): Promise<W
   }
 }
 
-/** Map weather phenomenon text to an emoji icon */
-export function weatherIcon(phenomenon: string): string {
+import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Sun, Haze } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+/** Return a lucide weather icon component for the given phenomenon text */
+export function weatherIcon(phenomenon: string): LucideIcon {
   const p = phenomenon.toLowerCase();
-  if (!p) return '🌡️';
-  if (p.includes('thunder')) return '⛈️';
-  if (p.includes('heavy rain') || p.includes('torrential')) return '🌧️';
-  if (p.includes('rain') || p.includes('shower')) return '🌦️';
-  if (p.includes('sleet')) return '🌨️';
-  if (p.includes('heavy snow') || p.includes('blowing snow') || p.includes('snowstorm')) return '❄️';
-  if (p.includes('snow')) return '🌨️';
-  if (p.includes('hail')) return '🌨️';
-  if (p.includes('mist') || p.includes('fog') || p.includes('haze')) return '🌫️';
-  if (p.includes('overcast') || p.includes('cloudy')) return '☁️';
-  if (p.includes('cloud') || p.includes('partly')) return '⛅';
-  if (p.includes('clear')) return '☀️';
-  return '🌡️';
+  if (!p) return Cloud;
+  if (p.includes('thunder')) return CloudLightning;
+  if (p.includes('heavy rain') || p.includes('torrential')) return CloudRain;
+  if (p.includes('rain') || p.includes('shower') || p.includes('drizzle')) return CloudDrizzle;
+  if (p.includes('sleet') || p.includes('hail')) return CloudRain;
+  if (p.includes('heavy snow') || p.includes('blowing snow') || p.includes('snowstorm')) return CloudSnow;
+  if (p.includes('snow')) return CloudSnow;
+  if (p.includes('mist') || p.includes('fog') || p.includes('haze')) return CloudFog;
+  if (p.includes('overcast') || p.includes('cloudy')) return Cloud;
+  if (p.includes('cloud') || p.includes('partly')) return CloudSun;
+  if (p.includes('clear') || p.includes('sun')) return Sun;
+  return Cloud;
 }
