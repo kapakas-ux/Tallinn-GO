@@ -17,6 +17,18 @@
     "min": "min",
     "error": "Viga"
   },
+  "whatsNew": {
+    "title": "Mis on uut?",
+    "gotIt": "Selge!",
+    "items": [
+      "Tume minimalistlik teema — puhas must ja valge öökullidele",
+      "Lohista jaotis ümber — hoia pikalt jaotise pealkirja",
+      "Lemmikmarsruudid — salvesta Planeerija marsruudid avalehele",
+      "Horisontaalne teemade valik — libista teemade vahel",
+      "Ilmateade avalehel uute ikoonidega",
+      "Vaata marsruute otse kaardil"
+    ]
+  },
   "language": {
     "label": "Keel",
     "en": "English",

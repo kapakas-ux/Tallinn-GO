@@ -11,6 +11,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Stops } from './pages/Stops';
 import { Map } from './pages/Map';
 import { Planner } from './pages/Planner';
+import { WhatsNewModal } from './components/WhatsNewModal';
 import { getSettings } from './services/settingsService';
 import type { AppTheme } from './services/settingsService';
 import { startRidangoWS, stopRidangoWS } from './services/ridangoWebSocket';
@@ -224,6 +225,7 @@ function AppContent() {
           </div>
         </main>
         <BottomNav />
+        <WhatsNewModal />
       </div>
     </>
   );

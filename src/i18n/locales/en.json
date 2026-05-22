@@ -17,6 +17,18 @@
     "min": "Min",
     "error": "Error"
   },
+  "whatsNew": {
+    "title": "What's new",
+    "gotIt": "Got it!",
+    "items": [
+      "Dark minimal theme — pure black and white for night owls",
+      "Drag to reorder dashboard sections — long-press any section title",
+      "Favourite journeys — save Planner routes to your dashboard",
+      "Horizontal theme picker — swipe through themes",
+      "Weather on dashboard with new icon set",
+      "View journey routes directly on the map"
+    ]
+  },
   "language": {
     "label": "Language",
     "en": "English",
