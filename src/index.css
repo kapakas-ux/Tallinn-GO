@@ -444,6 +444,37 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 [data-theme="minimal"] .ring-indigo-500\/20 {
   --tw-ring-color: rgba(255,255,255,0.10) !important;
 }
+/* Minimal: Getting Started icons — teal / purple / rose / orange / pink */
+[data-theme="minimal"] .bg-teal-500\/10 {
+  background-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="minimal"] .text-teal-500 {
+  color: #cccccc !important;
+}
+[data-theme="minimal"] .bg-purple-500\/10 {
+  background-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="minimal"] .text-purple-500 {
+  color: #cccccc !important;
+}
+[data-theme="minimal"] .bg-rose-500\/10 {
+  background-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="minimal"] .text-rose-500 {
+  color: #cccccc !important;
+}
+[data-theme="minimal"] .bg-orange-500\/10 {
+  background-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="minimal"] .text-orange-500 {
+  color: #cccccc !important;
+}
+[data-theme="minimal"] .bg-pink-500\/10 {
+  background-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="minimal"] .text-pink-500 {
+  color: #cccccc !important;
+}
 [data-theme="minimal"] .bg-sky-500\/10 {
   background-color: rgba(255,255,255,0.08) !important;
 }
