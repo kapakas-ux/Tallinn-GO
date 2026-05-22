@@ -66,7 +66,7 @@ export const SettingsModal = ({ onClose }: Props) => {
             <h3 className="font-headline font-bold text-sm text-secondary uppercase tracking-widest mb-3">
               {t('settings.theme')}
             </h3>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
+            <div className="flex gap-2 overflow-x-auto pt-1 pb-1 -mx-1 px-1 snap-x">
               {THEMES.map((th) => (
                 <button
                   key={th.id}
