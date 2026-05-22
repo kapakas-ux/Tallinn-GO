@@ -123,11 +123,16 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
   // Auto-scroll when dragging near edges
   const autoScroll = useCallback((clientY: number) => {
-    const container = containerRef.current;
+    // Walk up to find the scrollable container (the <main> element)
+    let el: HTMLElement | null = containerRef.current;
+    while (el && el.scrollHeight <= el.clientHeight) {
+      el = el.parentElement;
+    }
+    const container = el;
     if (!container) return;
     const rect = container.getBoundingClientRect();
     const edgeThreshold = 80;
-    const maxSpeed = 10;
+    const maxSpeed = 8;
     let speed = 0;
     if (clientY < rect.top + edgeThreshold) {
       speed = -maxSpeed * (1 - (clientY - rect.top) / edgeThreshold);
