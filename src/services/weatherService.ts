@@ -108,8 +108,8 @@ import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, Cl
 import type { LucideIcon } from 'lucide-react';
 
 /** Return a lucide weather icon component for the given phenomenon text */
-export function weatherIcon(phenomenon: string): LucideIcon {
-  const p = phenomenon.toLowerCase();
+export function weatherIcon(phenomenon: string | null | undefined): LucideIcon {
+  const p = (phenomenon || '').toLowerCase();
   if (!p) return Cloud;
   if (p.includes('thunder')) return CloudLightning;
   if (p.includes('heavy rain') || p.includes('torrential')) return CloudRain;
