@@ -1111,7 +1111,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
                         className="w-full py-2.5 flex items-center justify-center gap-2 rounded-xl bg-surface-container-high text-primary font-headline font-bold text-xs uppercase tracking-wider hover:bg-surface-container-highest active:scale-95 transition-all"
                       >
                         <MapIcon className="w-4 h-4" />
-                        {t('map.viewOnMap')}
+                        {t('planner.viewOnMap')}
                       </button>
                     </div>
                   ) : null}

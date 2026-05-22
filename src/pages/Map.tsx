@@ -1113,7 +1113,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
         console.log('journey: fitting bounds, total coords:', allCoords.length);
         m.fitBounds(
           [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-          { padding: 80, duration: 800 }
+          { padding: { top: 120, bottom: 180, left: 60, right: 60 }, duration: 800 }
         );
       }
     };
