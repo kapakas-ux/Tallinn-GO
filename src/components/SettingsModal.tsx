@@ -21,7 +21,6 @@ export const SettingsModal = ({ onClose }: Props) => {
   const handleClose = () => { stopPreview(); onClose(); };
   const [selectedSound, setSelectedSound] = useState(getSettings().alarmSound);
   const [showFact, setShowFact] = useState(getSettings().showDailyFact);
-  const [showFavoritesFirst, setShowFavoritesFirst] = useState(getSettings().showFavoritesFirst);
   const [largeText, setLargeText] = useState(getSettings().largeText);
   const [clusterRadius, setClusterRadius] = useState(getSettings().clusterRadius);
   const [clusterEnabled, setClusterEnabled] = useState(getSettings().clusterEnabled);
@@ -148,24 +147,6 @@ export const SettingsModal = ({ onClose }: Props) => {
               className={`relative w-11 h-6 rounded-full transition-colors ${showFact ? 'bg-primary' : 'bg-outline-variant/40'}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showFact ? 'translate-x-5' : 'translate-x-0'}`} />
-            </button>
-          </div>
-
-          {/* Show Favorites First toggle */}
-          <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-black/8 bg-black/4">
-            <div>
-              <p className="font-headline font-bold text-sm text-primary">{t('settings.showFavoritesFirst')}</p>
-              <p className="font-label text-[10px] text-secondary mt-0.5">{t('settings.showFavoritesFirstDesc')}</p>
-            </div>
-            <button
-              onClick={() => {
-                const next = !showFavoritesFirst;
-                setShowFavoritesFirst(next);
-                saveSettings({ showFavoritesFirst: next });
-              }}
-              className={`relative w-11 h-6 rounded-full transition-colors ${showFavoritesFirst ? 'bg-primary' : 'bg-outline-variant/40'}`}
-            >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${showFavoritesFirst ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
 

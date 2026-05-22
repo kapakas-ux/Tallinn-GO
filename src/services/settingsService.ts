@@ -22,7 +22,6 @@ export function getInitialTheme(): AppTheme {
 export interface AppSettings {
   alarmSound: string;
   showDailyFact: boolean;
-  showFavoritesFirst: boolean;
   largeText: boolean;
   clusterEnabled: boolean;
   clusterRadius: number;
@@ -33,7 +32,6 @@ export interface AppSettings {
 const DEFAULT_SETTINGS: AppSettings = {
   alarmSound: 'default',
   showDailyFact: true,
-  showFavoritesFirst: false,
   largeText: false,
   clusterEnabled: false,
   clusterRadius: 80,

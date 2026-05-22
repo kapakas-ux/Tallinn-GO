@@ -88,25 +88,61 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
     setSectionOrder(order);
     try { localStorage.setItem('dashboard_section_order', JSON.stringify(order)); } catch {}
   };
-  const [dragSection, setDragSection] = useState<{ id: SectionId; startY: number; currentY: number } | null>(null);
+  const [dragSection, setDragSection] = useState<SectionId | null>(null);
+  const dragStartY = useRef(0);
+  const dragCurrentY = useRef(0);
+  const dragOffset = useRef(0);
   const sectionElRefs = useRef<Record<SectionId, HTMLDivElement | null>>({} as any);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
   const hasMovedDuringPress = useRef(false);
+  const lastSwapTime = useRef(0);
+  const scrollRaf = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [dragVisualY, setDragVisualY] = useState(0);
 
   const onSectionHeaderDown = useCallback((sectionId: SectionId, e: React.PointerEvent) => {
-    // Only enable on section titles, not edit buttons etc.
     const target = e.target as HTMLElement;
     if (target.closest('button')) return;
     pointerDownPos.current = { x: e.clientX, y: e.clientY };
     hasMovedDuringPress.current = false;
     longPressTimer.current = setTimeout(() => {
       if (!hasMovedDuringPress.current) {
-        setDragSection({ id: sectionId, startY: e.clientY, currentY: e.clientY });
+        dragStartY.current = e.clientY;
+        dragCurrentY.current = e.clientY;
+        dragOffset.current = 0;
+        lastSwapTime.current = 0;
+        setDragSection(sectionId);
+        setDragVisualY(0);
         (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
       }
       longPressTimer.current = null;
     }, 500);
+  }, []);
+
+  // Auto-scroll when dragging near edges
+  const autoScroll = useCallback((clientY: number) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const edgeThreshold = 80;
+    const maxSpeed = 10;
+    let speed = 0;
+    if (clientY < rect.top + edgeThreshold) {
+      speed = -maxSpeed * (1 - (clientY - rect.top) / edgeThreshold);
+    } else if (clientY > rect.bottom - edgeThreshold) {
+      speed = maxSpeed * (1 - (rect.bottom - clientY) / edgeThreshold);
+    }
+    if (speed !== 0 && !scrollRaf.current) {
+      const doScroll = () => {
+        container.scrollBy(0, speed);
+        scrollRaf.current = requestAnimationFrame(doScroll);
+      };
+      scrollRaf.current = requestAnimationFrame(doScroll);
+    } else if (speed === 0 && scrollRaf.current) {
+      cancelAnimationFrame(scrollRaf.current);
+      scrollRaf.current = null;
+    }
   }, []);
 
   const onSectionHeaderMove = useCallback((e: React.PointerEvent) => {
@@ -116,44 +152,53 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       if (dx > 5 || dy > 5) hasMovedDuringPress.current = true;
     }
     if (!dragSection) return;
-    e.preventDefault(); // block scrolling while dragging
-    setDragSection(prev => prev ? { ...prev, currentY: e.clientY } : null);
-    // Determine swap target by comparing pointer Y with section midpoints
-    const order = [...sectionOrder];
-    const dragIdx = order.indexOf(dragSection.id);
+    e.preventDefault();
+    dragCurrentY.current = e.clientY;
+    dragOffset.current = e.clientY - dragStartY.current;
+    setDragVisualY(dragOffset.current);
+    autoScroll(e.clientY);
+
+    // Only swap if >150ms since last swap (debounce to prevent jitter)
+    const now = Date.now();
+    if (now - lastSwapTime.current < 150) return;
+
+    const order = sectionOrder;
+    const dragIdx = order.indexOf(dragSection);
     for (let i = 0; i < order.length; i++) {
       if (i === dragIdx) continue;
       const el = sectionElRefs.current[order[i]];
       if (!el) continue;
       const rect = el.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
-      if ((dragIdx < i && e.clientY > midY) || (dragIdx > i && e.clientY < midY)) {
-        // Swap
+      // Hysteresis: need 12px past midpoint to trigger swap
+      if ((dragIdx < i && e.clientY > midY + 12) || (dragIdx > i && e.clientY < midY - 12)) {
         const newOrder = [...order];
         [newOrder[dragIdx], newOrder[i]] = [newOrder[i], newOrder[dragIdx]];
         setSectionOrder(newOrder);
-        // Reset startY so translateY doesn't accumulate across swaps
-        setDragSection(prev => prev ? { ...prev, startY: e.clientY } : null);
+        lastSwapTime.current = now;
+        // Adjust startY so the visual offset stays relative to the new position
+        dragStartY.current = e.clientY - dragOffset.current;
         break;
       }
     }
-  }, [dragSection, sectionOrder]);
+  }, [dragSection, sectionOrder, autoScroll]);
 
   const onSectionHeaderUp = useCallback(() => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
+    if (scrollRaf.current) {
+      cancelAnimationFrame(scrollRaf.current);
+      scrollRaf.current = null;
+    }
     pointerDownPos.current = null;
     if (dragSection) {
-      // Persist final order
       try { localStorage.setItem('dashboard_section_order', JSON.stringify(sectionOrder)); } catch {}
       setDragSection(null);
+      setDragVisualY(0);
     }
   }, [dragSection, sectionOrder]);
-
-  // Drag offset for translateY visual feedback
-  const dragOffset = dragSection ? dragSection.currentY - dragSection.startY : 0;
 
   useEffect(() => {
     const handleSettingsChange = () => {
@@ -615,7 +660,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
   const sectionHeaderProps = (id: SectionId) => ({
     className: cn(
       "font-headline font-bold text-2xl gradient-text select-none cursor-grab active:cursor-grabbing transition-transform",
-      dragSection?.id === id && "scale-105 opacity-80"
+      dragSection === id && "scale-105 opacity-80"
     ),
     style: { touchAction: 'none' } as React.CSSProperties,
     onPointerDown: (e: React.PointerEvent) => onSectionHeaderDown(id, e),
@@ -626,7 +671,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       <section className="mb-12 space-y-4" ref={(el) => { sectionElRefs.current['nearby'] = el as any; }} data-section-id="nearby">
         <div className="flex items-baseline justify-between">
           <h3 {...sectionHeaderProps('nearby')}>{t('dashboard.nearbyStops')}</h3>
-          {dragSection?.id === 'nearby' && <GripVertical className="w-5 h-5 text-primary animate-pulse" />}
+          {dragSection === 'nearby' && <GripVertical className="w-5 h-5 text-primary animate-pulse" />}
         </div>
         <div className="grid grid-cols-1 gap-3">
           {nearbyStops.map((stop) => (
@@ -774,7 +819,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       <div className="flex items-baseline justify-between">
         <h3 {...sectionHeaderProps('favorites')}>{t('dashboard.favorites')}</h3>
         <div className="flex items-center gap-2">
-          {dragSection?.id === 'favorites' && <GripVertical className="w-5 h-5 text-primary animate-pulse" />}
+          {dragSection === 'favorites' && <GripVertical className="w-5 h-5 text-primary animate-pulse" />}
           {favorites.length > 0 && (
           <button 
             onClick={() => setIsEditingFavs(!isEditingFavs)}
@@ -992,7 +1037,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
       <div className="flex items-baseline justify-between">
         <h3 {...sectionHeaderProps('journeys')}>{t('dashboard.favouriteJourneys')}</h3>
         <div className="flex items-center gap-2">
-          {dragSection?.id === 'journeys' && <GripVertical className="w-5 h-5 text-primary animate-pulse" />}
+          {dragSection === 'journeys' && <GripVertical className="w-5 h-5 text-primary animate-pulse" />}
           {favJourneys.length > 0 && (
           <button 
             onClick={() => setIsEditingJourneys(!isEditingJourneys)}
@@ -1126,6 +1171,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
   return (
     <div
+      ref={containerRef}
       className={cn(
         "max-w-screen-md mx-auto px-6 mt-4 pb-10 content-fade",
         contentReady && "content-visible",
@@ -1469,7 +1515,7 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
 
       {/* Nearby Stations, Favorites & Journeys — drag-reorderable */}
       {sectionOrder.map(id => {
-        const isDragging = dragSection?.id === id;
+        const isDragging = dragSection === id;
         const content = (() => {
           switch (id) {
             case 'nearby': return renderNearbyStops();
@@ -1483,9 +1529,9 @@ export const Dashboard = ({ active = true }: { active?: boolean }) => {
             key={id}
             className={cn(
               "transition-transform duration-150",
-              isDragging && "relative z-20 scale-[1.02]"
+              isDragging && "relative z-20 scale-[1.02] bg-surface rounded-[20px] shadow-2xl"
             )}
-            style={isDragging ? { transform: `translateY(${dragOffset}px)`, filter: 'brightness(1.05)' } : undefined}
+            style={isDragging ? { transform: `translateY(${dragVisualY}px)` } : undefined}
           >
             {content}
           </div>
