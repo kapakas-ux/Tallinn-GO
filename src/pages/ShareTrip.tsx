@@ -28,8 +28,8 @@ export const ShareTrip = () => {
   const markers = useRef<maplibregl.Marker[]>([]);
   const sourceIds = useRef<string[]>([]);
 
-  const fromName = searchParams.get('from') || 'Start';
-  const toName = searchParams.get('to') || 'Destination';
+  const fromName = searchParams.get('from') || t('share.from', 'Start');
+  const toName = searchParams.get('to') || t('share.to', 'Destination');
   const flat = parseFloat(searchParams.get('flat') || '');
   const flng = parseFloat(searchParams.get('flng') || '');
   const tlat = parseFloat(searchParams.get('tlat') || '');
@@ -113,13 +113,13 @@ export const ShareTrip = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      <div className="flex items-center gap-3 px-5 py-4 bg-surface-container-lowest border-b border-outline-variant/10" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
+    <div className="bg-surface flex flex-col" style={{ minHeight: '100dvh' }}>
+      <div className="flex items-center gap-3 px-5 py-3 bg-surface-container-lowest border-b border-outline-variant/10" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0.5rem)' }}>
         <img src="/logo.png" alt="GO NOW" className="h-6" />
         <span className="font-label text-[10px] text-secondary uppercase tracking-widest">{t('share.title', 'Trip shared from GO NOW')}</span>
       </div>
-      <div ref={mapContainer} className="w-full h-[40vh] shrink-0" />
-      <div className="flex-1 p-5 space-y-4">
+      <div ref={mapContainer} className="w-full" style={{ height: '40dvh' }} />
+      <div className="p-5 space-y-4" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 1rem)' }}>
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>
         ) : error ? (
@@ -134,16 +134,27 @@ export const ShareTrip = () => {
               <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center shrink-0"><MapPin className="w-4 h-4 text-red-500" /></div>
               <div className="min-w-0"><p className="font-headline font-bold text-sm text-primary truncate">{toName}</p><p className="text-[10px] text-secondary">{fmtTime(itinerary.endTime)} · {Math.round(itinerary.duration / 60)} min</p></div>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {itinerary.legs.map((leg, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs px-2">
-                  <span className="text-secondary w-12 text-right shrink-0">{fmtTime(leg.startTime)}</span>
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  <span className="text-primary truncate">
-                    {leg.mode === 'WALK'
-                      ? `${Math.round(leg.distance)}m ${t('planner.walk', 'walk')}`
-                      : `${modeLabel(leg.mode)} ${leg.routeShortName || ''}`}
-                  </span>
+                <div key={i} className="flex items-start gap-2 text-xs px-2">
+                  <span className="text-secondary w-12 text-right shrink-0 pt-0.5">{fmtTime(leg.startTime)}</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1" />
+                  <div className="min-w-0">
+                    <span className="text-primary font-medium">
+                      {leg.mode === 'WALK'
+                        ? `${Math.round(leg.distance)}m ${t('planner.walk', 'walk')}`
+                        : `${modeLabel(leg.mode)} ${leg.routeShortName || ''}`}
+                    </span>
+                    {leg.mode !== 'WALK' && leg.headsign && (
+                      <span className="text-secondary truncate block">→ {leg.headsign}</span>
+                    )}
+                    {leg.mode === 'WALK' && (
+                      <span className="text-secondary truncate block">{Math.round(leg.duration / 60)} min</span>
+                    )}
+                    {leg.mode !== 'WALK' && (
+                      <span className="text-secondary truncate block">{Math.round(leg.duration / 60)} min · {leg.from.name}</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

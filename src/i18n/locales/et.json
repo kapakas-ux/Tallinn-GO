@@ -114,10 +114,12 @@
     "gotIt": "Selge!"
   },
   "share": {
-    "title": "GO NOW jagatud marsruut",
+    "title": "Jagatud marsruut",
     "invalidCoords": "Vigased koordinaadid",
     "planError": "Marsruudi koostamine ebaõnnestus",
-    "openApp": "Ava GO NOW"
+    "openApp": "Ava GO NOW",
+    "from": "Algus",
+    "to": "Sihtkoht"
   },
   "settings": {
     "title": "Seaded",

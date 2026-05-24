@@ -117,7 +117,9 @@
     "title": "Trip shared from GO NOW",
     "invalidCoords": "Invalid coordinates",
     "planError": "Could not plan journey",
-    "openApp": "Open GO NOW"
+    "openApp": "Open GO NOW",
+    "from": "Start",
+    "to": "Destination"
   },
   "settings": {
     "title": "Settings",
