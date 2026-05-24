@@ -295,6 +295,7 @@
     "routeFound_one": "{{count}} route found",
     "routeFound_other": "{{count}} routes found",
     "viewOnMap": "View on map",
+    "share": "Share",
     "tram": "Tram",
     "train": "Train",
     "bus": "Bus",

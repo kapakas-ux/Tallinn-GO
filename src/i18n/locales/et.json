@@ -295,6 +295,7 @@
     "routeFound_one": "{{count}} marsruut leitud",
     "routeFound_other": "{{count}} marsruuti leitud",
     "viewOnMap": "Vaata kaardil",
+    "share": "Jaga",
     "tram": "Tramm",
     "train": "Rong",
     "bus": "Buss",

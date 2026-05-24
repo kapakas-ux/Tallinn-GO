@@ -12,7 +12,7 @@ import { HomeAddressPicker } from '../components/HomeAddressPicker';
 import { watchLocation, TALLINN_CENTER as TALLINN_CENTER_COORD } from '../services/locationService';
 import { decodePolyline } from '../lib/geo';
 import { Stop, Arrival, Vehicle, PlanItinerary, LegMode, ServiceAlert } from '../types';
-import { Bus, Loader2, Navigation, Footprints, Bell, X, Construction, TriangleAlert, Sun, Moon, Home, ExternalLink } from 'lucide-react';
+import { Bus, Loader2, Navigation, Footprints, Bell, X, Construction, TriangleAlert, Sun, Moon, Home, ExternalLink, Share2 } from 'lucide-react';
 import { getDistance } from '../lib/geo';
 import { cn, formatDistance, formatWalkingTime, getVehicleColorClass } from '../lib/utils';
 import { fetchDarkMapStyle } from '../lib/mapStyles';
@@ -20,6 +20,7 @@ import { scheduleDepartureNotification } from '../services/notificationService';
 import { getSettings, AppTheme } from '../services/settingsService';
 import { addActiveAlert, getActiveAlerts, isAlertActive } from '../services/alertService';
 import { getRouteStopsForVehicle, fetchVehicleTripStoptimes } from '../services/transportService';
+import { shareJourney } from '../lib/shareTrip';
 import type { TripStoptime } from '../services/transportService';
 import { VehicleMap } from '../components/VehicleMap';
 import { AnimatePresence, motion } from 'motion/react';
@@ -66,6 +67,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
   const [styleLoadCount, setStyleLoadCount] = useState(0);
   const [serviceAlerts, setServiceAlerts] = useState<ServiceAlert[]>([]);
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
+  const [journeyItinerary, setJourneyItinerary] = useState<PlanItinerary | null>(null);
   const [isDarkMap, setIsDarkMap] = useState(() => isDarkTheme(getSettings().theme));
 
   // Sync map style when app theme changes (e.g. from settings modal)
@@ -914,13 +916,14 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     };
 
     const searchParams = new URLSearchParams(location.search);
-    if (!searchParams.has('journey')) { clearOverlay(); return; }
+    if (!searchParams.has('journey')) { clearOverlay(); setJourneyItinerary(null); return; }
 
     const raw = sessionStorage.getItem('planner_journey');
     if (!raw) { console.warn('journey: no planner_journey in sessionStorage'); return; }
 
     let itinerary: PlanItinerary;
     try { itinerary = JSON.parse(raw); } catch { console.error('journey: failed to parse planner_journey'); return; }
+    setJourneyItinerary(itinerary);
 
     console.log('journey: itinerary loaded, legs:', itinerary.legs.length);
 
@@ -1232,6 +1235,16 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       >
         <Home className={`w-5 h-5 ${home ? 'text-primary' : 'text-secondary'}`} />
       </button>
+
+      {journeyItinerary && (
+        <button
+          onClick={() => shareJourney(journeyItinerary)}
+          className="absolute bottom-[calc(13rem+env(safe-area-inset-bottom))] right-4 z-10 map-fab bg-white hover:bg-gray-100 p-3 rounded-full shadow-lg border border-surface-container-high transition-colors"
+          title="Share"
+        >
+          <Share2 className="w-5 h-5 text-primary" />
+        </button>
+      )}
 
       {homePickerOpen && (
         <HomeAddressPicker

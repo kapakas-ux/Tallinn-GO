@@ -11,6 +11,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Stops } from './pages/Stops';
 import { Map } from './pages/Map';
 import { Planner } from './pages/Planner';
+import { ShareTrip } from './pages/ShareTrip';
 import { WhatsNewModal } from './components/WhatsNewModal';
 import { getSettings } from './services/settingsService';
 import type { AppTheme } from './services/settingsService';
@@ -181,7 +182,7 @@ function AppContent() {
     <>
       <OrbLayer />
         <div className="themed-root h-full flex flex-col overflow-hidden relative">
-        <TopBar />
+        {!location.pathname.startsWith('/share') && <TopBar />}
         <main
           ref={mainRef}
           onTouchStart={onPullStart}
@@ -209,6 +210,7 @@ function AppContent() {
           )}
           <Routes>
             <Route path="/plan" element={<Planner />} />
+            <Route path="/share" element={<ShareTrip />} />
             {/* Fallback so Routes doesn't complain on other paths */}
             <Route path="*" element={null} />
           </Routes>
@@ -224,7 +226,7 @@ function AppContent() {
             <Map active={location.pathname === '/map'} />
           </div>
         </main>
-        <BottomNav />
+        {!location.pathname.startsWith('/share') && <BottomNav />}
         <WhatsNewModal />
       </div>
     </>

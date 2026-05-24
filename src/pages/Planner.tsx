@@ -5,7 +5,7 @@ import maplibregl from 'maplibre-gl';
 import {
   MapPin, Navigation, ArrowUpDown, Bus, TrainFront as Tram, TrainFront, Ship,
   Footprints, Search, X, Loader2, AlertCircle, Clock, ChevronDown, ChevronUp, Map as MapIcon, Route as RouteIcon,
-  CalendarDays, Building2, Home as HomeIcon, Star
+  CalendarDays, Building2, Home as HomeIcon, Star, Share2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { fetchStops, planJourney } from '../services/transportService';
@@ -14,6 +14,7 @@ import { decodePolyline } from '../lib/geo';
 import { darknessOverlapMs } from '../services/sunTimesService';
 import { getHome } from '../services/homeService';
 import { toggleFavouriteJourney, isJourneyFavourited, renameJourney, getFavouriteJourneys } from '../services/favouriteJourneysService';
+import { shareJourney } from '../lib/shareTrip';
 import type { Stop, PlanItinerary, LegMode } from '../types';
 
 // ─── geocoding ──────────────────────────────────────────────────
@@ -645,10 +646,17 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
             )}
           </div>
 
-          <div className="px-4 pb-4">
+          <div className="px-4 pb-4 flex gap-2">
+            <button
+              onClick={() => shareJourney(itinerary)}
+              className="flex-1 py-3 rounded-[16px] bg-surface-container-high text-primary font-headline font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+            >
+              <Share2 className="w-4 h-4" />
+              {t('planner.share', 'Share')}
+            </button>
             <button
               onClick={onViewOnMap}
-              className="w-full py-3 rounded-[16px] bg-primary text-white font-headline font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+              className="flex-1 py-3 rounded-[16px] bg-primary text-white font-headline font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
             >
               <MapIcon className="w-4 h-4" />
               {t('planner.viewOnMap')}
