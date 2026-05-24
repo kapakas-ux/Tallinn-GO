@@ -14,6 +14,9 @@ export default defineConfig(({mode}) => {
     },
     build: {
       target: 'es2022',
+      rollupOptions: {
+        external: ['@capacitor/share'],
+      },
     },
     esbuild: {
       target: 'es2022',

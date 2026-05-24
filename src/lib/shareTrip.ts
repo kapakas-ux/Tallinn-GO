@@ -20,25 +20,34 @@ export function buildShareUrl(itinerary: PlanItinerary): string {
   return `${base}/share?from=${from}&flat=${first.from.lat.toFixed(5)}&flng=${first.from.lon.toFixed(5)}&to=${to}&tlat=${last.to.lat.toFixed(5)}&tlng=${last.to.lon.toFixed(5)}`;
 }
 
-/** Share via native share sheet (Web Share API) or clipboard fallback */
+/** Share via native share sheet or clipboard fallback */
 export async function shareJourney(itinerary: PlanItinerary): Promise<boolean> {
   const url = buildShareUrl(itinerary);
   const first = itinerary.legs[0];
   const last = itinerary.legs[itinerary.legs.length - 1];
   const title = `${first.from.name} → ${last.to.name}`;
 
-  // Web Share API — works on iOS Safari, Android Chrome, Capacitor webviews
+  // 1. Capacitor native Share (Android/iOS — works when Web Share isn't available)
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (Capacitor.isNativePlatform()) {
+      const { Share } = await import('@capacitor/share');
+      await Share.share({ title, text: title, url, dialogTitle: title });
+      return true;
+    }
+  } catch {}
+
+  // 2. Web Share API (PWA / modern browser)
   if (navigator.share) {
     try {
       await navigator.share({ title, text: title, url });
       return true;
     } catch {
-      // User cancelled — don't fall back to clipboard
       return false;
     }
   }
 
-  // Clipboard fallback (desktop)
+  // 3. Clipboard fallback (desktop)
   try {
     await navigator.clipboard.writeText(url);
     return true;
