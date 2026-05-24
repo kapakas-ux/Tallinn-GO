@@ -27,17 +27,17 @@ export async function shareJourney(itinerary: PlanItinerary): Promise<boolean> {
   const last = itinerary.legs[itinerary.legs.length - 1];
   const title = `${first.from.name} → ${last.to.name}`;
 
-  // 1. Capacitor native Share (Android/iOS — works when Web Share isn't available)
-  try {
-    const { Capacitor } = await import('@capacitor/core');
-    if (Capacitor.isNativePlatform()) {
+  // 1. Capacitor native Share — check global Capacitor object (set by Capacitor runtime)
+  const cap = (window as any).Capacitor;
+  if (cap?.isNativePlatform?.()) {
+    try {
       const { Share } = await import('@capacitor/share');
       await Share.share({ title, text: title, url, dialogTitle: title });
       return true;
-    }
-  } catch {}
+    } catch {}
+  }
 
-  // 2. Web Share API (PWA / modern browser)
+  // 2. Web Share API
   if (navigator.share) {
     try {
       await navigator.share({ title, text: title, url });
@@ -47,7 +47,7 @@ export async function shareJourney(itinerary: PlanItinerary): Promise<boolean> {
     }
   }
 
-  // 3. Clipboard fallback (desktop)
+  // 3. Clipboard fallback
   try {
     await navigator.clipboard.writeText(url);
     return true;
