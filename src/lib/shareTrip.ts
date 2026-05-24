@@ -20,34 +20,43 @@ export function buildShareUrl(itinerary: PlanItinerary): string {
   return `${base}/share?from=${from}&flat=${first.from.lat.toFixed(5)}&flng=${first.from.lon.toFixed(5)}&to=${to}&tlat=${last.to.lat.toFixed(5)}&tlng=${last.to.lon.toFixed(5)}`;
 }
 
-/** Share via Web Share API or clipboard fallback */
+/** Share via native share sheet or clipboard fallback */
 export async function shareJourney(itinerary: PlanItinerary): Promise<boolean> {
   const url = buildShareUrl(itinerary);
   const first = itinerary.legs[0];
   const last = itinerary.legs[itinerary.legs.length - 1];
   const title = `${first.from.name} → ${last.to.name}`;
 
-  // navigator.share works on Android WebView, iOS Safari, and modern browsers
-  // Must be called directly from a user gesture (click/tap handler)
+  // 1. Capacitor native Share (Android/iOS) — uses global plugin registry
+  const cap = (window as any).Capacitor;
+  if (cap?.isNativePlatform?.()) {
+    try {
+      const SharePlugin = cap.Plugins?.Share;
+      if (SharePlugin?.share) {
+        await SharePlugin.share({ title, text: title, url, dialogTitle: title });
+        return true;
+      }
+    } catch {}
+  }
+
+  // 2. Web Share API
   if (navigator.share) {
     try {
       await navigator.share({ title, text: title, url });
       return true;
     } catch {
-      // User cancelled — do NOT fall back to clipboard
       return false;
     }
   }
 
-  // Clipboard fallback — show a brief visual feedback
+  // 3. Clipboard fallback
   try {
     await navigator.clipboard.writeText(url);
-    // Show a brief toast-like notification
     const toast = document.createElement('div');
-    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] bg-primary text-white px-4 py-2 rounded-full font-headline font-bold text-sm shadow-lg animate-in fade-in slide-in-from-bottom-4';
+    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] bg-primary text-white px-4 py-2 rounded-full font-headline font-bold text-sm shadow-lg';
     toast.textContent = 'Link copied!';
     document.body.appendChild(toast);
-    setTimeout(() => { toast.classList.add('opacity-0', 'transition-opacity', 'duration-300'); setTimeout(() => toast.remove(), 300); }, 1500);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 300ms'; setTimeout(() => toast.remove(), 300); }, 1500);
     return true;
   } catch {
     return false;
