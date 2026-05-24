@@ -1,15 +1,13 @@
 ﻿import type { PlanItinerary } from '../types';
+import { Capacitor } from '@capacitor/core';
 
 /** Base URL for share links */
 function getBaseUrl(): string {
   const origin = window.location.origin;
-  // If running on the real production domain, use it directly
   if (origin.includes('gonow.ee')) return 'https://gonow.ee';
-  // If running on any non-local domain (e.g. Vercel preview), use it
   if (!origin.includes('localhost') && !origin.includes('capacitor') && !origin.includes('127.0.0.1')) {
     return origin;
   }
-  // Dev / Capacitor native — always link to the production site
   return 'https://gonow.ee';
 }
 
@@ -23,24 +21,31 @@ export function buildShareUrl(itinerary: PlanItinerary): string {
   return `${base}/share?from=${from}&flat=${first.from.lat.toFixed(5)}&flng=${first.from.lon.toFixed(5)}&to=${to}&tlat=${last.to.lat.toFixed(5)}&tlng=${last.to.lon.toFixed(5)}`;
 }
 
-/** Share via Web Share API, clipboard fallback. Returns true if shared. */
+/** Share via native share sheet (Capacitor), Web Share API, or clipboard */
 export async function shareJourney(itinerary: PlanItinerary): Promise<boolean> {
   const url = buildShareUrl(itinerary);
   const first = itinerary.legs[0];
   const last = itinerary.legs[itinerary.legs.length - 1];
+  const title = `${first.from.name} → ${last.to.name}`;
 
+  // 1. Capacitor native Share (iOS/Android)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { Share } = await import('@capacitor/share');
+      await Share.share({ title, text: title, url, dialogTitle: 'Share trip' });
+      return true;
+    } catch {}
+  }
+
+  // 2. Web Share API (PWA / modern browser)
   if (navigator.share) {
     try {
-      await navigator.share({
-        title: `${first.from.name} → ${last.to.name}`,
-        text: `${first.from.name} → ${last.to.name}`,
-        url,
-      });
+      await navigator.share({ title, text: title, url });
       return true;
-    } catch {
-      return false;
-    }
+    } catch {}
   }
+
+  // 3. Clipboard fallback
   try {
     await navigator.clipboard.writeText(url);
     return true;

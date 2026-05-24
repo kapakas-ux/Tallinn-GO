@@ -3,9 +3,9 @@
   "short_name": "GO NOW",
   "icons": [
     {
-      "src": "../icons/icon-48.webp",
-      "type": "image/png",
-      "sizes": "48x48",
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
       "purpose": "any maskable"
     },
     {
