@@ -6,3 +6,19 @@ coverage/
 *.log
 .env*
 !.env.example
+.idea/
+*.p8
+*.p12
+*.pem
+*.cer
+*.key
+*.csr
+*.mobileprovision
+*secret*.txt
+IOS images/
+Tallinn-GO-1/
+android/.idea/
+android/app/src/main/res/raw/
+android/app/src/main/res/mipmap*/
+android/app/src/main/res/drawable/
+android/gradle/gradle-daemon-jvm.properties
