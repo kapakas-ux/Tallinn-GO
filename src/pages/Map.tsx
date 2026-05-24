@@ -1108,7 +1108,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
             🏁
           </div>
           <div style="background: #DC143C; color: white; font-size: calc(10px * var(--map-text-scale, 1)); font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-top: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">
-            ${last.to.name || i18next.t('map.arrive')} · ${fmtTime(itinerary.endTime)}
+            ${!last.to.name || last.to.name === 'Destination' ? i18next.t('planner.destination') : last.to.name} · ${fmtTime(itinerary.endTime)}
           </div>
         `;
         journeyMarkers.current.push(
