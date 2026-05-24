@@ -482,9 +482,11 @@ interface CardProps {
   expanded: boolean;
   onToggle: () => void;
   onViewOnMap: () => void;
+  fromName: string;
+  toName: string;
 }
 
-const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onToggle, onViewOnMap }) => {
+const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onToggle, onViewOnMap, fromName, toName }) => {
   const { t } = useTranslation();
   const leavesInMin = Math.round((itinerary.startTime - Date.now()) / 60000);
   const label = index === 0 ? t('planner.fastest') : index === 1 ? t('planner.alternative') : t('planner.lessWalking');
@@ -648,7 +650,7 @@ const ItineraryCard: React.FC<CardProps> = ({ itinerary, index, expanded, onTogg
 
           <div className="px-4 pb-4 flex gap-2">
             <button
-              onClick={() => shareJourney(itinerary)}
+              onClick={() => shareJourney(itinerary, fromName, toName)}
               className="flex-1 py-3 rounded-[16px] bg-surface-container-high text-primary font-headline font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
             >
               <Share2 className="w-4 h-4" />
@@ -1356,6 +1358,8 @@ export const Planner = () => {
               expanded={expandedIndex === i}
               onToggle={() => setExpandedIndex(expandedIndex === i ? null : i)}
               onViewOnMap={() => handleViewOnMap(it)}
+              fromName={from}
+              toName={to}
             />
           ))}
         </section>

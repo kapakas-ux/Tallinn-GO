@@ -11,21 +11,21 @@ function getBaseUrl(): string {
 }
 
 /** Build a shareable URL with from/to names + coordinates */
-export function buildShareUrl(itinerary: PlanItinerary): string {
+export function buildShareUrl(itinerary: PlanItinerary, fromName?: string, toName?: string): string {
   const first = itinerary.legs[0];
   const last = itinerary.legs[itinerary.legs.length - 1];
-  const from = encodeURIComponent(first.from.name || 'Start');
-  const to = encodeURIComponent(last.to.name || 'Destination');
+  const from = encodeURIComponent(fromName || first.from.name || 'Start');
+  const to = encodeURIComponent(toName || last.to.name || 'Destination');
   const base = getBaseUrl();
   return `${base}/share?from=${from}&flat=${first.from.lat.toFixed(5)}&flng=${first.from.lon.toFixed(5)}&to=${to}&tlat=${last.to.lat.toFixed(5)}&tlng=${last.to.lon.toFixed(5)}`;
 }
 
 /** Share via native share sheet or clipboard fallback */
-export async function shareJourney(itinerary: PlanItinerary): Promise<boolean> {
-  const url = buildShareUrl(itinerary);
+export async function shareJourney(itinerary: PlanItinerary, fromName?: string, toName?: string): Promise<boolean> {
+  const url = buildShareUrl(itinerary, fromName, toName);
   const first = itinerary.legs[0];
   const last = itinerary.legs[itinerary.legs.length - 1];
-  const title = `${first.from.name} → ${last.to.name}`;
+  const title = `${fromName || first.from.name} → ${toName || last.to.name}`;
 
   // 1. Capacitor native Share (Android/iOS) — uses global plugin registry
   const cap = (window as any).Capacitor;
