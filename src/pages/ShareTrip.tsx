@@ -28,8 +28,8 @@ export const ShareTrip = () => {
   const markers = useRef<maplibregl.Marker[]>([]);
   const sourceIds = useRef<string[]>([]);
 
-  const fromName = decodeURIComponent(searchParams.get('from') || '') || t('share.from', 'Start');
-  const toName = decodeURIComponent(searchParams.get('to') || '') || t('share.to', 'Destination');
+  const fromName = decodeURIComponent(searchParams.get('from') || '') || '—';
+  const toName = decodeURIComponent(searchParams.get('to') || '') || '—';
   const flat = parseFloat(searchParams.get('flat') || '');
   const flng = parseFloat(searchParams.get('flng') || '');
   const tlat = parseFloat(searchParams.get('tlat') || '');
