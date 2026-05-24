@@ -39,9 +39,15 @@ export async function shareJourney(itinerary: PlanItinerary): Promise<boolean> {
     }
   }
 
-  // Clipboard fallback (desktop browsers without share support)
+  // Clipboard fallback — show a brief visual feedback
   try {
     await navigator.clipboard.writeText(url);
+    // Show a brief toast-like notification
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] bg-primary text-white px-4 py-2 rounded-full font-headline font-bold text-sm shadow-lg animate-in fade-in slide-in-from-bottom-4';
+    toast.textContent = 'Link copied!';
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.classList.add('opacity-0', 'transition-opacity', 'duration-300'); setTimeout(() => toast.remove(), 300); }, 1500);
     return true;
   } catch {
     return false;
