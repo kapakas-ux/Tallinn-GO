@@ -3,16 +3,14 @@
 /** Base URL for share links */
 function getBaseUrl(): string {
   const origin = window.location.origin;
-  // If running on a real domain (production web), use it directly
+  // If running on the real production domain, use it directly
+  if (origin.includes('gonow.ee')) return 'https://gonow.ee';
+  // If running on any non-local domain (e.g. Vercel preview), use it
   if (!origin.includes('localhost') && !origin.includes('capacitor') && !origin.includes('127.0.0.1')) {
     return origin;
   }
-  // Dev / Capacitor native — use the APP_URL env var (set in .env or Vercel)
-  const envUrl = (import.meta as any).env?.APP_URL || '';
-  if (envUrl && !envUrl.includes('MY_APP_URL')) {
-    return envUrl.replace(/\/+$/, '');
-  }
-  return origin; // fallback
+  // Dev / Capacitor native — always link to the production site
+  return 'https://gonow.ee';
 }
 
 /** Build a shareable URL with from/to names + coordinates */
