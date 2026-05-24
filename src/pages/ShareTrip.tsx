@@ -28,8 +28,8 @@ export const ShareTrip = () => {
   const markers = useRef<maplibregl.Marker[]>([]);
   const sourceIds = useRef<string[]>([]);
 
-  const fromName = searchParams.get('from') || t('share.from', 'Start');
-  const toName = searchParams.get('to') || t('share.to', 'Destination');
+  const fromName = decodeURIComponent(searchParams.get('from') || '') || t('share.from', 'Start');
+  const toName = decodeURIComponent(searchParams.get('to') || '') || t('share.to', 'Destination');
   const flat = parseFloat(searchParams.get('flat') || '');
   const flng = parseFloat(searchParams.get('flng') || '');
   const tlat = parseFloat(searchParams.get('tlat') || '');
@@ -113,13 +113,13 @@ export const ShareTrip = () => {
   };
 
   return (
-    <div className="bg-surface flex flex-col" style={{ minHeight: '100dvh' }}>
-      <div className="flex items-center gap-3 px-5 py-3 bg-surface-container-lowest border-b border-outline-variant/10" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0.5rem)' }}>
+    <div className="bg-surface flex flex-col min-h-screen">
+      <div className="flex items-center gap-3 px-5 py-3 bg-surface-container-lowest border-b border-outline-variant/10">
         <img src="/logo.png" alt="GO NOW" className="h-6" />
         <span className="font-label text-[10px] text-secondary uppercase tracking-widest">{t('share.title', 'Trip shared from GO NOW')}</span>
       </div>
-      <div ref={mapContainer} className="w-full" style={{ height: '40dvh' }} />
-      <div className="p-5 space-y-4" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 1rem)' }}>
+      <div ref={mapContainer} className="w-full h-[40vh] shrink-0" />
+      <div className="flex-1 p-5 space-y-4">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>
         ) : error ? (
