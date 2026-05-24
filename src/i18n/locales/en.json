@@ -113,6 +113,12 @@
     "reorder": "Long-press any section title on the dashboard (e.g. \"Favourite stops\") to drag and rearrange the order. Your layout is saved and stays the way you like it.",
     "gotIt": "Got it!"
   },
+  "share": {
+    "title": "Trip shared from GO NOW",
+    "invalidCoords": "Invalid coordinates",
+    "planError": "Could not plan journey",
+    "openApp": "Open GO NOW"
+  },
   "settings": {
     "title": "Settings",
     "theme": "Theme",
@@ -301,6 +307,7 @@
     "bus": "Bus",
     "trolley": "Trolley",
     "ferry": "Ferry",
+    "walk": "Walk",
     "commercialBus": "Intercity bus",
     "commercialBusTag": "INTER",
     "commercialBusHint": "Commercial intercity service — separate ticket required",

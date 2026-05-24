@@ -37,7 +37,7 @@ export const ShareTrip = () => {
 
   useEffect(() => {
     if (isNaN(flat) || isNaN(flng) || isNaN(tlat) || isNaN(tlng)) {
-      setError('Invalid coordinates');
+      setError(t('share.invalidCoords', 'Invalid coordinates'));
       setLoading(false);
       return;
     }
@@ -45,7 +45,7 @@ export const ShareTrip = () => {
       setItinerary(results?.[0] || null);
       setLoading(false);
     }).catch(err => {
-      setError(err.message || 'Could not plan journey');
+      setError(err.message || t('share.planError', 'Could not plan journey'));
       setLoading(false);
     });
   }, []);
@@ -102,13 +102,21 @@ export const ShareTrip = () => {
     };
   }, [itinerary]);
 
-  const fmtTime = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const fmtTime = (ms: number) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  const modeLabel = (mode: LegMode) => {
+    if (mode === 'BUS') return t('planner.bus', 'Bus');
+    if (mode === 'TRAM') return t('planner.tram', 'Tram');
+    if (mode === 'RAIL') return t('planner.train', 'Train');
+    if (mode === 'FERRY') return t('planner.ferry', 'Ferry');
+    return mode;
+  };
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      <div className="flex items-center gap-3 px-5 py-4 bg-surface-container-lowest border-b border-outline-variant/10">
+      <div className="flex items-center gap-3 px-5 py-4 bg-surface-container-lowest border-b border-outline-variant/10" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
         <img src="/logo.png" alt="GO NOW" className="h-6" />
-        <span className="font-label text-[10px] text-secondary uppercase tracking-widest">{t('planner.viewOnMap', 'Trip shared from GO NOW')}</span>
+        <span className="font-label text-[10px] text-secondary uppercase tracking-widest">{t('share.title', 'Trip shared from GO NOW')}</span>
       </div>
       <div ref={mapContainer} className="w-full h-[40vh] shrink-0" />
       <div className="flex-1 p-5 space-y-4">
@@ -131,13 +139,17 @@ export const ShareTrip = () => {
                 <div key={i} className="flex items-center gap-2 text-xs px-2">
                   <span className="text-secondary w-12 text-right shrink-0">{fmtTime(leg.startTime)}</span>
                   <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  <span className="text-primary truncate">{leg.mode === 'WALK' ? Math.round(leg.distance) + 'm walk' : leg.routeShortName || leg.mode}</span>
+                  <span className="text-primary truncate">
+                    {leg.mode === 'WALK'
+                      ? `${Math.round(leg.distance)}m ${t('planner.walk', 'walk')}`
+                      : `${modeLabel(leg.mode)} ${leg.routeShortName || ''}`}
+                  </span>
                 </div>
               ))}
             </div>
           </>
         ) : null}
-        <a href="/" className="block w-full py-3 bg-primary text-white rounded-xl font-headline font-bold text-sm text-center mt-4">{t('common.done', 'Open GO NOW')}</a>
+        <a href="/" className="block w-full py-3 bg-primary text-white rounded-xl font-headline font-bold text-sm text-center mt-4">{t('share.openApp', 'Open GO NOW')}</a>
       </div>
     </div>
   );

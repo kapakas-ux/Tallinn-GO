@@ -113,6 +113,12 @@
     "reorder": "Hoia pikalt avalehe jaotise pealkirja (nt \"Lemmikpeatused\"), et seda lohistada ja järjekorda muuta. Sinu paigutus salvestatakse ja jääb selliseks nagu sulle meeldib.",
     "gotIt": "Selge!"
   },
+  "share": {
+    "title": "GO NOW jagatud marsruut",
+    "invalidCoords": "Vigased koordinaadid",
+    "planError": "Marsruudi koostamine ebaõnnestus",
+    "openApp": "Ava GO NOW"
+  },
   "settings": {
     "title": "Seaded",
     "theme": "Teema",
@@ -301,6 +307,7 @@
     "bus": "Buss",
     "trolley": "Troll",
     "ferry": "Praam",
+    "walk": "Kõnni",
     "commercialBus": "Kaugbuss",
     "commercialBusTag": "KAUG",
     "commercialBusHint": "Ärilisel liinil kaugbuss — eraldi pilet vajalik",
