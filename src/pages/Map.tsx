@@ -496,10 +496,6 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       console.log(`Jittered ${jitteredCount} stops out of ${validStops.length}`);
     }
 
-    // Build a lineCount per stop using stop.modes length for density-based sizing
-    const lineCountMap: Record<string, number> = {};
-    stops.forEach(s => { lineCountMap[s.id] = (s.modes?.length || 0); });
-
     const geojson: any = {
       type: 'FeatureCollection',
       features: validStops.map((stop, index) => ({
@@ -514,7 +510,6 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           siriId: stop.siriId,
           name: stop.name,
           modes: stop.modes || [],
-          lineCount: lineCountMap[stop.id] || 0,
           originalLat: (stop as any).originalLat || stop.lat,
           originalLng: (stop as any).originalLng || stop.lng
         }
@@ -532,54 +527,34 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     console.log('GeoJSON to set:', JSON.stringify(geojson.features.slice(0, 3), null, 2));
 
     const addLayers = () => {
-      // ── Tier 1: Glow halo layer (underneath stops) ──────────
-      if (!m.getLayer('stops-glow')) {
+      // Clean up old layers from previous design
+      try { if (m.getLayer('stops-glow')) m.removeLayer('stops-glow'); } catch {}
+      try { if (m.getLayer('stops-shadow')) m.removeLayer('stops-shadow'); } catch {}
+      try { if (m.getLayer('stops-icons')) m.removeLayer('stops-icons'); } catch {}
+
+      // ── Clean modern stop dots ─────────────────────────────
+
+      // Inner highlight ring (brighter core)
+      if (!m.getLayer('stops-core')) {
         m.addLayer({
-          id: 'stops-glow',
+          id: 'stops-core',
           type: 'circle',
           source: 'stops',
           minzoom: 13,
           paint: {
             'circle-radius': [
               'interpolate', ['linear'], ['zoom'],
-              13, ['+', 6, ['*', ['get', 'lineCount'], 1.5]],
-              16, ['+', 14, ['*', ['get', 'lineCount'], 2]],
+              13, 2,
+              16, 5
             ],
-            'circle-color': [
-              'case',
-              ['all', ['in', 'tram', ['get', 'modes']], ['==', ['length', ['get', 'modes']], 1]],
-              '#DC143C',
-              '#4DA3FF'
-            ],
-            'circle-opacity': 0.12,
-            'circle-blur': 1.5,
+            'circle-color': '#ffffff',
+            'circle-opacity': 0.3,
             'circle-stroke-width': 0,
           }
         });
       }
 
-      // ── Tier 2: Main stop dots with shadow and dynamic sizing ──
-      if (!m.getLayer('stops-shadow')) {
-        m.addLayer({
-          id: 'stops-shadow',
-          type: 'circle',
-          source: 'stops',
-          minzoom: 13,
-          paint: {
-            'circle-radius': [
-              'interpolate', ['linear'], ['zoom'],
-              13, ['+', 3, ['*', ['get', 'lineCount'], 0.8]],
-              16, ['+', 8, ['*', ['get', 'lineCount'], 1.2]],
-            ],
-            'circle-color': 'rgba(0,0,0,0.15)',
-            'circle-opacity': 0.6,
-            'circle-blur': 0.5,
-            'circle-translate': [1, 2],
-            'circle-stroke-width': 0,
-          }
-        });
-      }
-
+      // Main dot
       if (!m.getLayer('stops-layer')) {
         m.addLayer({
           id: 'stops-layer',
@@ -589,54 +564,21 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           paint: {
             'circle-radius': [
               'interpolate', ['linear'], ['zoom'],
-              13, ['+', 2, ['*', ['get', 'lineCount'], 0.8]],
-              16, ['+', 7, ['*', ['get', 'lineCount'], 1.2]],
+              13, 4.5,
+              14, 6.5,
+              16, 9
             ],
             'circle-color': [
               'case',
-              ['all', ['in', 'tram', ['get', 'modes']], ['==', ['length', ['get', 'modes']], 1]],
-              '#DC143C',
-              ['any',
-                ['in', 'bus', ['get', 'modes']],
-                ['in', 'nightbus', ['get', 'modes']],
-                ['in', 'trolley', ['get', 'modes']],
-                ['in', 'regional', ['get', 'modes']],
-                ['in', 'commercial', ['get', 'modes']],
-                ['in', 'suburban', ['get', 'modes']]
-              ], '#4DA3FF',
-              '#ff4444'
+              ['all', ['in', 'tram', ['get', 'modes']], ['==', ['length', ['get', 'modes']], 1]], '#e63946',
+              ['in', 'train', ['get', 'modes']], '#f4a261',
+              ['in', 'trolley', ['get', 'modes']], '#2a9d8f',
+              '#1d3557'
             ],
-            'circle-stroke-width': 2,
-            'circle-stroke-color': 'rgba(255,255,255,0.55)',
-            'circle-opacity': 0.9
-          }
-        });
-      }
-
-      // ── Tier 3: Mode icon shapes at high zoom ──────────────
-      if (!m.getLayer('stops-icons')) {
-        m.addLayer({
-          id: 'stops-icons',
-          type: 'symbol',
-          source: 'stops',
-          minzoom: 15.5,
-          layout: {
-            'text-field': [
-              'case',
-              ['all', ['in', 'tram', ['get', 'modes']], ['==', ['length', ['get', 'modes']], 1]], '🚊',
-              ['all', ['in', 'train', ['get', 'modes']], ['==', ['length', ['get', 'modes']], 1]], '🚆',
-              ['in', 'trolley', ['get', 'modes']], '🚎',
-              ['in', 'regional', ['get', 'modes']], '🚍',
-              '🚏'
-            ],
-            'text-size': 14,
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-            'text-offset': [0, 0],
-            'text-anchor': 'center',
-          },
-          paint: {
-            'text-opacity': 0.85,
+            'circle-stroke-width': 1.5,
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-opacity': 0.9,
+            'circle-opacity': 0.92,
           }
         });
       }
@@ -650,16 +592,16 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           layout: {
             'text-field': ['get', 'name'],
             'text-size': 11,
-            'text-offset': [0, 1.2],
+            'text-offset': [0, 1.4],
             'text-anchor': 'top',
             'text-font': ['Open Sans Regular'],
             'text-allow-overlap': true,
             'text-ignore-placement': true
           },
           paint: {
-            'text-color': '#333333',
+            'text-color': '#1d3557',
             'text-halo-color': '#ffffff',
-            'text-halo-width': 1.5
+            'text-halo-width': 2,
           }
         });
       }
