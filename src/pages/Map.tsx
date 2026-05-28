@@ -496,6 +496,10 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       console.log(`Jittered ${jitteredCount} stops out of ${validStops.length}`);
     }
 
+    // Build a lineCount per stop using stop.modes length for density-based sizing
+    const lineCountMap: Record<string, number> = {};
+    stops.forEach(s => { lineCountMap[s.id] = (s.modes?.length || 0); });
+
     const geojson: any = {
       type: 'FeatureCollection',
       features: validStops.map((stop, index) => ({
@@ -510,6 +514,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           siriId: stop.siriId,
           name: stop.name,
           modes: stop.modes || [],
+          lineCount: lineCountMap[stop.id] || 0,
           originalLat: (stop as any).originalLat || stop.lat,
           originalLng: (stop as any).originalLng || stop.lng
         }
@@ -527,6 +532,54 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     console.log('GeoJSON to set:', JSON.stringify(geojson.features.slice(0, 3), null, 2));
 
     const addLayers = () => {
+      // ── Tier 1: Glow halo layer (underneath stops) ──────────
+      if (!m.getLayer('stops-glow')) {
+        m.addLayer({
+          id: 'stops-glow',
+          type: 'circle',
+          source: 'stops',
+          minzoom: 13,
+          paint: {
+            'circle-radius': [
+              'interpolate', ['linear'], ['zoom'],
+              13, ['+', 6, ['*', ['get', 'lineCount'], 1.5]],
+              16, ['+', 14, ['*', ['get', 'lineCount'], 2]],
+            ],
+            'circle-color': [
+              'case',
+              ['all', ['in', 'tram', ['get', 'modes']], ['==', ['length', ['get', 'modes']], 1]],
+              '#DC143C',
+              '#4DA3FF'
+            ],
+            'circle-opacity': 0.12,
+            'circle-blur': 1.5,
+            'circle-stroke-width': 0,
+          }
+        });
+      }
+
+      // ── Tier 2: Main stop dots with shadow and dynamic sizing ──
+      if (!m.getLayer('stops-shadow')) {
+        m.addLayer({
+          id: 'stops-shadow',
+          type: 'circle',
+          source: 'stops',
+          minzoom: 13,
+          paint: {
+            'circle-radius': [
+              'interpolate', ['linear'], ['zoom'],
+              13, ['+', 3, ['*', ['get', 'lineCount'], 0.8]],
+              16, ['+', 8, ['*', ['get', 'lineCount'], 1.2]],
+            ],
+            'circle-color': 'rgba(0,0,0,0.15)',
+            'circle-opacity': 0.6,
+            'circle-blur': 0.5,
+            'circle-translate': [1, 2],
+            'circle-stroke-width': 0,
+          }
+        });
+      }
+
       if (!m.getLayer('stops-layer')) {
         m.addLayer({
           id: 'stops-layer',
@@ -535,20 +588,14 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           minzoom: 13,
           paint: {
             'circle-radius': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              13, 4,
-              16, 10
+              'interpolate', ['linear'], ['zoom'],
+              13, ['+', 2, ['*', ['get', 'lineCount'], 0.8]],
+              16, ['+', 7, ['*', ['get', 'lineCount'], 1.2]],
             ],
             'circle-color': [
               'case',
-              // Only trams
-              ['all', 
-                ['in', 'tram', ['get', 'modes']], 
-                ['==', ['length', ['get', 'modes']], 1]
-              ], '#DC143C',
-              // Any bus, trolley, regional, commercial, or suburban
+              ['all', ['in', 'tram', ['get', 'modes']], ['==', ['length', ['get', 'modes']], 1]],
+              '#DC143C',
               ['any',
                 ['in', 'bus', ['get', 'modes']],
                 ['in', 'nightbus', ['get', 'modes']],
@@ -557,12 +604,40 @@ export const Map = ({ active = true }: { active?: boolean }) => {
                 ['in', 'commercial', ['get', 'modes']],
                 ['in', 'suburban', ['get', 'modes']]
               ], '#4DA3FF',
-              // Default
               '#ff4444'
             ],
             'circle-stroke-width': 2,
-            'circle-stroke-color': '#ffffff',
+            'circle-stroke-color': 'rgba(255,255,255,0.55)',
             'circle-opacity': 0.9
+          }
+        });
+      }
+
+      // ── Tier 3: Mode icon shapes at high zoom ──────────────
+      if (!m.getLayer('stops-icons')) {
+        // Add tram icon
+        const tramIcon = new Image(24, 24);
+        tramIcon.onload = () => { if (!m.hasImage('stop-tram')) m.addImage('stop-tram', { data: new Uint8Array(tramIcon.width * tramIcon.height * 4), width: 24, height: 24 } as any); };
+        // Use a circle with tram letter for now — simpler approach with symbol layer
+        m.addLayer({
+          id: 'stops-icons',
+          type: 'symbol',
+          source: 'stops',
+          minzoom: 15.5,
+          filter: ['all',
+            ['in', 'tram', ['get', 'modes']],
+            ['==', ['length', ['get', 'modes']], 1]
+          ],
+          layout: {
+            'text-field': '🚊',
+            'text-size': 14,
+            'text-allow-overlap': true,
+            'text-ignore-placement': true,
+            'text-offset': [0, 0],
+            'text-anchor': 'center',
+          },
+          paint: {
+            'text-opacity': 0.9,
           }
         });
       }
