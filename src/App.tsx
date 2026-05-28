@@ -190,7 +190,7 @@ function AppContent() {
           onTouchEnd={onPullEnd}
           onTouchCancel={onPullEnd}
           className={`relative flex-1 overflow-y-auto no-scrollbar overscroll-none ${
-          location.pathname.startsWith('/map') ? '' : 'pt-[calc(4rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))]'
+          (location.pathname.startsWith('/map') || location.pathname.startsWith('/share')) ? '' : 'pt-[calc(4rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))]'
         }`}
         >
           {canPullToRefresh && (
