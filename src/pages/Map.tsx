@@ -615,21 +615,20 @@ export const Map = ({ active = true }: { active?: boolean }) => {
 
       // ── Tier 3: Mode icon shapes at high zoom ──────────────
       if (!m.getLayer('stops-icons')) {
-        // Add tram icon
-        const tramIcon = new Image(24, 24);
-        tramIcon.onload = () => { if (!m.hasImage('stop-tram')) m.addImage('stop-tram', { data: new Uint8Array(tramIcon.width * tramIcon.height * 4), width: 24, height: 24 } as any); };
-        // Use a circle with tram letter for now — simpler approach with symbol layer
         m.addLayer({
           id: 'stops-icons',
           type: 'symbol',
           source: 'stops',
           minzoom: 15.5,
-          filter: ['all',
-            ['in', 'tram', ['get', 'modes']],
-            ['==', ['length', ['get', 'modes']], 1]
-          ],
           layout: {
-            'text-field': '🚊',
+            'text-field': [
+              'case',
+              ['all', ['in', 'tram', ['get', 'modes']], ['==', ['length', ['get', 'modes']], 1]], '🚊',
+              ['all', ['in', 'train', ['get', 'modes']], ['==', ['length', ['get', 'modes']], 1]], '🚆',
+              ['in', 'trolley', ['get', 'modes']], '🚎',
+              ['in', 'regional', ['get', 'modes']], '🚍',
+              '🚏'
+            ],
             'text-size': 14,
             'text-allow-overlap': true,
             'text-ignore-placement': true,
@@ -637,7 +636,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
             'text-anchor': 'center',
           },
           paint: {
-            'text-opacity': 0.9,
+            'text-opacity': 0.85,
           }
         });
       }
