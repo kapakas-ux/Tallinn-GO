@@ -115,13 +115,13 @@ export const ShareTrip = () => {
   };
 
   return (
-    <div className="bg-surface flex flex-col min-h-screen">
+    <div className="bg-surface">
       <div className="flex items-center gap-3 px-5 py-3 bg-surface-container-lowest border-b border-outline-variant/10">
         <img src="/logo.png" alt="GO NOW" className="h-6" />
         <span className="font-label text-[10px] text-secondary uppercase tracking-widest">{t('share.title', 'Trip shared from GO NOW')}</span>
       </div>
-      <div ref={mapContainer} className="w-full h-[40vh] shrink-0" />
-      <div className="flex-1 p-5 space-y-4">
+      <div ref={mapContainer} className="w-full h-[40vh]" />
+      <div className="p-5 space-y-4">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>
         ) : error ? (
