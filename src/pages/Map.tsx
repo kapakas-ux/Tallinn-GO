@@ -29,6 +29,7 @@ import { AnimatePresence, motion } from 'motion/react';
 
 const TALLINN_CENTER: [number, number] = [TALLINN_CENTER_COORD.lng, TALLINN_CENTER_COORD.lat]; // [lng, lat]
 const VEHICLE_VISIBILITY_MIN_ZOOM = 13;
+const NORTHERN_VISIBILITY_MIN_ZOOM = 7; // Northern Estonia buses visible when zoomed out
 
 const isDarkTheme = (theme: AppTheme) => theme === 'plum' || theme === 'havgra' || theme === 'minimal';
 
@@ -46,6 +47,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
   const markers = useRef([] as maplibregl.Marker[]);
   const vehicleMarkers = useRef({} as { [id: string]: maplibregl.Marker });
   const vehicleInterpolation = useRef({} as { [id: string]: { current: [number, number], target: [number, number], lastUpdate: number } });
+  const vehicleSources = useRef({} as { [id: string]: string | undefined }); // vehicle id → source
   const vehiclesRef = useRef<Vehicle[]>([]);
   const userMarker = useRef(null as maplibregl.Marker | null);
   const pulsatingMarker = useRef(null as maplibregl.Marker | null);
@@ -335,17 +337,17 @@ export const Map = ({ active = true }: { active?: boolean }) => {
 
       map.current.on('zoom', () => {
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= VEHICLE_VISIBILITY_MIN_ZOOM;
-        Object.values(vehicleMarkers.current).forEach((marker: maplibregl.Marker) => {
-          marker.getElement().style.display = visible ? 'block' : 'none';
+        Object.entries(vehicleMarkers.current).forEach(([id, marker]) => {
+          const minZoom = vehicleSources.current[id] === 'northern-gtfs' ? NORTHERN_VISIBILITY_MIN_ZOOM : VEHICLE_VISIBILITY_MIN_ZOOM;
+          marker.getElement().style.display = currentZoom >= minZoom ? 'block' : 'none';
         });
       });
 
       map.current.on('move', () => {
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= VEHICLE_VISIBILITY_MIN_ZOOM;
-        Object.values(vehicleMarkers.current).forEach((marker: maplibregl.Marker) => {
-          marker.getElement().style.display = visible ? 'block' : 'none';
+        Object.entries(vehicleMarkers.current).forEach(([id, marker]) => {
+          const minZoom = vehicleSources.current[id] === 'northern-gtfs' ? NORTHERN_VISIBILITY_MIN_ZOOM : VEHICLE_VISIBILITY_MIN_ZOOM;
+          marker.getElement().style.display = currentZoom >= minZoom ? 'block' : 'none';
         });
       });
 
@@ -375,6 +377,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
       if (!currentIds.has(id)) {
         vehicleMarkers.current[id].remove();
         delete vehicleMarkers.current[id];
+        delete vehicleSources.current[id];
       }
     });
 
@@ -399,8 +402,8 @@ export const Map = ({ active = true }: { active?: boolean }) => {
         const el = vehicleMarkers.current[vehicle.id].getElement();
         
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= VEHICLE_VISIBILITY_MIN_ZOOM;
-        el.style.display = visible ? 'block' : 'none';
+        const minZoom = vehicle.source === 'northern-gtfs' ? NORTHERN_VISIBILITY_MIN_ZOOM : VEHICLE_VISIBILITY_MIN_ZOOM;
+        el.style.display = currentZoom >= minZoom ? 'block' : 'none';
 
         const icon = el.querySelector('.vehicle-icon') as HTMLElement;
         if (icon) {
@@ -446,8 +449,8 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           .addTo(map.current!);
           
         const currentZoom = map.current?.getZoom() || 0;
-        const visible = currentZoom >= VEHICLE_VISIBILITY_MIN_ZOOM;
-        el.style.display = visible ? 'block' : 'none';
+        const minZoom = vehicle.source === 'northern-gtfs' ? NORTHERN_VISIBILITY_MIN_ZOOM : VEHICLE_VISIBILITY_MIN_ZOOM;
+        el.style.display = currentZoom >= minZoom ? 'block' : 'none';
           
         vehicleInterpolation.current[vehicle.id] = {
           current: [vehicle.lng, vehicle.lat],
@@ -456,6 +459,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
         };
 
         vehicleMarkers.current[vehicle.id] = marker;
+        vehicleSources.current[vehicle.id] = vehicle.source;
       }
     });
   }, [vehicles, styleLoadCount]);
