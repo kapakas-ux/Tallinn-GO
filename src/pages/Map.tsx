@@ -7,6 +7,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { fetchStops, fetchDepartures, fetchVehicles, fetchRoutes, fetchServiceAlerts, getVehicleDebugInfo } from '../services/transportService';
 import type { VehicleDebugInfo } from '../services/transportService';
+import { fetchNorthernVehicles } from '../services/northernEstoniaGtfs';
 import { getFavorites, toggleFavorite, isFavorite } from '../services/favoritesService';
 import { getHome, subscribeHome, type HomeLocation } from '../services/homeService';
 import { HomeAddressPicker } from '../components/HomeAddressPicker';
@@ -125,6 +126,22 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     loadVehicles();
     const interval = setInterval(loadVehicles, 2000); // Update every 2 seconds
 
+    // Independent Northern Estonia GTFS-RT fetch — not blocked by Tallinn API issues
+    const loadNorthern = () => {
+      fetchNorthernVehicles().then(data => {
+        if (data.length > 0) {
+          console.log(`[Northern] Fetched ${data.length} northern vehicles independently`);
+          setVehicles(prev => {
+            // Merge: dedup by line + proximity against existing
+            const existing = prev.filter(v => !data.some(nv => nv.line === v.line && getDistance(nv.lat, nv.lng, v.lat, v.lng) < 200));
+            return [...existing, ...data];
+          });
+        }
+      }).catch((err) => { console.warn('[Northern] fetch failed:', err); });
+    };
+    loadNorthern();
+    const northernInterval = setInterval(loadNorthern, 10000); // Every 10s
+
     // Animation loop for smooth vehicle movement
     let animationFrameId: number;
     const animate = () => {
@@ -152,6 +169,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
 
     return () => {
       clearInterval(interval);
+      clearInterval(northernInterval);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
