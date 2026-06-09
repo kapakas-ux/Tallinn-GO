@@ -564,6 +564,21 @@ let cachedVehicles: Vehicle[] = [];
 let lastVehiclesFetch = 0;
 let vehiclesPromise: Promise<Vehicle[]> | null = null;
 
+// Debug: per-source vehicle counts
+export interface VehicleDebugInfo {
+  gpsTxt: number;
+  gisEe: number;
+  ridangoWs: number;
+  tartuWs: number;
+  northernGtfs: number;
+  total: number;
+  lastFetch: number;
+}
+let vehicleDebug: VehicleDebugInfo = { gpsTxt: 0, gisEe: 0, ridangoWs: 0, tartuWs: 0, northernGtfs: 0, total: 0, lastFetch: 0 };
+export function getVehicleDebugInfo(): VehicleDebugInfo {
+  return { ...vehicleDebug };
+}
+
 export async function fetchVehicles(): Promise<Vehicle[]> {
   const now = Date.now();
   
@@ -753,6 +768,17 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
   }
 
   const allVehicles = [...cityVehicles, ...allExtra, ...tartuVehicles, ...northernVehicles];
+
+  // Update debug info
+  vehicleDebug = {
+    gpsTxt: cityVehicles.length,
+    gisEe: gisVehicles.length,
+    ridangoWs: wsVehicles.length,
+    tartuWs: tartuVehicles.length,
+    northernGtfs: northernVehicles.length,
+    total: allVehicles.length,
+    lastFetch: Date.now(),
+  };
 
   if (allVehicles.length > 0) {
     return allVehicles;
