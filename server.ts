@@ -149,6 +149,31 @@ async function startServer() {
     }
   });
 
+  // Proxy for Northern Estonia GTFS-Realtime vehicle positions (.pb protobuf)
+  app.get("/api/transport/northern-vehicles", async (req, res) => {
+    const url = "https://ytkpohja-avl-prod.ridango.cloud/data/gtfs/vehicle-positions.pb";
+    console.log("GET /api/transport/northern-vehicles — Fetching GTFS-RT protobuf...");
+    try {
+      const response = await axios.get(url, {
+        responseType: 'arraybuffer',
+        headers: {
+          'Accept': 'application/octet-stream',
+          'User-Agent': 'GO-NOW/1.0',
+        },
+        timeout: 15000,
+      });
+      console.log(`Northern vehicles response: ${response.data.byteLength} bytes`);
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      return res.send(Buffer.from(response.data));
+    } catch (error: any) {
+      console.error(`Error fetching northern vehicles:`, error.message);
+      res.status(500).json({ error: "Failed to fetch northern vehicles", details: error.message });
+    }
+  });
+
   app.get("/api/transport/departures", async (req, res) => {
     const { stopId, siriId, time } = req.query;
     if (!stopId) return res.status(400).json({ error: "stopId is required" });

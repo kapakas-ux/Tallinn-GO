@@ -41,6 +41,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "gtfs-realtime-bindings": "^2.0.0",
     "https-proxy-agent": "^8.0.0",
     "i18next": "^26.0.3",
     "lucide-react": "^0.546.0",

@@ -3,6 +3,7 @@ import { CapacitorHttp, Capacitor } from '@capacitor/core';
 import { getDistance, getBearing } from '../lib/geo';
 import { getRidangoVehicles, isRidangoConnected } from './ridangoWebSocket';
 import { getTartuVehicles, isTartuConnected } from './tartuWebSocket';
+import { fetchNorthernVehicles } from './northernEstoniaGtfs';
 import { getLastOfDayMap, annotateLastOfDay } from './scheduleAwarenessService';
 
 const getApiBaseUrl = () => {
@@ -733,7 +734,25 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     }
   }
 
-  const allVehicles = [...cityVehicles, ...allExtra, ...tartuVehicles];
+  // Northern Estonia GTFS-RT vehicles (dedup against city + extra by line + proximity)
+  let northernVehicles: Vehicle[] = [];
+  try {
+    const existingSet = [...cityVehicles, ...allExtra];
+    const raw = await fetchNorthernVehicles();
+    for (const v of raw) {
+      const isDup = existingSet.some(
+        av => av.line === v.line && getDistance(av.lat, av.lng, v.lat, v.lng) < 200
+      );
+      if (!isDup) northernVehicles.push(v);
+    }
+    if (northernVehicles.length > 0) {
+      console.log(`fetchVehicles: added ${northernVehicles.length} vehicles from Northern Estonia GTFS-RT`);
+    }
+  } catch (err) {
+    console.warn('fetchVehicles: Northern Estonia GTFS-RT fetch failed', err);
+  }
+
+  const allVehicles = [...cityVehicles, ...allExtra, ...tartuVehicles, ...northernVehicles];
 
   if (allVehicles.length > 0) {
     return allVehicles;
