@@ -42,6 +42,8 @@ export interface Vehicle {
   bearing: number;
   speed?: number;
   destination: string;
+  /** Source feed — used for per-source zoom thresholds */
+  source?: 'northern-gtfs';
 }
 
 export interface RouteOption {

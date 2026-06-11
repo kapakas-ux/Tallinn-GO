@@ -758,21 +758,15 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     // Resolve destinations synchronously so they're ready for display
     await enrichNorthernDestinations(northernVehicles).catch(() => {});
 
-    // Northern GTFS is the single source for ALL regional vehicles — remove from other sources
+    // Northern GTFS owns its lines — remove all vehicles of those lines from other sources
     if (northernVehicles.length > 0) {
+      const northernLines = new Set(northernVehicles.map(v => v.line).filter(Boolean));
       const cityBefore = cityVehicles.length;
       const extraBefore = allExtra.length;
-      cityVehicles = cityVehicles.filter(v => v.type !== 'regional');
-      allExtra = allExtra.filter(v => v.type !== 'regional');
-      tartuVehicles = tartuVehicles.filter(v => v.type !== 'regional');
-      // Also dedup by line+proximity for any remaining type overlap (e.g., 'bus' typed in gps.txt)
-      cityVehicles = cityVehicles.filter(cv =>
-        !northernVehicles.some(nv => nv.line === cv.line && getDistance(nv.lat, nv.lng, cv.lat, cv.lng) < 500)
-      );
-      allExtra = allExtra.filter(av =>
-        !northernVehicles.some(nv => nv.line === av.line && getDistance(nv.lat, nv.lng, av.lat, av.lng) < 500)
-      );
-      console.log(`fetchVehicles: removed ${cityBefore - cityVehicles.length} city + ${extraBefore - allExtra.length} extra (northern is source)`);
+      cityVehicles = cityVehicles.filter(v => !northernLines.has(v.line));
+      allExtra = allExtra.filter(v => !northernLines.has(v.line));
+      tartuVehicles = tartuVehicles.filter(v => !northernLines.has(v.line));
+      console.log(`fetchVehicles: removed ${cityBefore - cityVehicles.length} city + ${extraBefore - allExtra.length} extra — northern lines: ${northernLines.size}`);
     }
   } catch (err) {
     console.warn('fetchVehicles: Northern Estonia GTFS-RT fetch failed', err);
