@@ -109,14 +109,19 @@ export async function fetchNorthernVehicles(): Promise<Vehicle[]> {
       } as Vehicle);
     }
 
-    // Dedup: same vehicle ID → keep; same line within 1km → keep first only
+    // Dedup: same vehicle ID → keep; same line within 300m → keep first only
     const seen = new Map<string, Vehicle>();
     for (const v of vehicles) seen.set(v.id, v);
     let deduped = [...seen.values()];
+    console.log(`[northern] after ID dedup: ${deduped.length} (was ${vehicles.length})`);
     const final: Vehicle[] = [];
     for (const v of deduped) {
-      const isDup = final.some(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 1.0);
-      if (!isDup) final.push(v);
+      const dup = final.find(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 0.3);
+      if (dup) {
+        console.log(`[northern dedup] DROP ${v.line} id=${v.id} dst="${v.destination}" — kept id=${dup.id} dst="${dup.destination}" dist=${(getDistance(dup.lat, dup.lng, v.lat, v.lng)*1000).toFixed(0)}m`);
+      } else {
+        final.push(v);
+      }
     }
 
     if (final.length < vehicles.length) {
