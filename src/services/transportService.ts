@@ -1826,18 +1826,23 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
   
   try {
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
-    const url = `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
+    
+    // Native: call SIRI directly (no proxy needed — CapacitorHttp bypasses CORS)
+    // Web: use the proxy endpoint
+    const siriUrl = Capacitor.isNativePlatform()
+      ? `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}${time ? `&time=${time}` : ''}`
+      : `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
     
     // Run SIRI and peatus.ee fetches in parallel
     const [siriText, allPeatusArrivals] = await Promise.all([
-      universalFetch(url).catch(e => { console.error('Error fetching SIRI departures:', e); return ''; }),
+      universalFetch(siriUrl).catch(e => { console.error('Error fetching SIRI departures:', e); return ''; }),
       fetchPeatusDepartures(stopId, siriId, time, true)
     ]);
 
     let arrivals: Arrival[] = [];
     
     try {
-      console.log(`fetchDepartures: Fetching from ${url}`);
+      console.log(`fetchDepartures: Fetching from ${siriUrl}`);
       const text = siriText;
       
       if (text) {
