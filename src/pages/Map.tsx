@@ -118,7 +118,17 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     const loadVehicles = () => {
       fetchVehicles().then(data => {
         setVehicleError(null);
-        setVehicles(data);
+        setVehicles(prev => {
+          // Keep northern GTFS vehicles from previous state that aren't in the new data
+          const northernFromPrev = prev.filter(v => v.source === 'northern-gtfs');
+          if (northernFromPrev.length === 0) return data;
+          const newIds = new Set(data.map(v => v.id));
+          const keepNorthern = northernFromPrev.filter(v =>
+            !newIds.has(v.id) &&
+            !data.some(d => d.line === v.line && getDistance(d.lat, d.lng, v.lat, v.lng) < 200)
+          );
+          return [...data, ...keepNorthern];
+        });
       }).catch(err => {
         console.error('Error fetching vehicles:', err);
         setVehicleError(err?.message || 'Vehicle fetch failed');

@@ -1667,17 +1667,30 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       }
     }
 
-    const numberOfDepartures = time === '0' ? 50 : 15;
+    const numberOfDepartures = time === '0' ? 20 : 10;
 
+    // Simplified query — fewer fields, fewer departures for speed
     const query = `
       {
         stop(id: "${gtfsId}") {
-          name
-          stoptimesWithoutPatterns(numberOfDepartures: ${numberOfDepartures}, startTime: ${nowSeconds - 180}) {
+          stoptimesWithoutPatterns(numberOfDepartures: ${numberOfDepartures}, startTime: ${nowSeconds - 120}) {
             scheduledDeparture
             realtimeDeparture
-            realtime
             realtimeState
+            headsign
+            serviceDay
+            trip {
+              gtfsId
+              route {
+                shortName
+                mode
+                agency { name }
+              }
+            }
+          }
+        }
+      }
+    `;
             headsign
             serviceDay
             trip {
