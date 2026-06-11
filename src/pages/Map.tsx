@@ -417,13 +417,15 @@ export const Map = ({ active = true }: { active?: boolean }) => {
           </div>
         `;
 
-        el.addEventListener('click', async (e) => {
+        el.addEventListener('click', (e) => {
           e.stopPropagation();
-          // Use latest vehicle data (destination may have resolved since marker was created)
           const latest = vehiclesRef.current?.find(v => v.id === vehicle.id) || vehicle;
-          const routeStops = await getRouteStopsForVehicle(latest);
-          setSelectedVehicle({ vehicle: latest, routeStops });
+          // Show popup immediately, load route stops in background
+          setSelectedVehicle({ vehicle: latest, routeStops: [] });
           setTripStoptimes([]);
+          getRouteStopsForVehicle(latest).then(routeStops => {
+            setSelectedVehicle(prev => prev?.vehicle.id === latest.id ? { vehicle: latest, routeStops } : prev);
+          });
           fetchVehicleTripStoptimes(latest).then(st => setTripStoptimes(st));
         });
 
