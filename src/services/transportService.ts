@@ -750,18 +750,11 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     }
   }
 
-  // Northern Estonia GTFS-RT vehicles (dedup against city + extra by line + proximity)
+  // Northern Estonia GTFS-RT vehicles — always include, marker logic handles overlap
   let northernVehicles: Vehicle[] = [];
   try {
-    const existingSet = [...cityVehicles, ...allExtra];
-    const raw = await fetchNorthernVehicles();
-    console.log(`fetchVehicles: northern GTFS-RT raw=${raw.length}, deduping against ${existingSet.length} existing`);
-    for (const v of raw) {
-      const isDup = existingSet.some(
-        av => av.line === v.line && getDistance(av.lat, av.lng, v.lat, v.lng) < 50
-      );
-      if (!isDup) northernVehicles.push(v);
-    }
+    northernVehicles = await fetchNorthernVehicles();
+    console.log(`fetchVehicles: northern GTFS-RT raw=${northernVehicles.length}`);
     if (northernVehicles.length > 0) {
       console.log(`fetchVehicles: added ${northernVehicles.length} vehicles from Northern Estonia GTFS-RT`);
     }
