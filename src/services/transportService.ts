@@ -1657,14 +1657,11 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
   try {
     const nowSeconds = Math.floor(Date.now() / 1000);
     
-    // Find the stop to get its real gtfsId
-    await fetchStops();
+    // Quick GTFS ID lookup — use cached stops if available, otherwise fall back to stopId
     let gtfsId = `estonia:${stopId}`;
-    if (stopsByIdMap) {
+    if (stopsByIdMap && stopsByIdMap.size > 0) {
       const stop = stopsByIdMap.get(stopId);
-      if (stop && stop.gtfsId) {
-        gtfsId = `estonia:${stop.gtfsId}`;
-      }
+      if (stop?.gtfsId) gtfsId = `estonia:${stop.gtfsId}`;
     }
 
     const numberOfDepartures = time === '0' ? 20 : 10;
@@ -1831,8 +1828,14 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
       : `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
     
     // Run SIRI and peatus.ee fetches in parallel
+    // SIRI gets a 5s timeout — peatus.ee results shown immediately if SIRI is slow
+    const siriFetch = universalFetch(siriUrl).catch(e => { console.error('Error fetching SIRI departures:', e); return ''; });
+    const siriWithTimeout = Promise.race([
+      siriFetch,
+      new Promise<string>(r => setTimeout(() => r(''), 5000))
+    ]);
     const [siriText, allPeatusArrivals] = await Promise.all([
-      universalFetch(siriUrl).catch(e => { console.error('Error fetching SIRI departures:', e); return ''; }),
+      siriWithTimeout,
       fetchPeatusDepartures(stopId, siriId, time, true)
     ]);
 
