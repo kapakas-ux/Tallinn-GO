@@ -41,10 +41,10 @@ export const watchLocation = (callback: (location: Location, isSimulated: boolea
     if (fallbackTimer) clearTimeout(fallbackTimer);
     fallbackTimer = setTimeout(() => {
       if (!hasReceivedPosition) {
-        console.warn('watchLocation: No GPS fix after 5s, falling back to Tallinn center');
+        console.warn('watchLocation: No GPS fix after 20s, falling back to Tallinn center');
         callback(TALLINN_CENTER, true);
       }
-    }, 5_000);
+    }, 20_000);
   };
 
   const onPosition = (location: Location) => {

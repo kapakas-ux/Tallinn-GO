@@ -1705,7 +1705,9 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
       const response = await CapacitorHttp.post({
         url,
         headers: { 'Content-Type': 'application/json' },
-        data: { query }
+        data: { query },
+        connectTimeout: 5000,
+        readTimeout: 5000,
       });
       text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
     } else {
@@ -1829,16 +1831,22 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
       ? `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}${time ? `&time=${time}` : ''}`
       : `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
     
-    // Run SIRI and peatus.ee fetches in parallel
-    // SIRI gets a 5s timeout — peatus.ee results shown immediately if SIRI is slow
+    // Run SIRI and peatus.ee fetches in parallel — show whichever returns first
     const siriFetch = universalFetch(siriUrl).catch(e => { console.error('Error fetching SIRI departures:', e); return ''; });
     const siriWithTimeout = Promise.race([
       siriFetch,
       new Promise<string>(r => setTimeout(() => r(''), 5000))
     ]);
+    
+    // Wrap peatus fetch with timeout so it never blocks
+    const peatusWithTimeout = Promise.race([
+      fetchPeatusDepartures(stopId, siriId, time, true),
+      new Promise<Arrival[]>(r => setTimeout(() => r([]), 8000))
+    ]);
+    
     const [siriText, allPeatusArrivals] = await Promise.all([
       siriWithTimeout,
-      fetchPeatusDepartures(stopId, siriId, time, true)
+      peatusWithTimeout
     ]);
 
     let arrivals: Arrival[] = [];
