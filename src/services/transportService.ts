@@ -804,9 +804,10 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     console.log(`fetchVehicles: final dedup ${allVehicles.length} → ${finalVehicles.length}`);
   }
 
-  // Filter by user's vehicle type preferences (with fallback for old settings)
-  const types = getSettings().vehicleTypes || { bus: true, tram: true, trolley: true, train: true, regional: true };
-  const filtered = finalVehicles.filter(v => types[v.type] !== false);
+  // Filter by user's vehicle type preferences (disabled temporarily while debugging)
+  // const types = getSettings().vehicleTypes || { bus: true, tram: true, trolley: true, train: true, regional: true };
+  // const filtered = finalVehicles.filter(v => types[v.type] !== false);
+  const filtered = finalVehicles; // no-op filter for now
   if (filtered.length < finalVehicles.length) {
     console.log(`fetchVehicles: type filter ${finalVehicles.length} → ${filtered.length}`);
   }
