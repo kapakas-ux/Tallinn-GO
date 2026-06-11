@@ -109,8 +109,19 @@ export async function fetchNorthernVehicles(): Promise<Vehicle[]> {
       } as Vehicle);
     }
 
-    console.log(`northernVehicles: parsed ${vehicles.length} vehicles from GTFS-RT feed`);
-    return vehicles;
+    // Dedup by vehicle id — GTFS-RT feed may have duplicate entities for same vehicle
+    const seen = new Map<string, Vehicle>();
+    for (const v of vehicles) {
+      const existing = seen.get(v.id);
+      if (!existing || v.lat !== 0) seen.set(v.id, v); // keep first with valid position
+    }
+    const deduped = [...seen.values()];
+    if (deduped.length < vehicles.length) {
+      console.log(`northernVehicles: deduped ${vehicles.length} → ${deduped.length}`);
+    }
+
+    console.log(`northernVehicles: parsed ${deduped.length} vehicles from GTFS-RT feed`);
+    return deduped;
   } catch (err) {
     console.warn('northernVehicles: GTFS-RT fetch/parse failed', err);
     return [];
