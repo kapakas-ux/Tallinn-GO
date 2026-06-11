@@ -43,8 +43,8 @@ async function universalFetch(url: string): Promise<string> {
         'Accept': 'text/plain, */*',
         'Cache-Control': 'no-cache'
       },
-      connectTimeout: 20000,
-      readTimeout: 20000
+      connectTimeout: 5000,
+      readTimeout: 5000
     };
     try {
       const response = await CapacitorHttp.get(options);
