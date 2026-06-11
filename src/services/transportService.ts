@@ -1829,11 +1829,11 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
   try {
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
     
-    // Native: call SIRI directly (no proxy needed — CapacitorHttp bypasses CORS)
-    // Web: use the proxy endpoint
+    // Always pass time cache-buster — SIRI is 8x faster with it (390ms vs 3300ms)
+    const cacheBuster = time || Math.floor(Date.now() / 1000);
     const siriUrl = Capacitor.isNativePlatform()
-      ? `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}${time ? `&time=${time}` : ''}`
-      : `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
+      ? `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}&time=${cacheBuster}`
+      : `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}&time=${cacheBuster}`;
     
     // Fire both fetches — parse and return whichever finishes first
     const siriPromise = universalFetch(siriUrl).then(text => {
