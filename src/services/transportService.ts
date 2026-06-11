@@ -755,9 +755,10 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
   try {
     const existingSet = [...cityVehicles, ...allExtra];
     const raw = await fetchNorthernVehicles();
+    console.log(`fetchVehicles: northern GTFS-RT raw=${raw.length}, deduping against ${existingSet.length} existing`);
     for (const v of raw) {
       const isDup = existingSet.some(
-        av => av.line === v.line && getDistance(av.lat, av.lng, v.lat, v.lng) < 200
+        av => av.line === v.line && getDistance(av.lat, av.lng, v.lat, v.lng) < 50
       );
       if (!isDup) northernVehicles.push(v);
     }
