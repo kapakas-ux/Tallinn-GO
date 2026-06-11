@@ -635,8 +635,9 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
+  // Fire-and-forget: routes only needed for destination fallback — don't block vehicles
   if (Object.keys(routesMap).length === 0) {
-    await fetchRoutes();
+    fetchRoutes().catch(() => {});
   }
 
   const gpsUrl = Capacitor.isNativePlatform()
@@ -1814,8 +1815,9 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
 }
 
 async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
+  // Fire-and-forget: routes only needed for destination fallback — don't block departures
   if (Object.keys(routesMap).length === 0) {
-    await fetchRoutes();
+    fetchRoutes().catch(() => {});
   }
   
   try {
