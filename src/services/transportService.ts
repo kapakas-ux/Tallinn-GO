@@ -1821,6 +1821,7 @@ export async function fetchDepartures(stopId: string, siriId?: string, time?: st
 }
 
 async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: string): Promise<Arrival[]> {
+  const t0 = Date.now();
   // Fire-and-forget: routes only needed for destination fallback — don't block departures
   if (Object.keys(routesMap).length === 0) {
     fetchRoutes().catch(() => {});
@@ -1835,18 +1836,22 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
       ? `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}&time=${cacheBuster}`
       : `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}&time=${cacheBuster}`;
     
+    console.log(`[Departures] Starting fetch for ${stopId}, url=${siriUrl}`);
+    
     // Fire both fetches — parse and return whichever finishes first
     const siriPromise = universalFetch(siriUrl).then(text => {
+      console.log(`[Departures] SIRI responded in ${Date.now() - t0}ms`);
       return { source: 'siri' as const, text };
     }).catch(e => {
-      console.error('Error fetching SIRI departures:', e);
+      console.error(`[Departures] SIRI failed after ${Date.now() - t0}ms:`, e);
       return { source: 'siri' as const, text: '' };
     });
     
     const peatusPromise = fetchPeatusDepartures(stopId, siriId, time, true).then(arrivals => {
+      console.log(`[Departures] peatus.ee responded in ${Date.now() - t0}ms with ${arrivals.length} arrivals`);
       return { source: 'peatus' as const, arrivals };
     }).catch(e => {
-      console.error('Error fetching peatus departures:', e);
+      console.error(`[Departures] peatus.ee failed after ${Date.now() - t0}ms:`, e);
       return { source: 'peatus' as const, arrivals: [] as Arrival[] };
     });
     
@@ -2103,17 +2108,14 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
 
     const limited = trimmed.slice(0, time === '0' ? 50 : 10);
 
-    // Annotate "last of day" — best-effort, fire-and-forget cache lookup.
-    // Skip when the caller already asked for the full day (time === '0') to avoid recursion.
+    // Annotate "last of day" — fire-and-forget, don't block the UI
     if (time !== '0') {
-      try {
-        const lastMap = await getLastOfDayMap(stopId, siriId, () =>
-          fetchDepartures(stopId, siriId, '0'),
-        );
-        return annotateLastOfDay(limited, lastMap);
-      } catch (e) {
-        // Non-fatal — return arrivals unannotated
-      }
+      getLastOfDayMap(stopId, siriId, () =>
+        fetchDepartures(stopId, siriId, '0'),
+      ).then(lastMap => {
+        // Update arrivals in-place after they've been returned
+        annotateLastOfDay(limited, lastMap);
+      }).catch(() => {});
     }
 
     return limited;
