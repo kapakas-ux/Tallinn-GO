@@ -2031,7 +2031,8 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
     
     if (targetStop) {
       const etaBatch = arrivals.slice(0, 5);
-      await Promise.all(etaBatch.map(async (arrival) => {
+      // Fire-and-forget: compute GPS ETAs in background so UI is not blocked
+      Promise.all(etaBatch.map(async (arrival) => {
         // Snapshot the original schedule before any GPS adjustment so the
         // UI can report "+N min late" even after we mutate arrival.minutes.
         if (arrival.scheduledDepartureSeconds === undefined) {
