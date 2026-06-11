@@ -1658,11 +1658,15 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
   try {
     const nowSeconds = Math.floor(Date.now() / 1000);
     
-    // Quick GTFS ID lookup — use cached stops if available, otherwise fall back to stopId
+    // Quick GTFS ID lookup — use cached stops if available, otherwise strip platform suffix
     let gtfsId = `estonia:${stopId}`;
     if (stopsByIdMap && stopsByIdMap.size > 0) {
       const stop = stopsByIdMap.get(stopId);
       if (stop?.gtfsId) gtfsId = `estonia:${stop.gtfsId}`;
+    } else {
+      // No cached stops yet — strip platform suffix (e.g. "21216-1" → "21216")
+      const baseId = stopId.includes('-') ? stopId.split('-')[0] : stopId;
+      gtfsId = `estonia:${baseId}`;
     }
 
     const numberOfDepartures = time === '0' ? 20 : 10;
