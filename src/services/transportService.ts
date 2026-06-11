@@ -765,7 +765,14 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
       cityVehicles = cityVehicles.filter(v => v.type !== 'regional');
       allExtra = allExtra.filter(v => v.type !== 'regional');
       tartuVehicles = tartuVehicles.filter(v => v.type !== 'regional');
-      console.log(`fetchVehicles: removed ${cityBefore - cityVehicles.length} city + ${extraBefore - allExtra.length} extra regional (northern is source)`);
+      // Also dedup by line+proximity for any remaining type overlap (e.g., 'bus' typed in gps.txt)
+      cityVehicles = cityVehicles.filter(cv =>
+        !northernVehicles.some(nv => nv.line === cv.line && getDistance(nv.lat, nv.lng, cv.lat, cv.lng) < 500)
+      );
+      allExtra = allExtra.filter(av =>
+        !northernVehicles.some(nv => nv.line === av.line && getDistance(nv.lat, nv.lng, av.lat, av.lng) < 500)
+      );
+      console.log(`fetchVehicles: removed ${cityBefore - cityVehicles.length} city + ${extraBefore - allExtra.length} extra (northern is source)`);
     }
   } catch (err) {
     console.warn('fetchVehicles: Northern Estonia GTFS-RT fetch failed', err);
