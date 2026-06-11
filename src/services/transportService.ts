@@ -1829,8 +1829,8 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
   try {
     const targetId = siriId && siriId !== '0' ? siriId : stopId;
     
-    // Always pass time cache-buster — SIRI is 8x faster with it (390ms vs 3300ms)
-    const cacheBuster = time || Math.floor(Date.now() / 1000);
+    // Always pass time cache-buster in milliseconds (matches official site) — 390ms vs 3300ms
+    const cacheBuster = time || Date.now();
     const siriUrl = Capacitor.isNativePlatform()
       ? `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}&time=${cacheBuster}`
       : `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}&time=${cacheBuster}`;
