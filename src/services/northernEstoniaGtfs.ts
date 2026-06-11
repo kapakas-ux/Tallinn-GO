@@ -113,15 +113,22 @@ export async function fetchNorthernVehicles(): Promise<Vehicle[]> {
     const seen = new Map<string, Vehicle>();
     for (const v of vehicles) {
       const existing = seen.get(v.id);
-      if (!existing || v.lat !== 0) seen.set(v.id, v); // keep first with valid position
+      if (!existing || v.lat !== 0) seen.set(v.id, v);
     }
-    const deduped = [...seen.values()];
-    if (deduped.length < vehicles.length) {
-      console.log(`northernVehicles: deduped ${vehicles.length} → ${deduped.length}`);
+    let deduped = [...seen.values()];
+
+    // Also dedup by line+proximity — same bus may appear with different vehicle IDs
+    const final: Vehicle[] = [];
+    for (const v of deduped) {
+      const isDup = final.some(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 200);
+      if (!isDup) final.push(v);
     }
 
-    console.log(`northernVehicles: parsed ${deduped.length} vehicles from GTFS-RT feed`);
-    return deduped;
+    if (final.length < vehicles.length) {
+      console.log(`northernVehicles: deduped ${vehicles.length} → ${final.length}`);
+    }
+    console.log(`northernVehicles: parsed ${final.length} vehicles from GTFS-RT feed`);
+    return final;
   } catch (err) {
     console.warn('northernVehicles: GTFS-RT fetch/parse failed', err);
     return [];
@@ -206,13 +213,18 @@ function resolveHeadsign(line: string, lat: number, lng: number, bearing: number
   return cleanHeadsign(best.headsign, line);
 }
 
-/** Strip leading line number from headsign if present (e.g., "157 Võsu" → "Võsu") */
+/** Strip leading line number and clean up formatting */
 function cleanHeadsign(headsign: string, line: string): string {
-  const h = headsign.trim();
+  let h = headsign.trim();
   // Remove leading line number and optional separator
   const prefix = line.replace(/^0+/, '');
   const re = new RegExp(`^${prefix}[\\s\\-–—]+`, 'i');
-  return h.replace(re, '');
+  h = h.replace(re, '');
+  // Take only first part if pipe-separated (e.g., "Balti jaam | Vinterpalu")
+  if (h.includes('|')) h = h.split('|')[0].trim();
+  // Truncate if absurdly long
+  if (h.length > 40) h = h.substring(0, 40);
+  return h;
 }
 
 /** Resolve destinations for northern vehicles using peatus.ee route patterns.
