@@ -21,8 +21,9 @@
     "title": "Mis on uut?",
     "gotIt": "Selge!",
     "items": [
-      "Jaga marsruute — saada teekonnaplaan koos kaardilingiga",
-      "Täiustatud peatused kaardil"
+      "Parandatud väljumiste laadimise probleem",
+      "Nüüd on meil live bussid kogu Põhja-Eestis!",
+      "Lisatud sõidukitüüpide lülitid seadetes"
     ]
   },
   "language": {
@@ -144,6 +145,12 @@
     "clusterRadiusDesc": "Rühmita läheduses olevad peatused (vaikimisi 80 m)",
     "clusterEnabled": "Peatuste rühmitamine",
     "clusterEnabledDesc": "Liida lähedased peatused ühtseks sõlmpunktiks",
+    "vehicleTypes": "Näita sõidukitüüpe",
+    "vehicle_bus": "Buss",
+    "vehicle_tram": "Tramm",
+    "vehicle_trolley": "Troll",
+    "vehicle_train": "Rong",
+    "vehicle_regional": "Maakonna bussid",
     "clusterBeta": "⚠ Beeta — võib rakendust aeglustada",
     "homeAddress": "Koduaadress",
     "homeAddressUnset": "Vajuta määramiseks"

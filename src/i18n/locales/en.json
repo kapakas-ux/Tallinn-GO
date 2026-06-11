@@ -21,8 +21,9 @@
     "title": "What's new",
     "gotIt": "Got it!",
     "items": [
-      "Share trips — send your journey plan with a live map link",
-      "Polished map stops — cleaner mode-colored dots on the map"
+      "Fixed departures loading problem",
+      "We now have live buses for the whole of Northern Estonia!",
+      "Added vehicle type toggles in the settings"
     ]
   },
   "language": {
@@ -142,6 +143,12 @@
     "clusterRadiusDesc": "Group nearby stops together (default 80 m)",
     "clusterEnabled": "Stop clustering",
     "clusterEnabledDesc": "Merge nearby stops into hubs with unified departure boards",
+    "vehicleTypes": "Show vehicle types",
+    "vehicle_bus": "Bus",
+    "vehicle_tram": "Tram",
+    "vehicle_trolley": "Trolley",
+    "vehicle_train": "Train",
+    "vehicle_regional": "Regional buses",
     "clusterBeta": "⚠ Beta — may slow down the app",
     "largeText": "Larger text",
     "largeTextDesc": "Increase text size throughout the app",

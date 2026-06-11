@@ -27,6 +27,7 @@ export interface AppSettings {
   clusterRadius: number;
   theme: AppTheme;
   language: AppLanguage;
+  vehicleTypes: Record<string, boolean>;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -37,6 +38,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   clusterRadius: 80,
   theme: 'daylight',
   language: 'en',
+  vehicleTypes: { bus: true, tram: true, trolley: true, train: true, regional: true },
 };
 
 export const ALARM_SOUNDS = [

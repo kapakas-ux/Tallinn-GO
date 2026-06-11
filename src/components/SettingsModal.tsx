@@ -24,6 +24,7 @@ export const SettingsModal = ({ onClose }: Props) => {
   const [largeText, setLargeText] = useState(getSettings().largeText);
   const [clusterRadius, setClusterRadius] = useState(getSettings().clusterRadius);
   const [clusterEnabled, setClusterEnabled] = useState(getSettings().clusterEnabled);
+  const [vehicleTypes, setVehicleTypes] = useState(getSettings().vehicleTypes);
   const [activeTheme, setActiveTheme] = useState<AppTheme>(getSettings().theme);
   const [home, setHome] = useState<HomeLocation | null>(getHome());
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -207,6 +208,26 @@ export const SettingsModal = ({ onClose }: Props) => {
               onTouchEnd={() => saveSettings({ clusterRadius })}
               className="w-full h-2 bg-outline-variant/30 rounded-full appearance-none cursor-pointer accent-primary"
             />
+          </div>
+
+          {/* Vehicle type toggles */}
+          <div className="px-4 py-3 rounded-xl border border-black/8 bg-black/4 space-y-3">
+            <p className="font-headline font-bold text-sm text-primary">{t('settings.vehicleTypes')}</p>
+            {(['bus', 'tram', 'trolley', 'train', 'regional'] as const).map(type => (
+              <div key={type} className="flex items-center justify-between">
+                <span className="font-label text-xs text-primary">{t(`settings.vehicle_${type}`, type)}</span>
+                <button
+                  onClick={() => {
+                    const next = { ...vehicleTypes, [type]: !vehicleTypes[type] };
+                    setVehicleTypes(next);
+                    saveSettings({ vehicleTypes: next });
+                  }}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${vehicleTypes[type] ? 'bg-primary' : 'bg-outline-variant/40'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${vehicleTypes[type] ? 'translate-x-5' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            ))}
           </div>
 
           {/* Home address */}

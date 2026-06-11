@@ -1237,34 +1237,6 @@ export const Map = ({ active = true }: { active?: boolean }) => {
         {isDarkMap ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
       </button>
 
-      {/* Debug Vehicle Counter Pill — tap to toggle */}
-      <button
-        onClick={() => setShowDebug(s => !s)}
-        className="absolute z-10 bg-black/75 hover:bg-black/85 text-white px-2.5 py-1.5 rounded-full shadow-lg text-[10px] font-mono leading-tight transition-all"
-        style={{ top: 'calc(env(safe-area-inset-top) + 11.5rem)', right: '52px' }}
-      >
-        🚌 {debugInfo.total}
-      </button>
-
-      {showDebug && (
-        <div
-          className="absolute z-10 bg-black/80 text-white rounded-xl shadow-xl p-3 text-[10px] font-mono leading-relaxed space-y-0.5 pointer-events-none"
-          style={{ top: 'calc(env(safe-area-inset-top) + 14rem)', right: '10px' }}
-        >
-          <div className="text-[11px] font-bold mb-1">Vehicle Sources</div>
-          <div>gps.txt       {String(debugInfo.gpsTxt).padStart(4)}</div>
-          <div>gis.ee        {String(debugInfo.gisEe).padStart(4)}</div>
-          <div>Ridango WS    {String(debugInfo.ridangoWs).padStart(4)}</div>
-          <div>Tartu WS      {String(debugInfo.tartuWs).padStart(4)}</div>
-          <div style={{ color: debugInfo.northernGtfs > 0 ? '#4ade80' : '#f87171' }}>
-            North GTFS-RT  {String(debugInfo.northernGtfs).padStart(4)}
-          </div>
-          <div className="border-t border-white/20 pt-1 mt-1 font-bold">
-            TOTAL         {String(debugInfo.total).padStart(4)}
-          </div>
-        </div>
-      )}
-
 
 
       {/* Service Alerts Button */}
