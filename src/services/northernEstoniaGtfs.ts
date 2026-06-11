@@ -124,3 +124,88 @@ export async function fetchNorthernVehicles(): Promise<Vehicle[]> {
     return [];
   }
 }
+
+// ── Headsign resolution ────────────────────────────────────────────────
+
+const PEATUS_GQL = 'https://api.peatus.ee/routing/v1/routers/estonia/index/graphql';
+interface PatternInfo { headsign: string; lastStopLat: number; lastStopLng: number; }
+const headsignCache = new Map<string, PatternInfo[]>();
+const pendingLines = new Set<string>();
+
+function angleDiff(a: number, b: number): number {
+  let d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+function bearingTo(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const toDeg = (r: number) => (r * 180) / Math.PI;
+  const dLng = toRad(lng2 - lng1);
+  const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+async function fetchHeadsigns(line: string): Promise<void> {
+  if (headsignCache.has(line) || pendingLines.has(line)) return;
+  pendingLines.add(line);
+
+  const query = `{ routes(name: "${line}") { patterns { headsign stops { lat lon } } } }`;
+  try {
+    let text = '';
+    if (Capacitor.isNativePlatform()) {
+      const r = await CapacitorHttp.post({ url: PEATUS_GQL, headers: { 'Content-Type': 'application/json' }, data: { query }, connectTimeout: 5000, readTimeout: 5000 });
+      text = typeof r.data === 'string' ? r.data : JSON.stringify(r.data);
+    } else {
+      const r = await fetch(PEATUS_GQL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
+      text = await r.text();
+    }
+    const data = JSON.parse(text);
+    const routes = data?.data?.routes;
+    if (!routes?.length) return;
+
+    const seen = new Set<string>();
+    const infos: PatternInfo[] = [];
+    for (const route of routes) {
+      for (const p of route.patterns || []) {
+        if (!p.headsign || seen.has(p.headsign)) continue;
+        seen.add(p.headsign);
+        const stops = p.stops || [];
+        const last = stops[stops.length - 1];
+        if (last) infos.push({ headsign: p.headsign, lastStopLat: last.lat, lastStopLng: last.lon });
+      }
+    }
+    if (infos.length > 0) headsignCache.set(line, infos);
+  } catch { /* retry next fetch */ }
+  finally { pendingLines.delete(line); }
+}
+
+function resolveHeadsign(line: string, lat: number, lng: number, bearing: number): string {
+  const cached = headsignCache.get(line);
+  if (!cached) {
+    fetchHeadsigns(line);
+    return '';
+  }
+  if (cached.length === 1) return cached[0].headsign;
+  let best = cached[0];
+  let bestAngle = angleDiff(bearing, bearingTo(lat, lng, best.lastStopLat, best.lastStopLng));
+  for (let i = 1; i < cached.length; i++) {
+    const a = angleDiff(bearing, bearingTo(lat, lng, cached[i].lastStopLat, cached[i].lastStopLng));
+    if (a < bestAngle) { bestAngle = a; best = cached[i]; }
+  }
+  return best.headsign;
+}
+
+/** Resolve destinations for northern vehicles using peatus.ee route patterns.
+ *  Called asynchronously — vehicles update in-place as headsigns resolve. */
+export async function enrichNorthernDestinations(vehicles: Vehicle[]): Promise<void> {
+  const uniqueLines = [...new Set(vehicles.map(v => v.line).filter(Boolean))];
+  // Fire all headsign fetches in parallel
+  await Promise.all(uniqueLines.map(l => fetchHeadsigns(l).catch(() => {})));
+  // Assign headsigns
+  for (const v of vehicles) {
+    if (!v.destination && v.line) {
+      v.destination = resolveHeadsign(v.line, v.lat, v.lng, v.bearing);
+    }
+  }
+}

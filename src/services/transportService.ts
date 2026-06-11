@@ -3,7 +3,7 @@ import { CapacitorHttp, Capacitor } from '@capacitor/core';
 import { getDistance, getBearing } from '../lib/geo';
 import { getRidangoVehicles, isRidangoConnected } from './ridangoWebSocket';
 import { getTartuVehicles, isTartuConnected } from './tartuWebSocket';
-import { fetchNorthernVehicles } from './northernEstoniaGtfs';
+import { fetchNorthernVehicles, enrichNorthernDestinations } from './northernEstoniaGtfs';
 import { getLastOfDayMap, annotateLastOfDay } from './scheduleAwarenessService';
 
 const getApiBaseUrl = () => {
@@ -755,6 +755,8 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
   try {
     northernVehicles = await fetchNorthernVehicles();
     console.log(`fetchVehicles: northern GTFS-RT raw=${northernVehicles.length}`);
+    // Fire-and-forget: resolve destinations from peatus.ee (updates in-place)
+    enrichNorthernDestinations(northernVehicles).catch(() => {});
     if (northernVehicles.length > 0) {
       console.log(`fetchVehicles: added ${northernVehicles.length} vehicles from Northern Estonia GTFS-RT`);
     }
