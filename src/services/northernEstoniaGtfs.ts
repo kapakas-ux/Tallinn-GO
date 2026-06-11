@@ -208,14 +208,15 @@ function resolveHeadsign(line: string, lat: number, lng: number, bearing: number
   return cleanHeadsign(best.headsign, line);
 }
 
-/** Strip leading line number and clean up formatting */
+/** Strip leading line number (with optional direction letter A/B) and clean up */
 function cleanHeadsign(headsign: string, line: string): string {
   let h = headsign.trim();
-  // Remove leading line number and optional separator
+  // Strip optional direction letter (A/B) followed by line number prefix
+  // e.g., "B123A Keila-Joa" → "Keila-Joa", "157 Tartu Bussijaam" → "Tartu Bussijaam"
   const prefix = line.replace(/^0+/, '');
-  const re = new RegExp(`^${prefix}[\\s\\-–—]+`, 'i');
+  const re = new RegExp(`^[AB]?${prefix}[\\s\\-–—]+`, 'i');
   h = h.replace(re, '');
-  // Take only first part if pipe-separated (e.g., "Balti jaam | Vinterpalu")
+  // Take only first part if pipe-separated
   if (h.includes('|')) h = h.split('|')[0].trim();
   // Truncate if absurdly long
   if (h.length > 40) h = h.substring(0, 40);
