@@ -763,7 +763,7 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
       // Filter city vehicles too — keep only if no northern equivalent exists
       const cityBefore = cityVehicles.length;
       cityVehicles = cityVehicles.filter(cv =>
-        !northernVehicles.some(nv => nv.line === cv.line && getDistance(nv.lat, nv.lng, cv.lat, cv.lng) < 100)
+        !northernVehicles.some(nv => nv.line === cv.line && getDistance(nv.lat, nv.lng, cv.lat, cv.lng) < 300)
       );
       if (cityVehicles.length < cityBefore) {
         console.log(`fetchVehicles: removed ${cityBefore - cityVehicles.length} city vehicles overlapped by northern`);
