@@ -1835,23 +1835,43 @@ async function _fetchDeparturesImpl(stopId: string, siriId?: string, time?: stri
       ? `https://transport.tallinn.ee/siri-stop-departures.php?stopid=${targetId}${time ? `&time=${time}` : ''}`
       : `${API_BASE}/api/transport/departures?stopId=${stopId}&siriId=${targetId}${time ? `&time=${time}` : ''}`;
     
-    // Run SIRI and peatus.ee fetches in parallel — show whichever returns first
-    const siriFetch = universalFetch(siriUrl).catch(e => { console.error('Error fetching SIRI departures:', e); return ''; });
-    const siriWithTimeout = Promise.race([
-      siriFetch,
-      new Promise<string>(r => setTimeout(() => r(''), 5000))
-    ]);
+    // Fire both fetches — parse and return whichever finishes first
+    const siriPromise = universalFetch(siriUrl).then(text => {
+      return { source: 'siri' as const, text };
+    }).catch(e => {
+      console.error('Error fetching SIRI departures:', e);
+      return { source: 'siri' as const, text: '' };
+    });
     
-    // Wrap peatus fetch with timeout so it never blocks
-    const peatusWithTimeout = Promise.race([
-      fetchPeatusDepartures(stopId, siriId, time, true),
-      new Promise<Arrival[]>(r => setTimeout(() => r([]), 8000))
-    ]);
+    const peatusPromise = fetchPeatusDepartures(stopId, siriId, time, true).then(arrivals => {
+      return { source: 'peatus' as const, arrivals };
+    }).catch(e => {
+      console.error('Error fetching peatus departures:', e);
+      return { source: 'peatus' as const, arrivals: [] as Arrival[] };
+    });
     
-    const [siriText, allPeatusArrivals] = await Promise.all([
-      siriWithTimeout,
-      peatusWithTimeout
-    ]);
+    // Race: use first result immediately, then merge the second
+    const first = await Promise.race([siriPromise, peatusPromise]);
+    
+    let siriText = '';
+    let allPeatusArrivals: Arrival[] = [];
+    
+    if (first.source === 'siri') {
+      siriText = first.text;
+      // Wait up to 5s more for peatus
+      allPeatusArrivals = await Promise.race([
+        peatusPromise.then(r => r.source === 'peatus' ? r.arrivals : []),
+        new Promise<Arrival[]>(r => setTimeout(() => r([]), 5000))
+      ]);
+    } else {
+      allPeatusArrivals = first.arrivals;
+      // Wait up to 5s more for SIRI
+      const siriResult = await Promise.race([
+        siriPromise,
+        new Promise<{source: string; text: string}>(r => setTimeout(() => r({ source: 'siri', text: '' }), 5000))
+      ]);
+      siriText = siriResult.text;
+    }
 
     let arrivals: Arrival[] = [];
     
