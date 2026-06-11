@@ -118,17 +118,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     const loadVehicles = () => {
       fetchVehicles().then(data => {
         setVehicleError(null);
-        setVehicles(prev => {
-          // Keep northern GTFS vehicles from previous state that aren't in the new data
-          const northernFromPrev = prev.filter(v => v.source === 'northern-gtfs');
-          if (northernFromPrev.length === 0) return data;
-          const newIds = new Set(data.map(v => v.id));
-          const keepNorthern = northernFromPrev.filter(v =>
-            !newIds.has(v.id) &&
-            !data.some(d => d.line === v.line && getDistance(d.lat, d.lng, v.lat, v.lng) < 200)
-          );
-          return [...data, ...keepNorthern];
-        });
+        if (data.length > 0) setVehicles(data);
       }).catch(err => {
         console.error('Error fetching vehicles:', err);
         setVehicleError(err?.message || 'Vehicle fetch failed');
@@ -136,23 +126,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     };
 
     loadVehicles();
-    const interval = setInterval(loadVehicles, 2000); // Update every 2 seconds
-
-    // Independent Northern Estonia GTFS-RT fetch — not blocked by Tallinn API issues
-    const loadNorthern = () => {
-      fetchNorthernVehicles().then(data => {
-        if (data.length > 0) {
-          console.log(`[Northern] Fetched ${data.length} northern vehicles independently`);
-          setVehicles(prev => {
-            // Merge: dedup by line + proximity against existing
-            const existing = prev.filter(v => !data.some(nv => nv.line === v.line && getDistance(nv.lat, nv.lng, v.lat, v.lng) < 200));
-            return [...existing, ...data];
-          });
-        }
-      }).catch((err) => { console.warn('[Northern] fetch failed:', err); });
-    };
-    loadNorthern();
-    const northernInterval = setInterval(loadNorthern, 10000); // Every 10s
+    const interval = setInterval(loadVehicles, 2000);
 
     // Animation loop for smooth vehicle movement
     let animationFrameId: number;
@@ -181,7 +155,6 @@ export const Map = ({ active = true }: { active?: boolean }) => {
 
     return () => {
       clearInterval(interval);
-      clearInterval(northernInterval);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
