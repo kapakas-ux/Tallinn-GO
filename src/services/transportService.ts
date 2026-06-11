@@ -785,8 +785,25 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     lastFetch: Date.now(),
   };
 
-  if (allVehicles.length > 0) {
-    return allVehicles;
+  // Final dedup pass: same line within 500m → keep only one, prefer one with destination
+  const finalVehicles: Vehicle[] = [];
+  for (const v of allVehicles) {
+    const dup = finalVehicles.findIndex(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 0.5);
+    if (dup !== -1) {
+      // Keep the one with a destination if the other doesn't have one
+      if (!finalVehicles[dup].destination && v.destination) {
+        finalVehicles[dup] = v;
+      }
+    } else {
+      finalVehicles.push(v);
+    }
+  }
+  if (finalVehicles.length < allVehicles.length) {
+    console.log(`fetchVehicles: final dedup ${allVehicles.length} → ${finalVehicles.length}`);
+  }
+
+  if (finalVehicles.length > 0) {
+    return finalVehicles;
   }
 
   console.warn('fetchVehicles: all sources returned no data');
