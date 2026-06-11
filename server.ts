@@ -289,77 +289,48 @@ async function startServer() {
         console.log(`Siri with a- prefix also failed`);
       }
 
-      // Try Ridango API as a fallback
-      console.log(`Siri API returned empty for ${cleanSiriId}, trying Ridango fallback...`);
-      
-      // Ridango can use either the internal ID or the Siri ID
-      const ridangoIds = [cleanSiriId, cleanStopId.split('-')[0]];
-      for (const ridId of ridangoIds) {
-        const ridangoUrl = `https://api.ridango.com/v2/6/stop-departures?stop_id=${ridId}`;
-        try {
-          console.log(`Attempting Ridango with ID: ${ridId}`);
-          const ridangoRes = await axios.get(ridangoUrl, { timeout: 5000 });
-          if (ridangoRes.data && ridangoRes.data.departures && ridangoRes.data.departures.length > 0) {
-            console.log(`Ridango fallback successful for ${ridId}, found ${ridangoRes.data.departures.length} departures`);
-            const serverTimeUnix = Math.floor(Date.now() / 1000);
-            let siriText = `1,${ridId},0,0,${serverTimeUnix},0\n\n`;
-            ridangoRes.data.departures.forEach((d: any) => {
-              const type = d.vehicle_type === 'tram' ? 'tram' : (d.vehicle_type === 'trolley' ? 'trolley' : 'bus');
-              const depTime = new Date(d.expected_time || d.scheduled_time);
-              const expectedTimeUnix = Math.floor(depTime.getTime() / 1000);
-              const schedTime = new Date(d.scheduled_time || d.expected_time);
-              const scheduledTimeUnix = Math.floor(schedTime.getTime() / 1000);
-              
-              // Clean up route code (sometimes it's like "6.486")
-              let line = d.route_code || '';
-              if (line.includes('.')) {
-                line = line.split('.')[0];
-              }
-              
-              // Format: type, line, expectedTime, scheduledTime, destination
-              siriText += `${type},${line},${expectedTimeUnix},${scheduledTimeUnix},${d.destination || ''}\n`;
-            });
-            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-            return res.send(siriText);
+      // Try peatus.ee GraphQL as fallback (Ridango & pilet.ee REST APIs removed — both broken)
+      console.log(`SIRI empty for ${cleanSiriId}, trying peatus.ee GraphQL fallback...`);
+
+      // Use the stop's GTFS ID to query peatus.ee
+      const gtfsId = `estonia:${cleanSiriId}`;
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const peatusQuery = {
+        query: `{ stop(id: "${gtfsId}") { stoptimesWithoutPatterns(numberOfDepartures: 30, startTime: ${nowSeconds - 180}) { scheduledDeparture realtimeDeparture realtime realtimeState headsign serviceDay trip { gtfsId route { shortName mode } } } } }`
+      };
+
+      try {
+        const peatusRes = await axios.post('https://api.peatus.ee/routing/v1/routers/estonia/index/graphql', peatusQuery, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 8000,
+        });
+
+        const stoptimes = peatusRes.data?.data?.stop?.stoptimesWithoutPatterns;
+        if (stoptimes && stoptimes.length > 0) {
+          console.log(`peatus.ee fallback: ${stoptimes.length} departures for ${cleanSiriId}`);
+          const serverTimeUnix = nowSeconds;
+          let siriText = `1,${cleanSiriId},0,0,${serverTimeUnix},0\n\n`;
+
+          for (const st of stoptimes) {
+            const modeStr = st.trip?.route?.mode?.toLowerCase() || 'bus';
+            let type = 'bus';
+            if (modeStr.includes('tram')) type = 'tram';
+            else if (modeStr.includes('trolley')) type = 'trolley';
+            else if (modeStr.includes('rail') || modeStr.includes('train')) type = 'train';
+
+            const line = st.trip?.route?.shortName || '';
+            const realtime = st.realtimeDeparture || st.scheduledDeparture;
+            const scheduled = st.scheduledDeparture;
+            const headsign = st.headsign || '';
+
+            siriText += `${type},${line},${realtime},${scheduled},${headsign}\n`;
           }
-        } catch (ridangoErr: any) {
-          console.error(`Ridango fallback failed for ${ridId}:`, ridangoErr.message);
+
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          return res.send(siriText);
         }
-      }
-      
-      // Try iil.pilet.ee API as another fallback
-      console.log(`Ridango fallback failed or empty, trying iil.pilet.ee fallback...`);
-      for (const ridId of ridangoIds) {
-        const piletUrl = `https://iil.pilet.ee/api/v1/stops/${ridId}/departures`;
-        try {
-          console.log(`Attempting iil.pilet.ee with ID: ${ridId}`);
-          const piletRes = await axios.get(piletUrl, { timeout: 5000 });
-          if (piletRes.data && piletRes.data.departures && piletRes.data.departures.length > 0) {
-            console.log(`iil.pilet.ee fallback successful for ${ridId}, found ${piletRes.data.departures.length} departures`);
-            const serverTimeUnix = Math.floor(Date.now() / 1000);
-            let siriText = `1,${ridId},0,0,${serverTimeUnix},0\n\n`;
-            piletRes.data.departures.forEach((d: any) => {
-              const type = d.vehicle_type === 'tram' ? 'tram' : (d.vehicle_type === 'trolley' ? 'trolley' : 'bus');
-              const depTime = new Date(d.expected_time || d.scheduled_time);
-              const expectedTimeUnix = Math.floor(depTime.getTime() / 1000);
-              const schedTime = new Date(d.scheduled_time || d.expected_time);
-              const scheduledTimeUnix = Math.floor(schedTime.getTime() / 1000);
-              
-              // Clean up route code
-              let line = d.route_code || '';
-              if (line.includes('.')) {
-                line = line.split('.')[0];
-              }
-              
-              // Format: type, line, expectedTime, scheduledTime, destination
-              siriText += `${type},${line},${expectedTimeUnix},${scheduledTimeUnix},${d.destination || ''}\n`;
-            });
-            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-            return res.send(siriText);
-          }
-        } catch (piletErr: any) {
-          console.error(`iil.pilet.ee fallback failed for ${ridId}:`, piletErr.message);
-        }
+      } catch (peatusErr: any) {
+        console.error(`peatus.ee fallback failed:`, peatusErr.message);
       }
 
       // If everything failed, return whatever Siri gave us (likely empty)
