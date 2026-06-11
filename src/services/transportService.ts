@@ -1250,7 +1250,10 @@ export async function getRouteStopsForArrival(arrival: Arrival): Promise<Stop[]>
 }
 
 export async function getRouteStopsForVehicle(vehicle: Vehicle, expectedDestination?: string): Promise<Stop[]> {
-  await fetchStops(); // Ensure stops are fetched and maps are populated
+  // Non-blocking: stops should already be cached from initial load
+  if (!stopsByIdMap || stopsByIdMap.size === 0) {
+    await fetchStops();
+  }
 
   // Primary: use peatus.ee trip stoptimes — always direction-aware
   try {
