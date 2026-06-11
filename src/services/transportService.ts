@@ -750,13 +750,24 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     }
   }
 
-  // Northern Estonia GTFS-RT vehicles — always include, marker logic handles overlap
+  // Northern Estonia GTFS-RT vehicles — preferred source for regional buses
   let northernVehicles: Vehicle[] = [];
   try {
     northernVehicles = await fetchNorthernVehicles();
     console.log(`fetchVehicles: northern GTFS-RT raw=${northernVehicles.length}`);
-    // Fire-and-forget: resolve destinations from peatus.ee (updates in-place)
-    enrichNorthernDestinations(northernVehicles).catch(() => {});
+    // Resolve destinations synchronously so they're ready for display
+    await enrichNorthernDestinations(northernVehicles).catch(() => {});
+
+    // Remove non-northern vehicles that overlap with northern ones (northern is preferred)
+    if (northernVehicles.length > 0) {
+      const before = allExtra.length;
+      allExtra = allExtra.filter(av =>
+        !northernVehicles.some(nv => nv.line === av.line && getDistance(nv.lat, nv.lng, av.lat, av.lng) < 100)
+      );
+      if (allExtra.length < before) {
+        console.log(`fetchVehicles: removed ${before - allExtra.length} duplicate non-northern vehicles`);
+      }
+    }
     if (northernVehicles.length > 0) {
       console.log(`fetchVehicles: added ${northernVehicles.length} vehicles from Northern Estonia GTFS-RT`);
     }
