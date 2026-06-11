@@ -118,18 +118,7 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     const loadVehicles = () => {
       fetchVehicles().then(data => {
         setVehicleError(null);
-        if (data.length === 0) return;
-        // Final dedup: same line within 1km → keep one per unique vehicle id
-        const seen = new Map<string, Vehicle>();
-        for (const v of data) {
-          const dup = [...seen.values()].find(s => s.line === v.line && getDistance(s.lat, s.lng, v.lat, v.lng) < 1.0);
-          if (!dup) seen.set(v.id, v);
-        }
-        const deduped = [...seen.values()];
-        if (deduped.length < data.length) {
-          console.log(`[Map] deduped vehicles ${data.length} → ${deduped.length}`);
-        }
-        setVehicles(deduped);
+        if (data.length > 0) setVehicles(data);
       }).catch(err => {
         console.error('Error fetching vehicles:', err);
         setVehicleError(err?.message || 'Vehicle fetch failed');
