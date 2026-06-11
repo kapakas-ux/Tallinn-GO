@@ -760,12 +760,21 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
 
     // Remove non-northern vehicles that overlap with northern ones (northern is preferred)
     if (northernVehicles.length > 0) {
-      const before = allExtra.length;
+      // Filter city vehicles too — keep only if no northern equivalent exists
+      const cityBefore = cityVehicles.length;
+      cityVehicles = cityVehicles.filter(cv =>
+        !northernVehicles.some(nv => nv.line === cv.line && getDistance(nv.lat, nv.lng, cv.lat, cv.lng) < 100)
+      );
+      if (cityVehicles.length < cityBefore) {
+        console.log(`fetchVehicles: removed ${cityBefore - cityVehicles.length} city vehicles overlapped by northern`);
+      }
+      // Filter extra vehicles (gis.ee + WS)
+      const extraBefore = allExtra.length;
       allExtra = allExtra.filter(av =>
         !northernVehicles.some(nv => nv.line === av.line && getDistance(nv.lat, nv.lng, av.lat, av.lng) < 100)
       );
-      if (allExtra.length < before) {
-        console.log(`fetchVehicles: removed ${before - allExtra.length} duplicate non-northern vehicles`);
+      if (allExtra.length < extraBefore) {
+        console.log(`fetchVehicles: removed ${extraBefore - allExtra.length} extra vehicles overlapped by northern`);
       }
     }
     if (northernVehicles.length > 0) {
