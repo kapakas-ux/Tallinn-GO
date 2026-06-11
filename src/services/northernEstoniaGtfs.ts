@@ -177,14 +177,23 @@ function resolveHeadsign(line: string, lat: number, lng: number, bearing: number
     fetchHeadsigns(line);
     return '';
   }
-  if (cached.length === 1) return cached[0].headsign;
+  if (cached.length === 1) return cleanHeadsign(cached[0].headsign, line);
   let best = cached[0];
   let bestAngle = angleDiff(bearing, bearingTo(lat, lng, best.lastStopLat, best.lastStopLng));
   for (let i = 1; i < cached.length; i++) {
     const a = angleDiff(bearing, bearingTo(lat, lng, cached[i].lastStopLat, cached[i].lastStopLng));
     if (a < bestAngle) { bestAngle = a; best = cached[i]; }
   }
-  return best.headsign;
+  return cleanHeadsign(best.headsign, line);
+}
+
+/** Strip leading line number from headsign if present (e.g., "157 Võsu" → "Võsu") */
+function cleanHeadsign(headsign: string, line: string): string {
+  const h = headsign.trim();
+  // Remove leading line number and optional separator
+  const prefix = line.replace(/^0+/, '');
+  const re = new RegExp(`^${prefix}[\\s\\-–—]+`, 'i');
+  return h.replace(re, '');
 }
 
 /** Resolve destinations for northern vehicles using peatus.ee route patterns.
