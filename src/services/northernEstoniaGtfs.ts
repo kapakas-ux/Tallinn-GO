@@ -8,6 +8,7 @@
  */
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { getDistance } from '../lib/geo';
 import type { Vehicle } from '../types';
 
 const GTFS_RT_URL = 'https://ytkpohja-avl-prod.ridango.cloud/data/gtfs/vehicle-positions.pb';
@@ -178,11 +179,18 @@ function resolveHeadsign(line: string, lat: number, lng: number, bearing: number
     return '';
   }
   if (cached.length === 1) return cleanHeadsign(cached[0].headsign, line);
+
+  // Pick the pattern whose last stop is closest to the vehicle AND in the right direction.
+  // Closer last stop = more likely to be the correct regional route (filters out same-line-number
+  // routes in other counties, e.g., line 145 in Tallinn vs Jõgeva).
   let best = cached[0];
-  let bestAngle = angleDiff(bearing, bearingTo(lat, lng, best.lastStopLat, best.lastStopLng));
-  for (let i = 1; i < cached.length; i++) {
-    const a = angleDiff(bearing, bearingTo(lat, lng, cached[i].lastStopLat, cached[i].lastStopLng));
-    if (a < bestAngle) { bestAngle = a; best = cached[i]; }
+  let bestScore = Infinity;
+  for (const p of cached) {
+    const dist = getDistance(lat, lng, p.lastStopLat, p.lastStopLng);
+    const angle = angleDiff(bearing, bearingTo(lat, lng, p.lastStopLat, p.lastStopLng));
+    // Score: distance weighted heavily (closer is better), angle breaks ties
+    const score = dist * 1000 + angle;
+    if (score < bestScore) { bestScore = score; best = p; }
   }
   return cleanHeadsign(best.headsign, line);
 }
