@@ -120,7 +120,7 @@ export async function fetchNorthernVehicles(): Promise<Vehicle[]> {
     // Also dedup by line+proximity — same bus may appear with different vehicle IDs
     const final: Vehicle[] = [];
     for (const v of deduped) {
-      const isDup = final.some(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 200);
+      const isDup = final.some(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 0.2);
       if (!isDup) final.push(v);
     }
 
