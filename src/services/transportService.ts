@@ -5,7 +5,6 @@ import { getRidangoVehicles, isRidangoConnected } from './ridangoWebSocket';
 import { getTartuVehicles, isTartuConnected } from './tartuWebSocket';
 import { fetchNorthernVehicles, enrichNorthernDestinations } from './northernEstoniaGtfs';
 import { getLastOfDayMap, annotateLastOfDay } from './scheduleAwarenessService';
-import { getSettings } from './settingsService';
 
 const getApiBaseUrl = () => {
   // 1. Check for environment variable (set during build)
@@ -782,7 +781,7 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     ridangoWs: wsVehicles.length,
     tartuWs: tartuVehicles.length,
     northernGtfs: northernVehicles.length,
-    total: filtered.length,
+    total: allVehicles.length,
     lastFetch: Date.now(),
   };
 
@@ -804,16 +803,8 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     console.log(`fetchVehicles: final dedup ${allVehicles.length} → ${finalVehicles.length}`);
   }
 
-  // Filter by user's vehicle type preferences (disabled temporarily while debugging)
-  // const types = getSettings().vehicleTypes || { bus: true, tram: true, trolley: true, train: true, regional: true };
-  // const filtered = finalVehicles.filter(v => types[v.type] !== false);
-  const filtered = finalVehicles; // no-op filter for now
-  if (filtered.length < finalVehicles.length) {
-    console.log(`fetchVehicles: type filter ${finalVehicles.length} → ${filtered.length}`);
-  }
-
-  if (filtered.length > 0) {
-    return filtered;
+  if (finalVehicles.length > 0) {
+    return finalVehicles;
   }
 
   console.warn('fetchVehicles: all sources returned no data');
