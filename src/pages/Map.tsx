@@ -118,7 +118,11 @@ export const Map = ({ active = true }: { active?: boolean }) => {
     const loadVehicles = () => {
       fetchVehicles().then(data => {
         setVehicleError(null);
-        if (data.length > 0) setVehicles(data);
+        if (data.length > 0) {
+          const types = getSettings().vehicleTypes || { bus: true, tram: true, trolley: true, train: true, regional: true };
+          const filtered = data.filter(v => types[v.type] !== false);
+          setVehicles(filtered);
+        }
       }).catch(err => {
         console.error('Error fetching vehicles:', err);
         setVehicleError(err?.message || 'Vehicle fetch failed');
