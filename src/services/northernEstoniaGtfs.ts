@@ -109,18 +109,13 @@ export async function fetchNorthernVehicles(): Promise<Vehicle[]> {
       } as Vehicle);
     }
 
-    // Dedup by vehicle id — GTFS-RT feed may have duplicate entities for same vehicle
+    // Dedup: same vehicle ID → keep; same line within 1km → keep first only
     const seen = new Map<string, Vehicle>();
-    for (const v of vehicles) {
-      const existing = seen.get(v.id);
-      if (!existing || v.lat !== 0) seen.set(v.id, v);
-    }
+    for (const v of vehicles) seen.set(v.id, v);
     let deduped = [...seen.values()];
-
-    // Also dedup by line+proximity — same bus may appear with different vehicle IDs
     const final: Vehicle[] = [];
     for (const v of deduped) {
-      const isDup = final.some(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 0.2);
+      const isDup = final.some(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 1.0);
       if (!isDup) final.push(v);
     }
 
