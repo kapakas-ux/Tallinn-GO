@@ -785,15 +785,16 @@ async function fetchVehiclesFromApi(): Promise<Vehicle[]> {
     lastFetch: Date.now(),
   };
 
-  // Final dedup pass: same line within 500m → keep only one, prefer one with destination
+  // Final dedup pass: same line within 500m → keep one, prefer northern source with destination
   const finalVehicles: Vehicle[] = [];
   for (const v of allVehicles) {
-    const dup = finalVehicles.findIndex(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 0.5);
-    if (dup !== -1) {
-      // Keep the one with a destination if the other doesn't have one
-      if (!finalVehicles[dup].destination && v.destination) {
-        finalVehicles[dup] = v;
-      }
+    const dupIdx = finalVehicles.findIndex(f => f.line === v.line && getDistance(f.lat, f.lng, v.lat, v.lng) < 0.5);
+    if (dupIdx !== -1) {
+      const kept = finalVehicles[dupIdx];
+      // Prefer northern source, then prefer one with destination
+      const keptScore = (kept.source === 'northern-gtfs' ? 2 : 0) + (kept.destination ? 1 : 0);
+      const newScore = (v.source === 'northern-gtfs' ? 2 : 0) + (v.destination ? 1 : 0);
+      if (newScore > keptScore) finalVehicles[dupIdx] = v;
     } else {
       finalVehicles.push(v);
     }
