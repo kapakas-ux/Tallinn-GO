@@ -92,20 +92,21 @@ export async function fetchNorthernVehicles(): Promise<Vehicle[]> {
       // Extract just the route number (first underscore-delimited segment)
       const line = rawRouteId.includes('_') ? rawRouteId.split('_')[0] : rawRouteId;
 
-      // Destination: GTFS-RT VehiclePosition doesn't carry headsign directly.
-      // Use vehicle.label if it looks like a destination (not just a fleet number).
+      // Destination: try vehicle label first, then trip headsign from route
       let destination = '';
-      const label = vp.vehicle?.label || '';
-      if (label && !/^\d+$/.test(label) && label.length > 1 && label !== vehicleId) {
+      const label = (vp.vehicle?.label || '').trim();
+      // Filter out labels that are just fleet numbers or IDs
+      if (label && !/^\d+$/.test(label) && label.length > 1 && !label.includes('_') && label !== vehicleId) {
         destination = label;
       }
-
-      // Trip ID for deduplication
-      const tripId = vp.trip?.tripId || '';
+      // Fallback: use stop_id as hint (the bus is heading to that stop)
+      if (!destination && vp.stopId) {
+        destination = vp.stopId;
+      }
 
       vehicles.push({
         id: vehicleId,
-        type: 'bus',
+        type: 'regional',
         line,
         lat: vp.position.latitude,
         lng: vp.position.longitude,
