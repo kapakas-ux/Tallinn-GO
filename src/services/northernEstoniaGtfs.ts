@@ -202,10 +202,14 @@ export async function enrichNorthernDestinations(vehicles: Vehicle[]): Promise<v
   const uniqueLines = [...new Set(vehicles.map(v => v.line).filter(Boolean))];
   // Fire all headsign fetches in parallel
   await Promise.all(uniqueLines.map(l => fetchHeadsigns(l).catch(() => {})));
-  // Assign headsigns
+  // Assign headsigns — skip if result looks like an ID (digits, dashes, underscores)
+  const isIdLike = (s: string) => /^[\d\-_]+$/.test(s.trim());
   for (const v of vehicles) {
     if (!v.destination && v.line) {
-      v.destination = resolveHeadsign(v.line, v.lat, v.lng, v.bearing);
+      const h = resolveHeadsign(v.line, v.lat, v.lng, v.bearing);
+      if (h && !isIdLike(h)) {
+        v.destination = h;
+      }
     }
   }
 }
