@@ -1691,22 +1691,6 @@ async function fetchPeatusDepartures(stopId: string, siriId?: string, time?: str
         }
       }
     `;
-            headsign
-            serviceDay
-            trip {
-              gtfsId
-              route {
-                shortName
-                mode
-                agency {
-                  name
-                }
-              }
-            }
-          }
-        }
-      }
-    `;
 
     console.log(`fetchPeatusDepartures: Fetching for ${gtfsId} (allModes: ${allModes})`);
     
