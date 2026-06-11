@@ -86,26 +86,34 @@ export async function fetchNorthernVehicles(): Promise<Vehicle[]> {
       // Use vehicle descriptor ID, fall back to entity ID
       const vehicleId = vp.vehicle?.id || entity.id || 'unknown';
 
-      // Line from route_id (e.g. "1X_10_3" → extract the route number)
-      let line = vp.trip?.routeId || '';
-      // Often route_id looks like "1X_10_3" — try to extract a display-friendly number
-      // Keep the full string as-is; the UI truncates reasonably
+      // Line from route_id (e.g. "177_2842_2_3" → extract "177")
+      const rawRouteId = vp.trip?.routeId || '';
+      // Route IDs in this feed use format: ROUTENUM_TRIPID_DIRECTION_VARIANT
+      // Extract just the route number (first underscore-delimited segment)
+      const line = rawRouteId.includes('_') ? rawRouteId.split('_')[0] : rawRouteId;
+
+      // Destination: GTFS-RT VehiclePosition doesn't carry headsign directly.
+      // Use vehicle.label if it looks like a destination (not just a fleet number).
+      let destination = '';
+      const label = vp.vehicle?.label || '';
+      if (label && !/^\d+$/.test(label) && label.length > 1 && label !== vehicleId) {
+        destination = label;
+      }
 
       // Trip ID for deduplication
       const tripId = vp.trip?.tripId || '';
 
       vehicles.push({
         id: vehicleId,
-        type: 'bus', // Northern Estonia feed is all buses
+        type: 'bus',
         line,
         lat: vp.position.latitude,
         lng: vp.position.longitude,
         bearing: vp.position.bearing ?? 0,
         speed: vp.position.speed ?? 0,
-        destination: '', // GTFS-RT VehiclePosition doesn't carry headsign; resolved elsewhere
-        // Attach tripId for deduplication (not part of Vehicle interface, but carried via any cast)
-        ...({ tripId } as any),
-      });
+        destination,
+        source: 'northern-gtfs' as const,
+      } as Vehicle);
     }
 
     console.log(`northernVehicles: parsed ${vehicles.length} vehicles from GTFS-RT feed`);
