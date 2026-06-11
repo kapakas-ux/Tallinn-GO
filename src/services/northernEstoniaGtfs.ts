@@ -198,17 +198,20 @@ function resolveHeadsign(line: string, lat: number, lng: number, bearing: number
   }
   if (cached.length === 1) return cleanHeadsign(cached[0].headsign, line);
 
-  // Pick the pattern whose last stop is closest to the vehicle AND in the right direction.
-  // Closer last stop = more likely to be the correct regional route (filters out same-line-number
-  // routes in other counties, e.g., line 145 in Tallinn vs Jõgeva).
+  // Pick pattern whose last stop is in the same direction the bus is heading.
+  // Bearing is primary (must be within 90°), distance is tiebreaker.
   let best = cached[0];
-  let bestScore = Infinity;
-  for (const p of cached) {
-    const dist = getDistance(lat, lng, p.lastStopLat, p.lastStopLng);
-    const angle = angleDiff(bearing, bearingTo(lat, lng, p.lastStopLat, p.lastStopLng));
-    // Score: distance weighted heavily (closer is better), angle breaks ties
-    const score = dist * 1000 + angle;
-    if (score < bestScore) { bestScore = score; best = p; }
+  let bestAngle = angleDiff(bearing, bearingTo(lat, lng, best.lastStopLat, best.lastStopLng));
+  let bestDist = getDistance(lat, lng, best.lastStopLat, best.lastStopLng);
+  for (let i = 1; i < cached.length; i++) {
+    const a = angleDiff(bearing, bearingTo(lat, lng, cached[i].lastStopLat, cached[i].lastStopLng));
+    const d = getDistance(lat, lng, cached[i].lastStopLat, cached[i].lastStopLng);
+    // Prefer smaller angle (bus heading toward stop). If angles are close, prefer closer stop.
+    if (a < bestAngle - 30 || (Math.abs(a - bestAngle) < 30 && d < bestDist)) {
+      bestAngle = a;
+      bestDist = d;
+      best = cached[i];
+    }
   }
   return cleanHeadsign(best.headsign, line);
 }
