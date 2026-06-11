@@ -92,17 +92,8 @@ export async function fetchNorthernVehicles(): Promise<Vehicle[]> {
       // Extract just the route number (first underscore-delimited segment)
       const line = rawRouteId.includes('_') ? rawRouteId.split('_')[0] : rawRouteId;
 
-      // Destination: try vehicle label first, then trip headsign from route
+      // Destination: resolved by enrichNorthernDestinations via peatus.ee patterns
       let destination = '';
-      const label = (vp.vehicle?.label || '').trim();
-      // Filter out labels that are just fleet numbers or IDs
-      if (label && !/^\d+$/.test(label) && label.length > 1 && !label.includes('_') && label !== vehicleId) {
-        destination = label;
-      }
-      // Fallback: use stop_id as hint (the bus is heading to that stop)
-      if (!destination && vp.stopId) {
-        destination = vp.stopId;
-      }
 
       vehicles.push({
         id: vehicleId,
